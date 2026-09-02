@@ -1,4 +1,4 @@
-const CACHE = 'brainbite-v2.0-shell-v1';
+const CACHE = 'brainbite-v2.0-shell-v2';
 const FALLBACK = './index.html';
 const CORE = [
   './',
@@ -14,6 +14,7 @@ const CORE = [
   './assets/art/zip.svg',
   './assets/art/bloop.svg',
   './assets/art/scout.svg',
+  './assets/art/bite-village.svg',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './audio/AUDIO_MANIFEST.json',

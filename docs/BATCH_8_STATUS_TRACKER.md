@@ -63,6 +63,8 @@ Evidence:
 
 ## Gate 8.4 Real Device Matrix
 
+Note (2026-09-02): Screenshot-fidelity UI pause ended. Device matrix validates the **shipping 2D PWA**. True 3D match to approved references is tracked in `docs/BATCH_9_3D_PRESENTATION_PLAN.md` (WebGL presentation layer; not a Unity rewrite).
+
 Record each device with pass/fail and notes.
 
 | Device | First load | PWA install | Offline reload | Touch/keyboard | Persistence | Accessibility | Audio | Notes |
@@ -118,5 +120,6 @@ Evidence:
 Notes:
 
 - Gates 8.1–8.3 are complete with runtime evidence.
-- Gates 8.4–8.6 still require real devices, human review, and production domain/support setup.
-- **Next unambiguous action:** execute Gate 8.4 Real Device Matrix (start with Windows Chrome + Windows Edge on this machine, then phones/tablets).
+- Screenshot-fidelity UI pause closed: true 3D match deferred to Batch 9 (`docs/BATCH_9_3D_PRESENTATION_PLAN.md`).
+- Gates 8.5–8.6 still require human review and production domain/support setup.
+- **Next unambiguous action:** resume Gate 8.4 device matrix on the shipping 2D PWA (or start Batch 9.0 WebGL spike).

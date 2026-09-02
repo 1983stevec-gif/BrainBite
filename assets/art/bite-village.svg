@@ -1,6 +1,82 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600">
-<rect width="1200" height="600" fill="#24304a"/>
-<circle cx="160" cy="120" r="70" fill="#70ee7a" opacity=".18"/><circle cx="990" cy="160" r="120" fill="#70ee7a" opacity=".12"/>
-<path d="M0 480 Q260 360 520 470 T1200 440 V600 H0Z" fill="#70ee7a" opacity=".13"/>
-<text x="60" y="100" font-family="system-ui,sans-serif" font-size="54" font-weight="900" fill="white" opacity=".16">BITE VILLAGE</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" role="img" aria-label="Bite Village jungle hub">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#57b7ff"/>
+      <stop offset="45%" stop-color="#8ed0ff"/>
+      <stop offset="100%" stop-color="#c5ebff"/>
+    </linearGradient>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4ea832"/>
+      <stop offset="100%" stop-color="#256b22"/>
+    </linearGradient>
+    <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4ec4ff"/>
+      <stop offset="100%" stop-color="#1f6db8"/>
+    </linearGradient>
+    <linearGradient id="thatch" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d9a45a"/>
+      <stop offset="100%" stop-color="#8a4f1d"/>
+    </linearGradient>
+    <linearGradient id="portal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#9bfff8"/>
+      <stop offset="50%" stop-color="#3d8bff"/>
+      <stop offset="100%" stop-color="#7a3dff"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffe9a0"/>
+      <stop offset="100%" stop-color="#ffe9a0" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="700" fill="url(#sky)"/>
+  <circle cx="980" cy="90" r="54" fill="#ffe27a"/>
+  <circle cx="980" cy="90" r="120" fill="url(#sun)"/>
+
+  <path d="M0 250 C180 180 320 220 480 190 C680 150 820 210 1000 170 C1100 150 1160 170 1200 160 V360 H0Z" fill="#2f8f3d" opacity=".45"/>
+  <path d="M0 320 C220 250 420 300 620 260 C820 220 980 280 1200 250 V430 H0Z" fill="#247533"/>
+
+  <!-- waterfall + ruins -->
+  <rect x="760" y="180" width="120" height="150" rx="12" fill="#7d8678"/>
+  <rect x="780" y="200" width="80" height="130" fill="#9adfff" opacity=".7"/>
+  <path d="M780 330 L860 330 L900 390 L740 390Z" fill="#6f786c"/>
+
+  <path d="M0 420 C260 360 520 470 760 410 C960 360 1100 420 1200 400 V700 H0Z" fill="url(#ground)"/>
+  <ellipse cx="620" cy="560" rx="260" ry="70" fill="url(#water)" opacity=".55"/>
+  <ellipse cx="620" cy="560" rx="210" ry="48" fill="#7fe0ff" opacity=".25"/>
+
+  <!-- stone dais -->
+  <ellipse cx="600" cy="520" rx="120" ry="36" fill="#6d7368"/>
+  <ellipse cx="600" cy="508" rx="108" ry="28" fill="#8b9184"/>
+  <ellipse cx="600" cy="500" rx="96" ry="22" fill="#a7ada0"/>
+
+  <!-- Bite House -->
+  <rect x="220" y="360" width="190" height="130" rx="10" fill="#c9894a"/>
+  <path d="M200 372 L315 260 L430 372Z" fill="url(#thatch)"/>
+  <rect x="292" y="430" width="46" height="60" rx="6" fill="#5a3214"/>
+  <rect x="248" y="400" width="32" height="32" rx="4" fill="#8fd8ff"/>
+  <rect x="348" y="400" width="32" height="32" rx="4" fill="#8fd8ff"/>
+  <rect x="250" y="330" width="24" height="40" rx="6" fill="#6b3d1d"/>
+  <ellipse cx="262" cy="318" rx="26" ry="16" fill="#1f8a38"/>
+
+  <!-- trees -->
+  <rect x="90" y="300" width="26" height="170" rx="8" fill="#6b3d1d"/>
+  <ellipse cx="103" cy="280" rx="80" ry="64" fill="#1f8a38"/>
+  <ellipse cx="60" cy="320" rx="60" ry="48" fill="#157232"/>
+  <ellipse cx="150" cy="310" rx="64" ry="50" fill="#23a044"/>
+  <rect x="1000" y="290" width="28" height="180" rx="8" fill="#6b3d1d"/>
+  <ellipse cx="1014" cy="270" rx="88" ry="68" fill="#1f8a38"/>
+  <ellipse cx="960" cy="310" rx="66" ry="52" fill="#157232"/>
+  <ellipse cx="1065" cy="300" rx="70" ry="54" fill="#23a044"/>
+
+  <!-- Play Portal -->
+  <path d="M820 500 V320 C820 240 980 240 980 320 V500Z" fill="#5d6558" stroke="#cbb07a" stroke-width="14"/>
+  <path d="M848 500 V345 C848 285 952 285 952 345 V500Z" fill="url(#portal)"/>
+  <circle cx="900" cy="390" r="34" fill="#fff" opacity=".28"/>
+  <path d="M860 500 H940" stroke="#e7d39a" stroke-width="10" stroke-linecap="round"/>
+  <ellipse cx="900" cy="520" rx="70" ry="18" fill="#000" opacity=".16"/>
+
+  <!-- foliage accents -->
+  <circle cx="430" cy="470" r="10" fill="#ffd36e"/>
+  <circle cx="470" cy="500" r="8" fill="#ff8f6b"/>
+  <circle cx="740" cy="485" r="9" fill="#b6ff6a"/>
 </svg>

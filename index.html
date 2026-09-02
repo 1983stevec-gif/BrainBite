@@ -10,7 +10,7 @@
 </nav>
 <main id="main">
 <section id="home" class="screen show">
-<div class="dash-shell home-shell">
+<div class="dash-shell home-shell home-target">
 <div class="dash-top">
 <div class="dash-profile">
 <img id="homeAvatar" src="assets/art/nib.svg" alt="Active Bite avatar">
@@ -22,25 +22,25 @@
 </div>
 </div>
 <div class="dash-counters">
-<div class="dash-counter"><strong id="homeBrainBites">0</strong><span>BrainBites</span></div>
-<div class="dash-counter"><strong id="homeBrainifacts">0</strong><span>Brainifacts</span></div>
-<div class="dash-counter"><strong id="homeEnergy">5</strong><span>Full</span></div>
+<div class="dash-counter currency-star"><strong id="homeBrainBites">0</strong><span>BrainBites</span></div>
+<div class="dash-counter currency-gem"><strong id="homeBrainifacts">0</strong><span>Brainifacts</span></div>
+<div class="dash-counter currency-energy"><strong id="homeEnergy">5</strong><span>Full</span><button type="button" class="energy-plus" aria-label="Add energy" tabindex="-1">+</button></div>
 </div>
 <div class="dash-quick-actions">
-<button data-screen="diagnostics" aria-label="Home Achievements">Achievements</button>
-<button data-screen="settings" aria-label="Home Options">Settings</button>
-<button data-screen="parent" aria-label="Home Family">Parents</button>
+<button data-screen="diagnostics" aria-label="Home Achievements" class="orb-btn">Achievements</button>
+<button data-screen="settings" aria-label="Home Options" class="orb-btn">Settings</button>
+<button data-screen="parent" aria-label="Home Family" class="orb-btn">Parents</button>
 </div>
 </div>
 <div class="home-grid">
 <section class="home-rail" aria-label="Main menu">
 <h3>MAIN MENU</h3>
 <button id="continueBtn" class="rail-play" aria-label="Continue Adventure"><span class="rail-icon">▶</span><span><strong>PLAY</strong><small>Jungle Circuit</small></span></button>
-<button data-screen="practice" class="rail-brain" aria-label="Home Practice and Learn"><span class="rail-icon">B</span><span><strong>BRAIN BITE</strong><small>Practice &amp; Learn</small></span></button>
-<button data-screen="math" class="rail-quests" aria-label="Home Missions and Goals"><span class="rail-icon">Q</span><span><strong>QUESTS</strong><small>Missions &amp; Goals</small></span></button>
-<button data-screen="brainbase" class="rail-base" aria-label="Home BrainBase Hub"><span class="rail-icon">H</span><span><strong>BRAINBASE</strong><small>Your Home Hub</small></span></button>
-<button data-screen="bites" class="rail-shop" aria-label="Home Shop and Upgrades"><span class="rail-icon">S</span><span><strong>SHOP</strong><small>Cosmetics &amp; Upgrades</small></span></button>
-<button data-screen="math" class="rail-worlds" aria-label="Home Adventure Map"><span class="rail-icon">W</span><span><strong>WORLDS</strong><small>Adventure Map</small></span></button>
+<button data-screen="practice" class="rail-brain" aria-label="Home Practice and Learn"><span class="rail-icon">📘</span><span><strong>BRAIN BITE</strong><small>Practice &amp; Learn</small></span></button>
+<button data-screen="math" class="rail-quests" aria-label="Home Missions and Goals"><span class="rail-icon">🎒</span><span><strong>QUESTS</strong><small>Missions &amp; Goals</small></span></button>
+<button data-screen="brainbase" class="rail-base" aria-label="Home BrainBase Hub"><span class="rail-icon">🏠</span><span><strong>BRAINBASE</strong><small>Your Home Hub</small></span></button>
+<button data-screen="bites" class="rail-shop" aria-label="Home Shop and Upgrades"><span class="rail-icon">🛒</span><span><strong>SHOP</strong><small>Cosmetics &amp; Upgrades</small></span></button>
+<button data-screen="math" class="rail-worlds" aria-label="Home Adventure Map"><span class="rail-icon">🗺️</span><span><strong>WORLDS</strong><small>Adventure Map</small></span></button>
 <button data-screen="release" class="rail-news" aria-label="Home News and Events"><span class="rail-icon">N</span><span><strong>NEWS &amp; EVENTS</strong><small>Double BrainBites Weekend</small></span></button>
 <button id="memoryBtn" class="rail-memory"><span class="rail-icon">M</span><span><strong>MEMORY DROP</strong><small>Due review missions</small></span></button>
 <button id="installBtn" class="rail-install" hidden>Install BrainBite</button>
@@ -89,11 +89,11 @@
 <div class="news-badges"><span>2x</span><span>Stars</span></div>
 </div>
 <div class="home-dock">
-<button data-screen="profiles" aria-label="Profile">Profile</button>
-<button data-screen="profiles" aria-label="Friends">Friends</button>
-<button data-screen="bites" aria-label="Collection">Collection</button>
-<button data-screen="diagnostics" aria-label="Badges">Badges</button>
-<button data-screen="release" aria-label="Leaderboards">Leaderboards</button>
+<button data-screen="profiles" aria-label="Profile" class="dock-orb">Profile</button>
+<button data-screen="profiles" aria-label="Friends" class="dock-orb">Friends</button>
+<button data-screen="bites" aria-label="Collection" class="dock-orb dock-focus">Collection</button>
+<button data-screen="diagnostics" aria-label="Badges" class="dock-orb">Badges</button>
+<button data-screen="release" aria-label="Leaderboards" class="dock-orb">Leaderboards</button>
 </div>
 <div class="home-promo">
 <h3>NEW UPDATE!</h3>
@@ -186,7 +186,7 @@
 <section id="settings" class="screen"><h2>Settings</h2><div class="panel"><label><input id="reducedMotion" type="checkbox"> Reduced motion</label><label><input id="cameraMotionReduction" type="checkbox"> Camera motion reduction</label><label><input id="largeTargets" type="checkbox"> Large touch targets</label><label><input id="highContrast" type="checkbox"> High contrast</label><label><input id="captions" type="checkbox"> Captions</label><label><input id="dyslexicFont" type="checkbox"> Dyslexic-friendly font</label><label>Text size <select id="textScale"><option value="0.9">Small</option><option value="1" selected>Default</option><option value="1.1">Large</option><option value="1.25">Extra large</option></select></label><label>Quality tier <select id="qualityTier"><option value="ultra">Ultra</option><option value="high">High</option><option value="balanced" selected>Balanced</option><option value="performance">Performance</option><option value="mobile">Mobile</option></select></label><label><input id="soundOn" type="checkbox" checked> Sound effects</label><label><input id="musicOn" type="checkbox"> Background music</label><label>Enemy speed <select id="enemySpeed"><option value="slow">Slow</option><option value="normal">Normal</option><option value="fast">Fast</option></select></label></div></section>
 
 <section id="game" class="screen">
-<div class="battle-shell">
+<div class="battle-shell battle-target">
 <div class="battle-top">
 <div class="battle-profile">
 <img id="nib" src="assets/art/nib.svg" alt="Current Bite character">
@@ -194,10 +194,16 @@
 <small id="worldLabel"></small>
 <h2 id="battleProfileName">Alex</h2>
 <div class="battle-meta"><span><b id="battleProfileLevel">Level 12</b></span><span><b id="battleProfileStars">3,450</b> BrainBites</span></div>
+<div class="goal-card battle-inline-goal">
+<small>CURRENT GOAL</small>
+<h3 id="battleGoalTitle">Solve the mission</h3>
+<div class="goal-bar"><span id="battleGoalBar"></span></div>
+<p id="battleGoalText">Choose the correct tile to continue.</p>
+</div>
 </div>
 </div>
 <div class="battle-prompt">
-<button id="speakPrompt">Repeat Prompt</button>
+<button id="speakPrompt" aria-label="Repeat prompt">🔊</button>
 <h2 id="prompt"></h2>
 <p id="feedback" role="status" aria-live="polite">Ready.</p>
 <div class="battle-meta"><span><b id="lives">3</b> lives</span><span><b id="combo">0</b> combo</span><span><b id="targets">0/0</b> targets</span></div>
@@ -208,17 +214,9 @@
 <strong id="comboBanner">x0</strong>
 <div class="battle-stars" aria-hidden="true"><span>★</span><span>★</span><span>☆</span></div>
 </div>
-<button id="exitBtn" class="battle-pause" aria-label="Exit">Pause</button>
+<button id="exitBtn" class="battle-pause" aria-label="Exit">❚❚</button>
 </div>
 <div class="battle-main">
-<aside class="battle-left">
-<div class="goal-card">
-<small>CURRENT GOAL</small>
-<h3 id="battleGoalTitle">Solve the mission</h3>
-<div class="goal-bar"><span id="battleGoalBar"></span></div>
-<p id="battleGoalText">Choose the correct tile to continue.</p>
-</div>
-</aside>
 <div class="battle-scene">
 <div class="battle-frame">
 <div id="board" class="board" role="grid" aria-label="Game board"></div>
@@ -227,10 +225,9 @@
 </div>
 <aside class="battle-right">
 <div id="bossBox" hidden class="boss-card"><h3 id="bossName">Boss</h3><progress id="bossHealth" max="100" value="100" aria-label="Boss health"></progress><p id="bossPhase">Phase 1</p></div>
-<div class="reward-card">
+<div class="reward-card battle-toast">
 <small>RIGHT NOW</small>
 <h3 id="battleRewardTitle">Great job!</h3>
-<div class="goal-bar"><span id="battleRewardBar"></span></div>
 <p id="battleRewardText">+25 BrainBites</p>
 </div>
 <div class="minimap-card"><h3>Jungle Circuit</h3><div class="minimap"></div></div>
@@ -238,11 +235,16 @@
 </div>
 <div class="battle-bottom">
 <div class="battle-dock">
-<button data-screen="brainbase">BrainBase</button>
-<button data-screen="math">Quests</button>
-<button data-screen="bites">Inventory</button>
-<button data-screen="diagnostics">Stats</button>
-<button data-screen="settings">Settings</button>
+<button data-screen="brainbase" class="dock-orb">BrainBase</button>
+<button data-screen="math" class="dock-orb">Quests</button>
+<button data-screen="bites" class="dock-orb">Inventory</button>
+<button data-screen="diagnostics" class="dock-orb">Stats</button>
+<button data-screen="settings" class="dock-orb">Settings</button>
+</div>
+<div class="battle-health" aria-label="Health">
+<span class="health-heart" aria-hidden="true">❤</span>
+<div class="health-track"><span id="healthFill" class="health-fill"></span></div>
+<strong id="healthText">3 / 3</strong>
 </div>
 </div>
 </div>
