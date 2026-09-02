@@ -1,6 +1,6 @@
 # BrainBite Batch 8 Status Tracker
 
-Date: 2026-08-28
+Date: 2026-09-02
 
 ## Use
 
@@ -14,19 +14,19 @@ Fill this out while executing `docs/BATCH_8_EXTERNAL_LAUNCH_PLAN.md` in the real
 
 ## Gate 8.1 Real Git Checkout
 
-- [ ] Real clone created from `https://github.com/1983stevec-gif/BrainBite`
-- [ ] Branch confirmed
-- [ ] Remote confirmed
-- [ ] Clean status confirmed
-- [ ] `npm ci`
-- [ ] `npm run release:check`
+- [x] Real clone created from `https://github.com/1983stevec-gif/BrainBite`
+- [x] Branch confirmed
+- [x] Remote confirmed
+- [x] Clean status confirmed
+- [x] `npm ci`
+- [x] `npm run release:check`
 
 Evidence:
 
-- Commit:
-- Branch:
-- Remote:
-- Result:
+- Commit: `331cea5` (verified again on 2026-09-02 after `npm ci` + `npm run release:check`)
+- Branch: `main`
+- Remote: `origin` → `https://github.com/1983stevec-gif/BrainBite`
+- Result: PASS — 29 content packs, 40 question sets, 16 unit tests, 22 Playwright tests
 
 ## Gate 8.2 Production Firebase Setup
 
@@ -115,3 +115,7 @@ Evidence:
 - [ ] Batch 8 ready to mark complete
 
 Notes:
+
+- Gate 8.1 is complete with runtime evidence in the real checkout.
+- Gates 8.2–8.6 require production Firebase credentials, real devices, human review, and production domain/support setup.
+- **Next unambiguous action:** execute Gate 8.2 using `docs/FIREBASE_SETUP_v10.md` and `config/integration-config.example.json`.

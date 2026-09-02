@@ -1,6 +1,6 @@
 # BrainBite v2.0 Test Results
 
-Date: 2026-08-28
+Date: 2026-09-02
 
 ## VERIFIED
 
@@ -20,7 +20,7 @@ Date: 2026-08-28
 - Firebase ownership-rule validators: PASS.
 - Release evidence validator: PASS.
 
-Command executed: `npm run release:check`. Result: all validators passed and 20/20 Playwright tests passed in 39.8 seconds.
+Command executed: `npm ci` then `npm run release:check`. Result: all validators passed and 22/22 Playwright tests passed in 40.4 seconds on 2026-09-02 in `D:\Codex\Brainbite` on branch `main`.
 
 ## IMPLEMENTED BUT UNVERIFIED
 

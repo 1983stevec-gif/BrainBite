@@ -25,7 +25,7 @@ if (!failed) {
     contentPacksValidated: 29,
     questionSetsValidated: 40,
     unitTests: 16,
-    playwrightTests: 20
+    playwrightTests: 22
   };
 
   for (const [key, value] of Object.entries(expected)) {

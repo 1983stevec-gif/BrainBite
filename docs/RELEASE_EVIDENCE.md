@@ -1,28 +1,44 @@
 # BrainBite Release Evidence
 
-Date: 2026-08-28
+Date: 2026-09-02
 
 ## Automated Gate
 
 Latest verified command:
 
 ```powershell
+cd D:\Codex\Brainbite
+npm ci
 npm run release:check
 ```
 
-Result: PASS.
+Result: PASS on 2026-09-02 in the real GitHub checkout.
 
-Verified in this snapshot:
+Verified in this checkout:
 
 - 29 content packs and 40 question sets validated.
 - 16 unit tests passed.
-- 20 Playwright release tests passed.
+- 22 Playwright release tests passed.
 - Runtime, release, launch, final hardening, Firebase, and Firebase security validators passed.
 - Public policy pages for Privacy, Support, and Terms are present, linked from the footer, and labeled for launch review.
 
-## Current Architecture
+## Current Git State
 
-BrainBite is a static local-first PWA. The source snapshot under `D:\Codex\Brainbite` is not a git repository because it has no usable `.git` metadata. Cursor should work from a real clone of `https://github.com/1983stevec-gif/BrainBite`.
+- Checkout: `D:\Codex\Brainbite`
+- Branch: `main`
+- Remote: `origin` → `https://github.com/1983stevec-gif/BrainBite`
+- Push state: pushed and clean on 2026-09-02
+
+## Batch 8 Progress
+
+- Gate 8.1 Real Git Checkout: **PASS**
+- Gate 8.2 Production Firebase Setup: **PENDING** (requires dedicated Firebase project credentials)
+- Gate 8.3 Two-Session Sync: **PENDING**
+- Gate 8.4 Real Device Matrix: **PENDING**
+- Gate 8.5 External Review: **PENDING**
+- Gate 8.6 Production Readiness: **PENDING**
+
+Batch 8 is not complete until gates 8.2–8.6 are closed with runtime evidence.
 
 ## Verified Product Surface
 

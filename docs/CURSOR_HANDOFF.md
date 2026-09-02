@@ -4,9 +4,13 @@
 
 - Product: BrainBite
 - Type: local-first educational PWA
-- Current verified state: release gate green in repo
-- Source repo for Cursor: `https://github.com/1983stevec-gif/BrainBite`
-- Git note: this workspace snapshot is not a git repository, so there is no branch/remote to push from here
+- Current verified state: release gate green in real checkout
+- Source repo: `https://github.com/1983stevec-gif/BrainBite`
+- Real checkout: `D:\Codex\Brainbite`
+- Branch: `main`
+- Remote: `origin`
+- Push state: pushed and clean as of 2026-09-02
+- Batch 8: Gate 8.1 complete; gates 8.2–8.6 pending external validation
 
 ## What This App Is
 
@@ -156,10 +160,18 @@ Latest verified command:
 npm run release:check
 ```
 
-Result: PASS on 2026-08-28 in the local snapshot.
+Result: PASS on 2026-09-02.
 
 The evidence manifest is `release/v14-evidence.json`; the human-readable audit file is `docs/RELEASE_EVIDENCE.md`.
 
 ## Current Recommended Next Work
 
-If continuing, follow `docs/BATCH_8_EXTERNAL_LAUNCH_PLAN.md`. The next useful tasks are external launch validation and real-device QA, not more in-repo feature expansion.
+Batch 8 Gate 8.1 is complete. Continue with **Gate 8.2 Production Firebase Setup** in `docs/BATCH_8_EXTERNAL_LAUNCH_PLAN.md`:
+
+1. Create or confirm the dedicated BrainBite Firebase project.
+2. Enable Email/Password Auth and Firestore.
+3. Deploy `firebase/firestore.rules`.
+4. Enter Project ID and Web API key in BrainBite Integrations.
+5. Run the two-session sync checklist in `docs/V13_TWO_DEVICE_FIREBASE_TEST.md`.
+
+Do not mark Batch 8 complete until gates 8.2–8.6 have runtime evidence.
