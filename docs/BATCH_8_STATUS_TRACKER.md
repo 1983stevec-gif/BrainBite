@@ -10,7 +10,7 @@ Fill this out while executing `docs/BATCH_8_EXTERNAL_LAUNCH_PLAN.md` in the real
 
 - In-repo automated release gate is green in this snapshot.
 - Public Privacy, Support, and Terms pages are present and linked from the footer.
-- External launch gates below remain pending until the real GitHub checkout and production systems are available.
+- Gates 8.1–8.3 are complete. Gates 8.4–8.6 remain pending.
 
 ## Gate 8.1 Real Git Checkout
 
@@ -30,35 +30,36 @@ Evidence:
 
 ## Gate 8.2 Production Firebase Setup
 
-- [ ] Dedicated Firebase project confirmed
-- [ ] Email/Password Auth enabled
-- [ ] Firestore created
-- [ ] `firebase/firestore.rules` deployed
-- [ ] App configured with production Project ID and Web API key
+- [x] Dedicated Firebase project confirmed
+- [x] Email/Password Auth enabled
+- [x] Firestore created
+- [x] `firebase/firestore.rules` deployed
+- [x] App configured with production Project ID and Web API key
 
 Evidence:
 
-- Project ID:
-- Auth status:
-- Rules deploy result:
-- App config result:
+- Project ID: `brainbite-prod`
+- Auth status: Email/Password enabled; parent account created and signed in from BrainBite
+- Rules deploy result: rules deployed from `firebase/`; Firestore path created
+- App config result: Integrations saved; Push to Cloud created `families/{uid}/profiles`
+- Firestore path verified: `families/OvC2ntxWqkcHjZkDuHec4PSkUQk1/profiles`
 
 ## Gate 8.3 Two-Session Sync
 
-- [ ] Session A signed in
-- [ ] Session B signed in
-- [ ] Learner created or updated in session A
-- [ ] Push to cloud succeeded
-- [ ] Pull in session B succeeded
-- [ ] Duplicate sync did not duplicate progress
+- [x] Session A signed in
+- [x] Session B signed in
+- [x] Learner created or updated in session A
+- [x] Push to cloud succeeded
+- [x] Pull in session B succeeded
+- [x] Duplicate sync did not duplicate progress
 
 Evidence:
 
-- Account:
-- Learner:
-- Push result:
-- Pull result:
-- Merge result:
+- Account: production Email/Password parent on `brainbite-prod`
+- Learner: local profiles synced under family UID `OvC2ntxWqkcHjZkDuHec4PSkUQk1`
+- Push result: PASS — Firestore `families/.../profiles` populated
+- Pull result: PASS — operator confirmed Gate 8.3 done (Incognito second session)
+- Merge result: PASS — second-session pull restored family progress without reported duplication
 
 ## Gate 8.4 Real Device Matrix
 
@@ -116,6 +117,6 @@ Evidence:
 
 Notes:
 
-- Gate 8.1 is complete with runtime evidence in the real checkout.
-- Gates 8.2–8.6 require production Firebase credentials, real devices, human review, and production domain/support setup.
-- **Next unambiguous action:** execute Gate 8.2 using `docs/FIREBASE_SETUP_v10.md` and `config/integration-config.example.json`.
+- Gates 8.1–8.3 are complete with runtime evidence.
+- Gates 8.4–8.6 still require real devices, human review, and production domain/support setup.
+- **Next unambiguous action:** execute Gate 8.4 Real Device Matrix (start with Windows Chrome + Windows Edge on this machine, then phones/tablets).

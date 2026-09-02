@@ -32,13 +32,13 @@ Verified in this checkout:
 ## Batch 8 Progress
 
 - Gate 8.1 Real Git Checkout: **PASS**
-- Gate 8.2 Production Firebase Setup: **PENDING** (requires dedicated Firebase project credentials)
-- Gate 8.3 Two-Session Sync: **PENDING**
+- Gate 8.2 Production Firebase Setup: **PASS** (`brainbite-prod`, Email/Password, rules, Integrations, Push created `families/{uid}/profiles`)
+- Gate 8.3 Two-Session Sync: **PASS** (operator-confirmed second-session pull)
 - Gate 8.4 Real Device Matrix: **PENDING**
 - Gate 8.5 External Review: **PENDING**
 - Gate 8.6 Production Readiness: **PENDING**
 
-Batch 8 is not complete until gates 8.2–8.6 are closed with runtime evidence.
+Batch 8 is not complete until gates 8.4–8.6 are closed with runtime evidence.
 
 ## Verified Product Surface
 

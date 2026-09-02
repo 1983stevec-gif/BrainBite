@@ -10,7 +10,7 @@
 - Branch: `main`
 - Remote: `origin`
 - Push state: pushed and clean as of 2026-09-02
-- Batch 8: Gate 8.1 complete; gates 8.2–8.6 pending external validation
+- Batch 8: Gates 8.1–8.3 complete; gates 8.4–8.6 pending device/review/production readiness
 
 ## What This App Is
 
@@ -166,12 +166,6 @@ The evidence manifest is `release/v14-evidence.json`; the human-readable audit f
 
 ## Current Recommended Next Work
 
-Batch 8 Gate 8.1 is complete. Continue with **Gate 8.2 Production Firebase Setup** in `docs/BATCH_8_EXTERNAL_LAUNCH_PLAN.md`:
+Gates 8.1–8.3 are complete (`brainbite-prod` Firebase project, Email/Password parent sync, two-session push/pull). Continue with **Gate 8.4 Real Device Matrix** in `docs/BATCH_8_EXTERNAL_LAUNCH_PLAN.md`.
 
-1. Create or confirm the dedicated BrainBite Firebase project.
-2. Enable Email/Password Auth and Firestore.
-3. Deploy `firebase/firestore.rules`.
-4. Enter Project ID and Web API key in BrainBite Integrations.
-5. Run the two-session sync checklist in `docs/V13_TWO_DEVICE_FIREBASE_TEST.md`.
-
-Do not mark Batch 8 complete until gates 8.2–8.6 have runtime evidence.
+Do not mark Batch 8 complete until gates 8.4–8.6 have runtime evidence.

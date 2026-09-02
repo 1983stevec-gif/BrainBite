@@ -2,22 +2,23 @@
   "product": "BrainBite",
   "version": "2.0.0-functional-core.14",
   "date": "2026-09-02",
-  "stage": "batch-8-gate-8-1-complete",
+  "stage": "batch-8-gates-8-1-through-8-3-complete",
   "localSourceState": "real-git-checkout-on-main",
   "sourceRepo": "https://github.com/1983stevec-gif/BrainBite",
   "git": {
     "branch": "main",
-    "commit": "331cea5",
+    "commit": "1f47d66",
     "remote": "origin",
     "pushState": "pushed"
   },
   "batch8": {
     "gate81RealGitCheckout": "PASS",
-    "gate82ProductionFirebase": "PENDING",
-    "gate83TwoSessionSync": "PENDING",
+    "gate82ProductionFirebase": "PASS",
+    "gate83TwoSessionSync": "PASS",
     "gate84RealDeviceMatrix": "PENDING",
     "gate85ExternalReview": "PENDING",
-    "gate86ProductionReadiness": "PENDING"
+    "gate86ProductionReadiness": "PENDING",
+    "firebaseProjectId": "brainbite-prod"
   },
   "automatedGate": {
     "command": "npm run release:check",
