@@ -1,0 +1,92 @@
+{
+  "id": "math-question-bank-v1.7",
+  "status": "prototype-curated",
+  "sets": [
+    {
+      "skill": "addition_20",
+      "prompt": "Bite expressions equal to 20",
+      "correct": [
+        "9+11",
+        "8+12",
+        "7+13",
+        "6+14"
+      ],
+      "wrong": [
+        "9+10",
+        "8+11",
+        "7+12",
+        "6+13"
+      ]
+    },
+    {
+      "skill": "multiplication",
+      "prompt": "Bite products equal to 24",
+      "correct": [
+        "6×4",
+        "3×8",
+        "2×12"
+      ],
+      "wrong": [
+        "5×4",
+        "3×7",
+        "4×7"
+      ]
+    },
+    {
+      "skill": "division",
+      "prompt": "Bite expressions equal to 6",
+      "correct": [
+        "24÷4",
+        "18÷3",
+        "42÷7"
+      ],
+      "wrong": [
+        "20÷4",
+        "16÷2",
+        "35÷7"
+      ]
+    },
+    {
+      "skill": "fractions_half",
+      "prompt": "Bite values greater than one half",
+      "correct": [
+        "3/4",
+        "2/3",
+        "0.75"
+      ],
+      "wrong": [
+        "1/4",
+        "1/3",
+        "0.4"
+      ]
+    },
+    {
+      "skill": "decimals",
+      "prompt": "Bite values equal to 0.5",
+      "correct": [
+        "0.50",
+        "1/2",
+        "50%"
+      ],
+      "wrong": [
+        "0.05",
+        "5%",
+        "1/5"
+      ]
+    },
+    {
+      "skill": "ratios",
+      "prompt": "Bite ratios equivalent to 1:2",
+      "correct": [
+        "2:4",
+        "3:6",
+        "5:10"
+      ],
+      "wrong": [
+        "2:3",
+        "4:6",
+        "5:8"
+      ]
+    }
+  ]
+}

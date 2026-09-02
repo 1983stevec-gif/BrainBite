@@ -1,0 +1,17 @@
+{
+  "required_files": {
+    "index.html": true,
+    "app.js": true,
+    "styles.css": true,
+    "manifest.webmanifest": true,
+    "service-worker.js": true,
+    "package.json": true,
+    "README.md": true,
+    "docs/FINAL_LAUNCH_CHECKLIST.md": true,
+    "release/VERSION.json": true,
+    ".github/workflows/ci.yml": true
+  },
+  "json_files_checked": 37,
+  "json_errors": [],
+  "package_audit_pass": true
+}

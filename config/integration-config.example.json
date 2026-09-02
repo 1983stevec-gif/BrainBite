@@ -1,0 +1,11 @@
+{
+  "cloud": {
+    "provider": "firebase",
+    "url": "your-firebase-project-id",
+    "key": "YOUR_FIREBASE_WEB_API_KEY"
+  },
+  "ocr": {
+    "provider": "custom",
+    "endpoint": "https://YOUR_DOMAIN.example/ocr"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "product": "BrainBite",
+  "version": "2.0.0",
+  "channel": "final-release-readiness",
+  "featureFreeze": true,
+  "dataSchema": 3,
+  "status": "ready-for-final-human-validation",
+  "releaseRule": "Ship only after all required manual gates are closed"
+}

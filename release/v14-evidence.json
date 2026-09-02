@@ -1,0 +1,42 @@
+{
+  "product": "BrainBite",
+  "version": "2.0.0-functional-core.14",
+  "date": "2026-08-28",
+  "stage": "post-batch-release-evidence",
+  "localSourceState": "snapshot-without-git-metadata",
+  "sourceRepo": "https://github.com/1983stevec-gif/BrainBite",
+  "automatedGate": {
+    "command": "npm run release:check",
+    "result": "PASS",
+    "contentPacksValidated": 29,
+    "questionSetsValidated": 40,
+    "unitTests": 16,
+    "playwrightTests": 20
+  },
+  "verifiedSurface": [
+    "profile isolation",
+    "BrainBase progression",
+    "30 missions across 3 worlds",
+    "3 boss encounters",
+    "adaptive LearningCore",
+    "remediation and spaced review",
+    "reward idempotency",
+    "save, backup, and recovery snapshots",
+    "offline queue replay and duplicate rejection",
+    "PWA service worker offline reload",
+    "Firebase family isolation through mocked REST tests",
+    "accessibility preferences and automated WCAG scan",
+    "low-end device class and performance mode hint"
+  ],
+  "manualGateRequired": [
+    "real Firebase project sync and account deletion",
+    "real device touch/audio/install/offline reconnect QA",
+    "screen-reader QA",
+    "educator curriculum review",
+    "fluent Spanish review",
+    "legal/privacy review",
+    "production domain and support contact verification"
+  ],
+  "nextPhase": "Batch 8 - external launch validation and real-device certification",
+  "nextPhaseDoc": "docs/BATCH_8_EXTERNAL_LAUNCH_PLAN.md"
+}

@@ -1,0 +1,48 @@
+{
+  "locale": "fr",
+  "supportLocale": "en-US",
+  "units": {
+    "greetings": [
+      [
+        "bonjour",
+        "hello"
+      ],
+      [
+        "merci",
+        "thank you"
+      ],
+      [
+        "au revoir",
+        "goodbye"
+      ]
+    ],
+    "colors": [
+      [
+        "rouge",
+        "red"
+      ],
+      [
+        "bleu",
+        "blue"
+      ],
+      [
+        "vert",
+        "green"
+      ]
+    ],
+    "animals": [
+      [
+        "chat",
+        "cat"
+      ],
+      [
+        "chien",
+        "dog"
+      ],
+      [
+        "poisson",
+        "fish"
+      ]
+    ]
+  }
+}

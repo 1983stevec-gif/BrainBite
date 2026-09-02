@@ -1,0 +1,76 @@
+{
+  "id": "language-question-bank-v1.9",
+  "status": "starter-fluent-review-needed",
+  "sets": [
+    {
+      "locale": "es",
+      "prompt": "Bite Spanish family words",
+      "correct": [
+        "madre",
+        "padre",
+        "hermana"
+      ],
+      "wrong": [
+        "rojo",
+        "pan",
+        "parque"
+      ]
+    },
+    {
+      "locale": "fr",
+      "prompt": "Bite French colors",
+      "correct": [
+        "rouge",
+        "bleu",
+        "vert"
+      ],
+      "wrong": [
+        "chat",
+        "pain",
+        "maison"
+      ]
+    },
+    {
+      "locale": "de",
+      "prompt": "Bite German greetings",
+      "correct": [
+        "hallo",
+        "danke",
+        "tschüss"
+      ],
+      "wrong": [
+        "rot",
+        "Hund",
+        "Haus"
+      ]
+    },
+    {
+      "locale": "it",
+      "prompt": "Bite Italian food words",
+      "correct": [
+        "pane",
+        "latte",
+        "formaggio"
+      ],
+      "wrong": [
+        "gatto",
+        "rosso",
+        "casa"
+      ]
+    },
+    {
+      "locale": "ja",
+      "prompt": "Bite Japanese colors",
+      "correct": [
+        "あか",
+        "あお",
+        "みどり"
+      ],
+      "wrong": [
+        "ねこ",
+        "いぬ",
+        "みず"
+      ]
+    }
+  ]
+}

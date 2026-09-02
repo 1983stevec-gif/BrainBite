@@ -1,0 +1,21 @@
+{
+  "id": "words-35-v1",
+  "gradeBand": "3-5",
+  "reviewStatus": "prototype-curated",
+  "skills": {
+    "vocabulary": [
+      "synonyms",
+      "antonyms"
+    ],
+    "context": [
+      "context clues"
+    ],
+    "word_parts": [
+      "prefixes",
+      "suffixes"
+    ],
+    "homophones": [
+      "common pairs"
+    ]
+  }
+}

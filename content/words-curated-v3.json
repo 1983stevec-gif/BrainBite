@@ -1,0 +1,50 @@
+{
+  "id": "words-curated-v3",
+  "locale": "en-US",
+  "reviewStatus": "curated-prototype",
+  "skills": {
+    "context_clues": [
+      {
+        "prompt": "Bite words that could replace enormous",
+        "correct": [
+          "huge",
+          "giant",
+          "massive"
+        ],
+        "wrong": [
+          "tiny",
+          "quiet",
+          "slow",
+          "early"
+        ]
+      },
+      {
+        "prompt": "Bite words that mean very tired",
+        "correct": [
+          "exhausted",
+          "weary"
+        ],
+        "wrong": [
+          "excited",
+          "bright",
+          "noisy",
+          "rapid"
+        ]
+      }
+    ],
+    "homophones": [
+      {
+        "prompt": "Bite the word that sounds like pair",
+        "correct": [
+          "pear"
+        ],
+        "wrong": [
+          "peer",
+          "par",
+          "pour",
+          "pure"
+        ]
+      }
+    ]
+  }
+}

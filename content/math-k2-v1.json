@@ -1,0 +1,26 @@
+{
+  "id": "math-k2-v1",
+  "gradeBand": "K-2",
+  "reviewStatus": "prototype-curated",
+  "skills": {
+    "counting": [
+      "count to 20",
+      "compare quantities",
+      "number order"
+    ],
+    "addition": [
+      "sums to 10",
+      "sums to 20",
+      "missing addends"
+    ],
+    "subtraction": [
+      "within 10",
+      "within 20"
+    ],
+    "geometry": [
+      "2D shapes",
+      "3D shapes",
+      "position words"
+    ]
+  }
+}

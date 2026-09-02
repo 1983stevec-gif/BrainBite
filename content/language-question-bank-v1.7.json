@@ -1,0 +1,76 @@
+{
+  "id": "language-question-bank-v1.7",
+  "status": "starter-fluent-review-needed",
+  "sets": [
+    {
+      "locale": "es",
+      "prompt": "Bite Spanish colors",
+      "correct": [
+        "rojo",
+        "azul",
+        "verde"
+      ],
+      "wrong": [
+        "perro",
+        "pan",
+        "casa"
+      ]
+    },
+    {
+      "locale": "fr",
+      "prompt": "Bite French greetings",
+      "correct": [
+        "bonjour",
+        "merci",
+        "au revoir"
+      ],
+      "wrong": [
+        "chat",
+        "rouge",
+        "pain"
+      ]
+    },
+    {
+      "locale": "de",
+      "prompt": "Bite German colors",
+      "correct": [
+        "rot",
+        "blau",
+        "grün"
+      ],
+      "wrong": [
+        "Hund",
+        "Brot",
+        "Haus"
+      ]
+    },
+    {
+      "locale": "it",
+      "prompt": "Bite Italian animals",
+      "correct": [
+        "gatto",
+        "cane",
+        "pesce"
+      ],
+      "wrong": [
+        "rosso",
+        "pane",
+        "casa"
+      ]
+    },
+    {
+      "locale": "ja",
+      "prompt": "Bite Japanese animal words",
+      "correct": [
+        "ねこ",
+        "いぬ",
+        "さかな"
+      ],
+      "wrong": [
+        "あか",
+        "みず",
+        "いえ"
+      ]
+    }
+  ]
+}

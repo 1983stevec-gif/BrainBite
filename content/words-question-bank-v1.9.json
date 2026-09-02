@@ -1,0 +1,44 @@
+{
+  "id": "words-question-bank-v1.9",
+  "status": "prototype-curated",
+  "sets": [
+    {
+      "skill": "roots",
+      "prompt": "Bite words related to GEO (earth)",
+      "correct": [
+        "geology",
+        "geography"
+      ],
+      "wrong": [
+        "biology",
+        "phonics",
+        "aquatic"
+      ]
+    },
+    {
+      "skill": "figurative_language",
+      "prompt": "Bite similes",
+      "correct": [
+        "fast as lightning",
+        "quiet as a mouse"
+      ],
+      "wrong": [
+        "the wind screamed",
+        "time is a thief"
+      ]
+    },
+    {
+      "skill": "context",
+      "prompt": "Bite words that could mean cautious",
+      "correct": [
+        "careful",
+        "wary"
+      ],
+      "wrong": [
+        "reckless",
+        "noisy",
+        "rapid"
+      ]
+    }
+  ]
+}

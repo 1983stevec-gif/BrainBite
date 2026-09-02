@@ -1,0 +1,20 @@
+{
+  "id": "words-6-v1",
+  "gradeBand": "6",
+  "reviewStatus": "prototype-curated",
+  "skills": {
+    "roots": [
+      "Greek/Latin roots"
+    ],
+    "figurative_language": [
+      "simile",
+      "metaphor"
+    ],
+    "academic_vocab": [
+      "cross-subject terms"
+    ],
+    "context": [
+      "multiple-meaning words"
+    ]
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "math-6-v1",
+  "gradeBand": "6",
+  "reviewStatus": "prototype-curated",
+  "skills": {
+    "ratios": [
+      "equivalent ratios",
+      "unit rates"
+    ],
+    "integers": [
+      "compare",
+      "absolute value",
+      "operations intro"
+    ],
+    "expressions": [
+      "evaluate",
+      "combine simple terms"
+    ],
+    "fractions": [
+      "operations",
+      "mixed numbers"
+    ]
+  }
+}

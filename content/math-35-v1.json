@@ -1,0 +1,26 @@
+{
+  "id": "math-35-v1",
+  "gradeBand": "3-5",
+  "reviewStatus": "prototype-curated",
+  "skills": {
+    "multiplication": [
+      "facts 0-12",
+      "arrays",
+      "groups"
+    ],
+    "division": [
+      "fact families",
+      "equal groups"
+    ],
+    "fractions": [
+      "equivalence",
+      "comparison",
+      "visual models"
+    ],
+    "decimals": [
+      "tenths",
+      "hundredths",
+      "fraction links"
+    ]
+  }
+}

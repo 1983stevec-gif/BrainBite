@@ -1,0 +1,39 @@
+{
+  "status": "starter content; fluent review required",
+  "units": {
+    "es": [
+      "greetings",
+      "colors",
+      "animals",
+      "food",
+      "family",
+      "actions",
+      "places"
+    ],
+    "fr": [
+      "greetings",
+      "colors",
+      "animals",
+      "food",
+      "family"
+    ],
+    "de": [
+      "greetings",
+      "colors",
+      "animals",
+      "food"
+    ],
+    "it": [
+      "greetings",
+      "colors",
+      "animals",
+      "food"
+    ],
+    "ja": [
+      "greetings",
+      "colors",
+      "animals",
+      "food"
+    ]
+  }
+}

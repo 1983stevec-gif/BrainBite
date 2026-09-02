@@ -1,0 +1,46 @@
+{
+  "version": "0.8.0",
+  "worlds": [
+    {
+      "id": "math",
+      "name": "Number Nebula",
+      "missions": [
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "id": "words",
+      "name": "Wordwood",
+      "missions": [
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "spanish",
+      "name": "Spanish Portal",
+      "missions": [
+        9,
+        10,
+        11,
+        12
+      ]
+    }
+  ],
+  "powers": [
+    "Shield",
+    "Freeze",
+    "Scanner",
+    "Dash"
+  ],
+  "bosses": [
+    "Astro Muncher",
+    "Word Warp",
+    "El Eco"
+  ]
+}

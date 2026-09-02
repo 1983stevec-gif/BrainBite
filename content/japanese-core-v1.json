@@ -1,0 +1,48 @@
+{
+  "locale": "ja",
+  "supportLocale": "en-US",
+  "units": {
+    "greetings": [
+      [
+        "こんにちは",
+        "hello"
+      ],
+      [
+        "ありがとう",
+        "thank you"
+      ],
+      [
+        "さようなら",
+        "goodbye"
+      ]
+    ],
+    "colors": [
+      [
+        "あか",
+        "red"
+      ],
+      [
+        "あお",
+        "blue"
+      ],
+      [
+        "みどり",
+        "green"
+      ]
+    ],
+    "animals": [
+      [
+        "ねこ",
+        "cat"
+      ],
+      [
+        "いぬ",
+        "dog"
+      ],
+      [
+        "さかな",
+        "fish"
+      ]
+    ]
+  }
+}

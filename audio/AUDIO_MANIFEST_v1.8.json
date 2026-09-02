@@ -1,0 +1,49 @@
+{
+  "version": "1.8",
+  "implementation": "WebAudio placeholder synth with production file slots",
+  "cues": {
+    "bite_correct": {
+      "file": "bite-correct.ogg",
+      "fallbackHz": 640
+    },
+    "bite_wrong": {
+      "file": "bite-wrong.ogg",
+      "fallbackHz": 170
+    },
+    "combo_up": {
+      "file": "combo-up.ogg",
+      "fallbackHz": 760
+    },
+    "super_bite": {
+      "file": "super-bite.ogg",
+      "fallbackHz": 920
+    },
+    "enemy_hit": {
+      "file": "enemy-hit.ogg",
+      "fallbackHz": 240
+    },
+    "boss_hit": {
+      "file": "boss-hit.ogg",
+      "fallbackHz": 320
+    },
+    "mission_clear": {
+      "file": "mission-clear.ogg",
+      "fallbackHz": 880
+    },
+    "level_up": {
+      "file": "level-up.ogg",
+      "fallbackHz": 1040
+    },
+    "portal_open": {
+      "file": "portal-open.ogg",
+      "fallbackHz": 520
+    }
+  },
+  "music": [
+    "bite-village.ogg",
+    "number-nebula.ogg",
+    "wordwood.ogg",
+    "language-portals.ogg",
+    "boss.ogg"
+  ]
+}

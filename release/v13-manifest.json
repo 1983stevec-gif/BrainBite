@@ -1,0 +1,14 @@
+{
+  "product": "BrainBite",
+  "version": "2.0.0-functional-core.13",
+  "stage": "release-execution",
+  "core": "complete",
+  "firebaseClient": "complete",
+  "twoDeviceQA": "manual-open",
+  "accessibilityQA": "manual-open",
+  "humanReviews": [
+    "educator",
+    "Spanish",
+    "legal"
+  ]
+}

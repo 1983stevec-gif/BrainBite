@@ -1,0 +1,20 @@
+{
+  "id": "words-k2-v1",
+  "gradeBand": "K-2",
+  "reviewStatus": "prototype-curated",
+  "skills": {
+    "phonics": [
+      "short vowels",
+      "long vowels",
+      "blends"
+    ],
+    "sight_words": [
+      "common words"
+    ],
+    "categories": [
+      "animals",
+      "foods",
+      "places"
+    ]
+  }
+}

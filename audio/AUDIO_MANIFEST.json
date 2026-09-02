@@ -1,0 +1,21 @@
+{
+  "status": "hooks-ready",
+  "cues": [
+    "bite_correct",
+    "bite_wrong",
+    "combo_up",
+    "super_bite",
+    "enemy_hit",
+    "boss_hit",
+    "mission_clear",
+    "level_up",
+    "portal_open"
+  ],
+  "music": [
+    "bite_village",
+    "number_nebula",
+    "wordwood",
+    "language_portal",
+    "boss"
+  ]
+}

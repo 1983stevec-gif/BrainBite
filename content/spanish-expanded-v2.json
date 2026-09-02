@@ -1,0 +1,49 @@
+{
+  "id": "spanish-expanded-v2",
+  "targetLocale": "es",
+  "supportLocale": "en-US",
+  "units": [
+    {
+      "id": "family",
+      "items": [
+        [
+          "madre",
+          "mother"
+        ],
+        [
+          "padre",
+          "father"
+        ],
+        [
+          "hermano",
+          "brother"
+        ],
+        [
+          "hermana",
+          "sister"
+        ]
+      ]
+    },
+    {
+      "id": "actions",
+      "items": [
+        [
+          "quiero",
+          "I want"
+        ],
+        [
+          "tengo",
+          "I have"
+        ],
+        [
+          "veo",
+          "I see"
+        ],
+        [
+          "me gusta",
+          "I like"
+        ]
+      ]
+    }
+  ]
+}

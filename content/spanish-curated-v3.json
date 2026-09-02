@@ -1,0 +1,71 @@
+{
+  "id": "spanish-curated-v3",
+  "targetLocale": "es",
+  "supportLocale": "en-US",
+  "reviewStatus": "curated-prototype",
+  "units": [
+    {
+      "id": "family",
+      "items": [
+        [
+          "madre",
+          "mother"
+        ],
+        [
+          "padre",
+          "father"
+        ],
+        [
+          "hermano",
+          "brother"
+        ],
+        [
+          "hermana",
+          "sister"
+        ]
+      ]
+    },
+    {
+      "id": "actions",
+      "items": [
+        [
+          "quiero",
+          "I want"
+        ],
+        [
+          "tengo",
+          "I have"
+        ],
+        [
+          "veo",
+          "I see"
+        ],
+        [
+          "me gusta",
+          "I like"
+        ]
+      ]
+    },
+    {
+      "id": "places",
+      "items": [
+        [
+          "casa",
+          "house"
+        ],
+        [
+          "escuela",
+          "school"
+        ],
+        [
+          "parque",
+          "park"
+        ],
+        [
+          "tienda",
+          "store"
+        ]
+      ]
+    }
+  ]
+}

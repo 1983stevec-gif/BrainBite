@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600">
+<rect width="1200" height="600" fill="#183b2c"/>
+<circle cx="160" cy="120" r="70" fill="#b6f36a" opacity=".18"/><circle cx="990" cy="160" r="120" fill="#b6f36a" opacity=".12"/>
+<path d="M0 480 Q260 360 520 470 T1200 440 V600 H0Z" fill="#b6f36a" opacity=".13"/>
+<text x="60" y="100" font-family="system-ui,sans-serif" font-size="54" font-weight="900" fill="white" opacity=".16">WORDWOOD</text>
+</svg>

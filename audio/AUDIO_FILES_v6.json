@@ -1,0 +1,15 @@
+{
+  "format": "wav",
+  "generated": true,
+  "files": [
+    "bite-correct.wav",
+    "bite-wrong.wav",
+    "enemy-hit.wav",
+    "boss-hit.wav",
+    "mission-clear.wav",
+    "level-up.wav",
+    "super-bite.wav",
+    "portal-open.wav"
+  ],
+  "note": "Original generated beta sound assets."
+}

@@ -1,0 +1,41 @@
+{
+  "characters": {
+    "Nib": [
+      "idle",
+      "walk",
+      "bite",
+      "hit",
+      "celebrate",
+      "super"
+    ],
+    "Zip": [
+      "idle",
+      "walk",
+      "bite",
+      "hit",
+      "celebrate",
+      "dash"
+    ],
+    "Bloop": [
+      "idle",
+      "walk",
+      "bite",
+      "hit",
+      "celebrate",
+      "shield"
+    ],
+    "Scout": [
+      "idle",
+      "walk",
+      "bite",
+      "hit",
+      "celebrate",
+      "scan"
+    ]
+  },
+  "formats": [
+    "webp",
+    "png-sequence"
+  ],
+  "targetFps": 12
+}

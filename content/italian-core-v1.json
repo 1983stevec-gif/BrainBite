@@ -1,0 +1,48 @@
+{
+  "locale": "it",
+  "supportLocale": "en-US",
+  "units": {
+    "greetings": [
+      [
+        "ciao",
+        "hello"
+      ],
+      [
+        "grazie",
+        "thank you"
+      ],
+      [
+        "arrivederci",
+        "goodbye"
+      ]
+    ],
+    "colors": [
+      [
+        "rosso",
+        "red"
+      ],
+      [
+        "blu",
+        "blue"
+      ],
+      [
+        "verde",
+        "green"
+      ]
+    ],
+    "animals": [
+      [
+        "gatto",
+        "cat"
+      ],
+      [
+        "cane",
+        "dog"
+      ],
+      [
+        "pesce",
+        "fish"
+      ]
+    ]
+  }
+}

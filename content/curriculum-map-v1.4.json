@@ -1,0 +1,49 @@
+{
+  "version": "1.4-rc",
+  "status": "prototype curriculum map; educator validation required before educational claims",
+  "bands": {
+    "K-2": {
+      "math": [
+        "counting",
+        "addition within 20",
+        "subtraction within 20",
+        "shapes"
+      ],
+      "words": [
+        "phonics",
+        "sight words",
+        "categories",
+        "basic vocabulary"
+      ]
+    },
+    "3-5": {
+      "math": [
+        "multiplication",
+        "division",
+        "fractions",
+        "decimals"
+      ],
+      "words": [
+        "synonyms",
+        "antonyms",
+        "context clues",
+        "homophones",
+        "roots"
+      ]
+    },
+    "6": {
+      "math": [
+        "ratios",
+        "integers",
+        "expressions",
+        "fraction operations"
+      ],
+      "words": [
+        "roots",
+        "figurative language",
+        "academic vocabulary",
+        "context"
+      ]
+    }
+  }
+}

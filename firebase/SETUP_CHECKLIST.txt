@@ -1,0 +1,11 @@
+BrainBite Firebase Setup
+1. Create dedicated Firebase project.
+2. Enable Authentication > Email/Password.
+3. Create Firestore Database.
+4. Deploy firestore.rules.
+5. Copy Project ID and Web API key from Firebase web-app settings.
+6. Open BrainBite > Integrations and save them.
+7. Open Account & Sync and create/sign in to parent account.
+8. Push to Cloud.
+9. Reload another browser/device and Pull from Cloud.
+10. Confirm only the signed-in family's profiles appear.

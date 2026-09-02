@@ -1,0 +1,52 @@
+{
+  "id": "math-core-v1",
+  "locale": "en-US",
+  "skills": [
+    {
+      "id": "even_numbers",
+      "gradeBand": "K-2",
+      "representations": [
+        "number"
+      ],
+      "masteryWeight": 1
+    },
+    {
+      "id": "multiples_3",
+      "gradeBand": "2-4",
+      "representations": [
+        "number",
+        "groups"
+      ],
+      "masteryWeight": 1.2
+    },
+    {
+      "id": "multiplication",
+      "gradeBand": "2-5",
+      "representations": [
+        "equation",
+        "groups",
+        "array"
+      ],
+      "masteryWeight": 1.4
+    },
+    {
+      "id": "addition_20",
+      "gradeBand": "1-3",
+      "representations": [
+        "equation",
+        "missing_addend"
+      ],
+      "masteryWeight": 1.0
+    },
+    {
+      "id": "fractions_half",
+      "gradeBand": "2-4",
+      "representations": [
+        "symbol",
+        "image",
+        "decimal"
+      ],
+      "masteryWeight": 1.3
+    }
+  ]
+}

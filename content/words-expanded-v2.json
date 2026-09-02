@@ -1,0 +1,35 @@
+{
+  "id": "words-expanded-v2",
+  "locale": "en-US",
+  "questionSets": {
+    "context_clues": [
+      {
+        "prompt": "Bite words meaning very tired",
+        "correct": [
+          "exhausted",
+          "weary"
+        ],
+        "wrong": [
+          "excited",
+          "tiny",
+          "loud",
+          "early"
+        ]
+      }
+    ],
+    "homophones": [
+      {
+        "prompt": "Bite the word that sounds like SEA",
+        "correct": [
+          "see"
+        ],
+        "wrong": [
+          "say",
+          "saw",
+          "sew",
+          "so"
+        ]
+      }
+    ]
+  }
+}

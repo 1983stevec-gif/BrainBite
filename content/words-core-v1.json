@@ -1,0 +1,26 @@
+{
+  "id": "words-core-v1",
+  "locale": "en-US",
+  "skills": [
+    {
+      "id": "categories",
+      "gradeBand": "K-2"
+    },
+    {
+      "id": "synonyms",
+      "gradeBand": "2-5"
+    },
+    {
+      "id": "antonyms",
+      "gradeBand": "2-5"
+    },
+    {
+      "id": "context_clues",
+      "gradeBand": "2-5"
+    },
+    {
+      "id": "homophones",
+      "gradeBand": "2-5"
+    }
+  ]
+}

@@ -1,0 +1,76 @@
+{
+  "id": "math-question-bank-v1.9",
+  "status": "prototype-curated",
+  "sets": [
+    {
+      "skill": "multiplication",
+      "prompt": "Bite products equal to 36",
+      "correct": [
+        "6×6",
+        "4×9",
+        "3×12"
+      ],
+      "wrong": [
+        "5×7",
+        "8×4",
+        "2×17"
+      ]
+    },
+    {
+      "skill": "division",
+      "prompt": "Bite expressions equal to 8",
+      "correct": [
+        "32÷4",
+        "40÷5",
+        "56÷7"
+      ],
+      "wrong": [
+        "28÷4",
+        "45÷5",
+        "63÷7"
+      ]
+    },
+    {
+      "skill": "fractions",
+      "prompt": "Bite fractions greater than 3/4",
+      "correct": [
+        "4/5",
+        "7/8",
+        "9/10"
+      ],
+      "wrong": [
+        "2/3",
+        "3/5",
+        "1/2"
+      ]
+    },
+    {
+      "skill": "decimals",
+      "prompt": "Bite decimals less than 0.5",
+      "correct": [
+        "0.4",
+        "0.25",
+        "0.09"
+      ],
+      "wrong": [
+        "0.5",
+        "0.6",
+        "0.75"
+      ]
+    },
+    {
+      "skill": "integers",
+      "prompt": "Bite integers less than -2",
+      "correct": [
+        "-3",
+        "-5",
+        "-10"
+      ],
+      "wrong": [
+        "-2",
+        "0",
+        "4"
+      ]
+    }
+  ]
+}

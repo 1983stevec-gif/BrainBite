@@ -1,0 +1,96 @@
+{
+  "id": "spanish-core-v1",
+  "targetLocale": "es",
+  "supportLocale": "en-US",
+  "units": [
+    {
+      "id": "colors",
+      "items": [
+        [
+          "rojo",
+          "red"
+        ],
+        [
+          "azul",
+          "blue"
+        ],
+        [
+          "verde",
+          "green"
+        ]
+      ]
+    },
+    {
+      "id": "food",
+      "items": [
+        [
+          "pan",
+          "bread"
+        ],
+        [
+          "queso",
+          "cheese"
+        ],
+        [
+          "leche",
+          "milk"
+        ]
+      ]
+    },
+    {
+      "id": "animals",
+      "items": [
+        [
+          "perro",
+          "dog"
+        ],
+        [
+          "gato",
+          "cat"
+        ],
+        [
+          "pez",
+          "fish"
+        ]
+      ]
+    },
+    {
+      "id": "greetings",
+      "items": [
+        [
+          "hola",
+          "hello"
+        ],
+        [
+          "adiós",
+          "goodbye"
+        ],
+        [
+          "gracias",
+          "thank you"
+        ]
+      ]
+    },
+    {
+      "id": "family",
+      "items": [
+        [
+          "madre",
+          "mother"
+        ],
+        [
+          "padre",
+          "father"
+        ],
+        [
+          "hermano",
+          "brother"
+        ],
+        [
+          "hermana",
+          "sister"
+        ]
+      ]
+    }
+  ]
+}

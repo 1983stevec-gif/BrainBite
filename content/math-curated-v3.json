@@ -1,0 +1,52 @@
+{
+  "id": "math-curated-v3",
+  "locale": "en-US",
+  "reviewStatus": "curated-prototype",
+  "skills": {
+    "fractions_half": [
+      {
+        "prompt": "Bite all values equal to one half",
+        "correct": [
+          "1/2",
+          "2/4",
+          "3/6",
+          "0.5"
+        ],
+        "wrong": [
+          "1/3",
+          "2/3",
+          "0.25",
+          "0.75"
+        ]
+      },
+      {
+        "prompt": "Bite pictures or values showing half",
+        "correct": [
+          "50%",
+          "4/8"
+        ],
+        "wrong": [
+          "25%",
+          "3/8"
+        ]
+      }
+    ],
+    "addition_20": [
+      {
+        "prompt": "Bite expressions equal to 20",
+        "correct": [
+          "11+9",
+          "13+7",
+          "16+4",
+          "18+2"
+        ],
+        "wrong": [
+          "10+9",
+          "12+7",
+          "15+4",
+          "17+2"
+        ]
+      }
+    ]
+  }
+}

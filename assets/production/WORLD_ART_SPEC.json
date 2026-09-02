@@ -1,0 +1,30 @@
+{
+  "worlds": {
+    "Bite Village": [
+      "background",
+      "portal",
+      "den",
+      "reward_chest"
+    ],
+    "Number Nebula": [
+      "floor",
+      "walls",
+      "asteroids",
+      "portal",
+      "boss"
+    ],
+    "Wordwood": [
+      "floor",
+      "trees",
+      "books",
+      "bridge",
+      "boss"
+    ],
+    "Language Portals": [
+      "portal",
+      "signage",
+      "town_objects",
+      "boss"
+    ]
+  }
+}

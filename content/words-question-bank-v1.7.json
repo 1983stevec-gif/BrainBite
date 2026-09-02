@@ -1,0 +1,72 @@
+{
+  "id": "words-question-bank-v1.7",
+  "status": "prototype-curated",
+  "sets": [
+    {
+      "skill": "synonyms",
+      "prompt": "Bite synonyms for BRAVE",
+      "correct": [
+        "bold",
+        "courageous",
+        "fearless"
+      ],
+      "wrong": [
+        "timid",
+        "quiet",
+        "tiny"
+      ]
+    },
+    {
+      "skill": "antonyms",
+      "prompt": "Bite antonyms for ANCIENT",
+      "correct": [
+        "modern",
+        "new",
+        "recent"
+      ],
+      "wrong": [
+        "old",
+        "historic",
+        "aged"
+      ]
+    },
+    {
+      "skill": "context_clues",
+      "prompt": "Bite words meaning very hungry",
+      "correct": [
+        "famished",
+        "starving"
+      ],
+      "wrong": [
+        "sleepy",
+        "silent",
+        "tiny"
+      ]
+    },
+    {
+      "skill": "homophones",
+      "prompt": "Bite the word sounding like KNIGHT",
+      "correct": [
+        "night"
+      ],
+      "wrong": [
+        "net",
+        "note",
+        "neat"
+      ]
+    },
+    {
+      "skill": "roots",
+      "prompt": "Bite words connected to the root BIO (life)",
+      "correct": [
+        "biology",
+        "biography"
+      ],
+      "wrong": [
+        "geometry",
+        "telephone",
+        "aquatic"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedInAs(familyId) {
+      return request.auth != null && request.auth.uid == familyId;
+    }
+
+    match /families/{familyId} {
+      allow read, delete: if signedInAs(familyId);
+      allow create, update: if signedInAs(familyId)
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.keys().hasOnly(['ownerId', 'updatedAt']);
+
+      match /profiles/{profileId} {
+        allow read: if signedInAs(familyId)
+          && resource.data.ownerId == request.auth.uid;
+
+        allow create: if signedInAs(familyId)
+          && request.resource.data.ownerId == request.auth.uid
+          && request.resource.data.clientProfileId == profileId
+          && request.resource.data.displayName is string
+          && request.resource.data.displayName.size() <= 40
+          && request.resource.data.progress is map
+          && request.resource.data.keys().hasOnly(['ownerId', 'displayName', 'clientProfileId', 'progress', 'clientUpdatedAt']);
+
+        allow update: if signedInAs(familyId)
+          && resource.data.ownerId == request.auth.uid
+          && request.resource.data.ownerId == request.auth.uid
+          && request.resource.data.clientProfileId == profileId
+          && request.resource.data.displayName is string
+          && request.resource.data.displayName.size() <= 40
+          && request.resource.data.progress is map
+          && request.resource.data.keys().hasOnly(['ownerId', 'displayName', 'clientProfileId', 'progress', 'clientUpdatedAt']);
+
+        allow delete: if signedInAs(familyId)
+          && resource.data.ownerId == request.auth.uid;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
