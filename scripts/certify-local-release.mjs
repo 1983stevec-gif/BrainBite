@@ -97,9 +97,27 @@ try {
     ['brainbase-match-browser', 'tests/brainbase.spec.js', 'tests/match.spec.js'],
   ];
   for (const [label, ...specs] of browserGroups) {
-    await record(label, npmCommand, ['exec', '--', 'playwright', 'test', ...specs, '--reporter=json'], {
+    // One retry, matching CI. Under load a WebGL mount or a reload can exceed its timeout
+    // and pass on a second attempt; without a retry a single such timeout failed the whole
+    // twenty-minute certification. Retries are not hidden: Playwright counts a test that
+    // passes on retry as flaky, and that count is recorded below.
+    const jsonReport = resolve(tempOutput, `${label}.json`);
+    await record(label, npmCommand, ['exec', '--', 'playwright', 'test', ...specs, '--reporter=json', '--retries=1'], {
       PLAYWRIGHT_OUTPUT_DIR: resolve(tempOutput, label),
+      PLAYWRIGHT_JSON_OUTPUT_NAME: jsonReport,
     });
+    {
+      const entry = results.at(-1);
+      try {
+        const stats = JSON.parse(await readFile(jsonReport, 'utf8')).stats ?? {};
+        entry.testsPassed = stats.expected ?? 0;
+        entry.testsFlaky = stats.flaky ?? 0;
+        entry.testsFailed = stats.unexpected ?? 0;
+        entry.note = `${entry.testsPassed} passed, ${entry.testsFlaky} flaky, ${entry.testsFailed} failed.`;
+      } catch (error) {
+        entry.note = `Playwright JSON report unavailable: ${error.message}`;
+      }
+    }
   }
 
   // One reported smoke runner owns the smoke inventory; the performance probe stays
