@@ -9,6 +9,7 @@ debug.log
 .codex-*/
 .tmp-*
 .stage-test/
+.certification-tmp/
 *.blend1
 .env
 .env.*

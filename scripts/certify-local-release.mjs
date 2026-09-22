@@ -61,6 +61,10 @@ async function gitSnapshot() {
   };
 }
 
+// The snapshot is taken before anything is written. This run regenerates tracked evidence
+// (viewport captures, the smoke report, and the report below), so snapshotting at the end
+// always recorded a dirty tree and the field carried no information.
+const git = await gitSnapshot();
 await mkdir(resolve(output, '..'), { recursive: true });
 await mkdir(tempOutput, { recursive: true });
 
@@ -146,7 +150,6 @@ try {
   // with its report status on Windows without terminating its process tree.
 }
 
-const git = await gitSnapshot();
 const report = {
   schema: 'brainbite.local-certification.v1',
   generatedAt: new Date().toISOString(),
