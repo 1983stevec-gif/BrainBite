@@ -2826,13 +2826,26 @@
   // Educator approvals are data, not code. The digest gate still protects the content:
   // if a source value changes, its recorded digest no longer matches and the approval
   // stops being eligible until a reviewer re-signs the new digest.
-  // Populate with: node scripts/approve-content.mjs --reviewer <id> --role <role> --ids <file>
+  // Populate with: node scripts/review-content.mjs --reviewer <id> --role <role> --ids <file>
   const EDUCATOR_APPROVALS = {
+  };
+
+  // Reviewer findings are the negative half of the review, and they are data for the same
+  // reason approvals are. A record an educator rejected must not be approvable and must
+  // never become production-eligible, so a finding quarantines the record and blocks any
+  // approval recorded earlier.
+  // Written with: node scripts/review-content.mjs --reject --reason "<finding>" ...
+  const REVIEWER_FINDINGS = {
   };
 
   function recordFromRow(row) {
     const [identity, kind, source, provenance, digest, evidence, taxonomy, quarantineReasons, runtimeStatus] = row;
-    const quarantined = quarantineReasons.length > 0;
+    const finding = REVIEWER_FINDINGS[identity] || null;
+    // A finding quarantines the record through the same path as an automated reason, so
+    // every downstream rule (no approval, never production-eligible) applies unchanged.
+    const rejectionReasons = finding ? [`reviewer-rejected: ${finding.reason}`] : [];
+    const allQuarantineReasons = [...quarantineReasons, ...rejectionReasons];
+    const quarantined = allQuarantineReasons.length > 0;
     const productionRegistry = kind === "registry-mission" && !quarantined;
     const approval = quarantined ? null : EDUCATOR_APPROVALS[identity] || null;
     const productionEligible = productionRegistry || Boolean(approval);
@@ -2855,10 +2868,15 @@
       taxonomy,
       educatorReview: approval
         ? { status: "approved", reviewer: approval.reviewer, reviewedAt: approval.reviewedAt }
-        : { status: "pending-educator", reviewer: null, reviewedAt: null },
+        : finding
+          ? { status: "rejected", reviewer: finding.reviewer, reviewedAt: finding.rejectedAt }
+          : { status: "pending-educator", reviewer: null, reviewedAt: null },
+      reviewerFinding: finding
+        ? { reviewer: finding.reviewer, rejectedAt: finding.rejectedAt, reason: finding.reason }
+        : null,
       quarantine: {
         status: quarantined ? "quarantined" : "clear",
-        reasons: quarantineReasons,
+        reasons: allQuarantineReasons,
       },
       runtime: {
         status: productionEligible ? "production-reviewed" : runtimeStatus,
@@ -3024,6 +3042,7 @@
     manifest,
     records: manifest.records,
     approvals: EDUCATOR_APPROVALS,
+    reviewerFindings: REVIEWER_FINDINGS,
     getReviewManifest,
     getReviewRecord,
     evaluateReview,

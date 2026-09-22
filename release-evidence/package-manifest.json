@@ -1,6 +1,6 @@
 {
   "schema": "brainbite.package-manifest.v1",
-  "generatedAt": "2026-09-22T16:44:52.368Z",
+  "generatedAt": "2026-09-22T23:01:45.746Z",
   "files": {
     "app.js": {
       "sha256": "ee251143bf9597ebd11acb0dcb46c9f21315affc31c594599f8c3f0902c1f36c",
@@ -115,8 +115,8 @@
       "bytes": 834
     },
     "content/content-review-manifest.js": {
-      "sha256": "b1a75f0c051094f0320d56c87837e874717ea1c43cca45ebd6713c420d5db808",
-      "bytes": 88305
+      "sha256": "af5d798c72fe746dbb78140da7a6017f7b9bd096adb35b0ab859c7c9b909b794",
+      "bytes": 89432
     },
     "content/curriculum-map-v1.4.json": {
       "sha256": "04a5eeec06d68d4a8a49f138d68be380ecbc8796080f34f0decfbcf0143c0990",

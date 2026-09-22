@@ -58,9 +58,13 @@ function nonEmpty(value) {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
-function addExpected(expected, approvals, { identity, kind, source, provenance, value, evidence, taxonomy, quarantineReasons, runtimeStatus }) {
-  const productionRegistry = kind === 'registry-mission' && quarantineReasons.length === 0;
-  const approved = quarantineReasons.length === 0 && Boolean(approvals[identity]);
+function addExpected(expected, approvals, findings, { identity, kind, source, provenance, value, evidence, taxonomy, quarantineReasons, runtimeStatus }) {
+  // A reviewer finding quarantines the record exactly as an automated reason does, so a
+  // rejected record can never be approved and never becomes production-eligible.
+  const finding = findings?.[identity] || null;
+  const allReasons = finding ? [...quarantineReasons, `reviewer-rejected: ${finding.reason}`] : quarantineReasons;
+  const productionRegistry = kind === 'registry-mission' && allReasons.length === 0;
+  const approved = allReasons.length === 0 && Boolean(approvals[identity]);
   const productionEligible = productionRegistry || approved;
   expected.push({
     identity,
@@ -70,12 +74,14 @@ function addExpected(expected, approvals, { identity, kind, source, provenance, 
     digest: digest(value),
     evidence,
     taxonomy,
-    quarantineStatus: quarantineReasons.length ? 'quarantined' : 'clear',
-    quarantineReasons,
+    quarantineStatus: allReasons.length ? 'quarantined' : 'clear',
+    quarantineReasons: allReasons,
+    reviewStatus: finding ? 'rejected' : approved ? 'approved' : 'pending-educator',
+    reviewerFinding: finding ? { reviewer: finding.reviewer, rejectedAt: finding.rejectedAt, reason: finding.reason } : null,
     runtimeStatus: productionEligible ? 'production-reviewed' : runtimeStatus,
     runtimePrototype: !productionEligible,
     runtimeProduction: productionEligible,
-    promotionStatus: quarantineReasons.length ? 'quarantined' : productionEligible ? 'production-reviewed' : 'pending-educator',
+    promotionStatus: allReasons.length ? 'quarantined' : productionEligible ? 'production-reviewed' : 'pending-educator',
   });
 }
 
@@ -89,8 +95,9 @@ function readJson(fileName, errors) {
   }
 }
 
-function expectedSources(errors, approvals = {}) {
+function expectedSources(errors, approvals = {}, findings = {}) {
   const expected = [];
+  const add = entry => addExpected(expected, approvals, findings, entry);
   const taxonomy = core.curriculumTaxonomy();
   const taxonomyById = new Map(Array.isArray(taxonomy?.skills) ? taxonomy.skills.map(skill => [skill.id, skill]) : []);
 
@@ -98,7 +105,7 @@ function expectedSources(errors, approvals = {}) {
     errors.push('experience-registry.js: missions export is missing');
   } else {
     registry.missions.forEach((mission, index) => {
-      addExpected(expected, approvals, {
+      add({
         identity: `registry-mission:${mission.id}`,
         kind: 'registry-mission',
         source: {
@@ -127,7 +134,7 @@ function expectedSources(errors, approvals = {}) {
     for (const [skillId, template] of Object.entries(core.CURRICULUM_ITEM_TEMPLATES)) {
       const skill = taxonomyById.get(skillId);
       if (!skill) errors.push(`brainbite-core.mjs: template ${skillId} has no canonical taxonomy skill`);
-      addExpected(expected, approvals, {
+      add({
         identity: `generated-template:${skillId}`,
         kind: 'generated-template',
         source: {
@@ -194,7 +201,7 @@ function expectedSources(errors, approvals = {}) {
       errors.push(`${sidecarIdentity}: linked entry needs only a canonical skill ID`);
     }
 
-    addExpected(expected, approvals, {
+    add({
       identity: `json-pack-item:${sidecarIdentity}`,
       kind: 'json-pack-item',
       source: {
@@ -256,9 +263,15 @@ function validateRecord(record, expected, errors, approvals = {}) {
     if (record.educatorReview?.reviewedAt !== approval.reviewedAt) errors.push(`${expected.identity}: approval timestamp mismatch`);
     if (record.runtime?.production !== true || record.runtime?.prototype !== false) errors.push(`${expected.identity}: an approved record must be promoted to production`);
     if (record.promotion?.status !== 'production-reviewed') errors.push(`${expected.identity}: an approved record must be promoted to production-reviewed`);
+  } else if (expected.reviewStatus === 'rejected') {
+    if (record.educatorReview?.status !== 'rejected') errors.push(`${expected.identity}: a rejected record must carry the rejected review status`);
+    if (!sameValue(record.educatorReview?.reviewer, expected.reviewerFinding?.reviewer)) errors.push(`${expected.identity}: rejection reviewer metadata mismatch`);
+    if (record.educatorReview?.reviewedAt !== expected.reviewerFinding?.rejectedAt) errors.push(`${expected.identity}: rejection timestamp mismatch`);
+    if (record.runtime?.production === true || record.runtime?.prototype !== true) errors.push(`${expected.identity}: a rejected record must not be production-eligible`);
   } else if (record.educatorReview?.status !== 'pending-educator' || record.educatorReview?.reviewer !== null || record.educatorReview?.reviewedAt !== null) {
     errors.push(`${expected.identity}: educator review must remain pending with no reviewer metadata`);
   }
+  if (!sameValue(record.reviewerFinding, expected.reviewerFinding)) errors.push(`${expected.identity}: reviewer finding mismatch`);
   if (record.verification?.approved !== undefined || record.approved !== undefined || record.educatorApproved !== undefined) {
     errors.push(`${expected.identity}: ambiguous approval metadata is not allowed`);
   }
@@ -275,7 +288,8 @@ function validateContentReview({ manifest = null } = {}) {
   const errors = [];
   const sourceManifest = manifest || reviewManifest.getReviewManifest();
   const approvals = sourceManifest?.approvals && typeof sourceManifest.approvals === 'object' ? sourceManifest.approvals : {};
-  const expected = expectedSources(errors, approvals);
+  const findings = sourceManifest?.reviewerFindings && typeof sourceManifest.reviewerFindings === 'object' ? sourceManifest.reviewerFindings : {};
+  const expected = expectedSources(errors, approvals, findings);
   const records = Array.isArray(sourceManifest?.records) ? sourceManifest.records : [];
   const expectedByIdentity = new Map();
   const actualIdentities = new Set();

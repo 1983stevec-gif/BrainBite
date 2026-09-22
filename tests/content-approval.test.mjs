@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { digest, validateContentReview } from '../scripts/validate-content-review.mjs';
-import { planApprovals } from '../scripts/approve-content.mjs';
+import { planApprovals, planRejections, replaceDataBlock } from '../scripts/review-content.mjs';
 import { loadSources, repoRoot, resolveRecordValue } from '../scripts/lib/content-sources.mjs';
 
 const require = createRequire(import.meta.url);
@@ -111,4 +111,106 @@ test('the approval planner refuses quarantined, unknown, and stale-digest reques
   // Registry missions already ship, so they are not re-approvable.
   const already = planApprovals({ requested: ['registry-mission:1'], recordsByIdentity: byIdentity, sources, reviewer: REVIEWER });
   assert.equal(already.refused[0].reason, 'already production-eligible');
+});
+
+// Builds a manifest clone that mirrors what review-content.mjs --reject writes for one
+// identity: the finding quarantines the record, the review status becomes rejected, and the
+// record leaves production.
+function manifestWithFinding(identity, {
+  reviewer = REVIEWER,
+  rejectedAt = REVIEWED_AT,
+  reason = 'answer key does not match the reviewed intent',
+  keepApproval = false,
+  forcePromote = false,
+} = {}) {
+  const clone = structuredClone(manifest.getReviewManifest());
+  const finding = { reviewer, rejectedAt, reason };
+  clone.reviewerFindings = { [identity]: finding };
+  const record = clone.records.find(entry => entry.identity === identity);
+  record.reviewerFinding = finding;
+  record.educatorReview = { status: 'rejected', reviewer, reviewedAt: rejectedAt };
+  record.quarantine = { status: 'quarantined', reasons: [...record.quarantine.reasons, `reviewer-rejected: ${reason}`] };
+  record.promotion = { status: 'quarantined', reasons: ['quarantine-active'] };
+  if (forcePromote) record.runtime = { status: 'production-reviewed', prototype: false, production: true };
+  if (keepApproval) clone.approvals = { [identity]: { reviewer, reviewedAt: rejectedAt } };
+  return clone;
+}
+
+test('a reviewer finding quarantines the record so it can never be approved', () => {
+  const clone = manifestWithFinding(TEMPLATE);
+  const consistent = validateContentReview({ manifest: clone });
+  assert.equal(consistent.valid, true, consistent.errors.join('\n'));
+
+  const rejectedByIdentity = new Map(clone.records.map(record => [record.identity, record]));
+  const { accepted, refused } = planApprovals({
+    requested: [TEMPLATE],
+    recordsByIdentity: rejectedByIdentity,
+    sources,
+    reviewer: REVIEWER,
+  });
+  assert.deepEqual(accepted, []);
+  assert.deepEqual(refused.map(entry => entry.reason), ['record is quarantined']);
+});
+
+test('a rejection supersedes an approval and cannot leave the record in production', () => {
+  const contradictory = validateContentReview({ manifest: manifestWithFinding(TEMPLATE, { keepApproval: true }) });
+  assert.equal(contradictory.valid, false);
+  assert.ok(
+    contradictory.errors.some(error => /quarantined record can never be educator-approved/.test(error)),
+    contradictory.errors.join('\n'),
+  );
+
+  const promoted = validateContentReview({ manifest: manifestWithFinding(TEMPLATE, { forcePromote: true }) });
+  assert.equal(promoted.valid, false);
+  assert.ok(
+    promoted.errors.some(error => /a rejected record must not be production-eligible/.test(error)),
+    promoted.errors.join('\n'),
+  );
+});
+
+test('the rejection planner accepts pending records and refuses unknown or already-rejected ones', () => {
+  const rejectedByIdentity = new Map(
+    manifestWithFinding(TEMPLATE).records.map(record => [record.identity, record]),
+  );
+  const { accepted, refused } = planRejections({
+    requested: [TEMPLATE, QUARANTINED, 'generated-template:no-such-skill'],
+    recordsByIdentity: new Map([...byIdentity, ...rejectedByIdentity]),
+    reviewer: REVIEWER,
+    reason: 'not age-appropriate for the stated grade',
+  });
+  // TEMPLATE already carries a finding in that map, QUARANTINED is rejectable, unknown is not.
+  assert.deepEqual(accepted.map(entry => entry.identity), [QUARANTINED]);
+  assert.deepEqual(refused, [
+    { identity: TEMPLATE, reason: 'record already carries a reviewer finding' },
+    { identity: 'generated-template:no-such-skill', reason: 'no such record' },
+  ]);
+});
+
+test('the manifest block rewrite cannot overrun an empty block', () => {
+  // The first approval ever recorded would have deleted everything between the approvals
+  // block and the next standalone `};`, because the previous regex required a line between
+  // the braces and so did not stop at its own closing line.
+  const source = [
+    'function factory() {',
+    '  const EDUCATOR_APPROVALS = {',
+    '  };',
+    '',
+    '  // REVIEWER_FINDINGS must survive an approvals rewrite.',
+    '  const REVIEWER_FINDINGS = {',
+    '  };',
+    '',
+    '  return { approvals: EDUCATOR_APPROVALS };',
+    '}',
+    '',
+  ].join('\n');
+
+  const updated = replaceDataBlock(source, 'EDUCATOR_APPROVALS', ['"a": { reviewer: { id: "r" } },']);
+  assert.ok(updated, 'the block must be found');
+  assert.match(updated, /const REVIEWER_FINDINGS = \{/);
+  assert.match(updated, /return \{ approvals: EDUCATOR_APPROVALS \};/);
+  assert.match(updated, / {2}"a": \{ reviewer: \{ id: "r" \} \},/);
+  assert.equal(updated.split('\n').length, source.split('\n').length + 1, 'exactly one entry line was added');
+
+  // A missing block must refuse rather than write something surprising.
+  assert.equal(replaceDataBlock(source, 'NO_SUCH_BLOCK', []), null);
 });

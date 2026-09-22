@@ -82,7 +82,7 @@ digest.
 
 Change: `scripts/gen-review-packet.mjs` emits a reviewer-facing packet (prompt, answers,
 distractors, explanation, hint, skill, difficulty, digest) for every non-production
-record; `scripts/approve-content.mjs` verifies digests and applies the approval
+record; `scripts/review-content.mjs` verifies digests and applies the approval
 atomically, refusing on drift.
 
 Acceptance: unit tests prove approval refuses a digest mismatch and produces a

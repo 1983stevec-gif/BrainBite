@@ -1,9 +1,10 @@
 {
   "schema": "brainbite.content-review-packet.v1",
-  "generatedAt": "2026-09-22T01:27:45.890Z",
+  "generatedAt": "2026-09-22T22:58:57.373Z",
   "totals": {
     "records": 105,
     "pending": 75,
+    "rejected": 0,
     "byKind": {
       "generated-template": 35,
       "json-pack-item": 40
@@ -2945,5 +2946,6 @@
         "subject": null
       }
     }
-  ]
+  ],
+  "rejected": []
 }

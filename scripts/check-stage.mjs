@@ -80,7 +80,13 @@ console.log(`staged package: ${staged.size} files; ${precached.length} precached
 if (problems.length) {
   console.error(`\n${problems.length} package problem(s):`);
   for (const problem of problems) console.error(`  ${problem}`);
-  console.error('\nUpdate scripts/stage-site.mjs so the runtime package matches what the app loads.');
+  // A digest mismatch means the manifest is simply stale, and the fix is to regenerate it.
+  // Only a missing file, a stale listing, or developer material in the package means the
+  // staging rules themselves need changing.
+  const onlyDigestDrift = problems.every(problem => /digest mismatch|missing from the manifest/.test(problem));
+  console.error(onlyDigestDrift
+    ? '\nRun npm run package:manifest to record the current files.'
+    : '\nUpdate scripts/stage-site.mjs so the runtime package matches what the app loads.');
   process.exit(1);
 }
 console.log('The closed-beta package is complete and free of developer material.');

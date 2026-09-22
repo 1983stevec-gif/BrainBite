@@ -401,6 +401,20 @@ Updated: 2026-09-22
   - The `pages` workflow fails on `main` with `Get Pages site failed`: GitHub Pages is not
     enabled. That is the repository owner's decision and the only remaining step that
     cannot be taken from code; it is recorded in the external-gates table.
+  - Closed the educator-review gap: the review could only record approvals, so a reviewer who
+    found a wrong answer key had no recorded outcome. `review:reject --reason "<finding>"`
+    now records a finding that quarantines the record through the same path as an automated
+    reason, which means it can never be approved and never becomes production-eligible; a
+    rejection also clears any approval recorded earlier. The packet carries a seven-point
+    rubric (correctness, age-appropriateness, clarity, distractor quality, feedback,
+    alignment, bias and safety) and lists rejected records separately.
+  - Two latent defects surfaced while building that path, both fatal to the first review:
+    the block rewrite used a body regex that cannot match an empty block and would have run
+    on to the next `};`, deleting every line between the approvals block and that point
+    (including the findings block) on the first approval ever recorded; and
+    `getReviewManifest()` did not expose `approvals` or `reviewerFindings`, so the validator
+    read `undefined` for both and no approval could ever have validated. Fixed and covered
+    by tests, including a regression test for the overrun.
   - Refreshed the local certification, which was stale since 2026-09-13. The first run in
     this cycle exposed three defects in the harness itself:
     - it started a server on port 4317 that nothing ever connected to (Playwright's global

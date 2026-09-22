@@ -103,6 +103,23 @@ The installer is unsigned and is an internal closed-beta artifact.
   resulting connection refusal as a measurement, which is why its earlier evidence was
   empty and `certify:local`'s performance stage could not have measured anything.
 
+### The educator review tooling could never have recorded an approval
+
+Preparing the reviewer workflow exposed two defects that would have made the first review
+outcome either corrupt the manifest or fail outright. Both were latent because the shipped
+manifest has no approvals yet, so neither path had ever run.
+
+| Defect | Effect | Fix |
+|---|---|---|
+| The block rewrite used `/const X = \{\n[\s\S]*?\n  \};/` | The regex needs at least one line between the braces, so for an **empty** block it does not stop at its own closing line — it runs on to the next `};` in the file. The first approval ever recorded would have deleted every line between the approvals block and that point, including the reviewer findings block | `replaceDataBlock` matches the opening and closing lines separately and cannot overrun; a regression test proves neighbouring code survives |
+| `getReviewManifest()` did not include the `approvals` or `reviewerFindings` blocks | The validator read `undefined` for both, so it expected every record to look unapproved. An approval could never have validated, and no finding could ever have been checked | Both blocks are part of the manifest object |
+
+The review also had no way to record a **negative** outcome: `review:approve` was the only
+command, so a reviewer who found a wrong answer key had no recorded path, and the packet
+gave no criteria to assess against. That is now a finding that quarantines the record (so it
+can never be approved and never ships), a seven-point rubric in the packet, and a
+`--list` that no longer offers records which cannot be approved.
+
 ### The certification harness certified less than it claimed
 
 Running `npm run certify:local` for the first time in this cycle exposed three defects in
@@ -193,7 +210,7 @@ change the arithmetic.
 
 | Gate | Owner | Requirement |
 |---|---|---|
-| Educator review of the 75 pending records | Human reviewer | `npm run review:packet`, then `npm run review:approve` |
+| Educator review of the 75 pending records | Human reviewer | `npm run review:packet` produces a printable sheet with the content and a seven-point rubric. `npm run review:approve` records an approval against the exact source digest; `npm run review:reject -- --reason "<finding>"` records a finding that quarantines the record, blocks any approval and keeps it out of production |
 | Physical-device matrix (phones, tablets, Chromebook, controller) | Steve | `docs/GATE_8_4_OPERATOR_CHECKLIST.md` |
 | Real screen-reader pass | Human reviewer | `docs/GATE_8_5_SR_OPERATOR.md` |
 | Legal / privacy sign-off | Human reviewer | `docs/GATE_8_5_LEGAL_CLAUSE_MAP.md` |
