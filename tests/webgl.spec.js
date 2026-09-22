@@ -130,23 +130,45 @@ test('3D boss HUD is hidden for regular missions and preserves real boss state',
   expect(await page.evaluate(()=>window.BrainBiteGame.getState().m.boss)).toBe(true);
 });
 
-test('context loss restores classic gameplay without losing the active mission',async({page})=>{
+test('a real context loss falls back to classic gameplay without an unhandled error',async({page})=>{
+  const errors=[];
+  page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/?presentation=webgl');
   await page.evaluate(()=>window.BrainBiteGame.startMission(1));
   await expect(page.locator('#game canvas.webgl-canvas')).toHaveCount(1);
-  await page.locator('#game canvas.webgl-canvas').evaluate(canvas=>canvas.dispatchEvent(new Event('webglcontextlost',{cancelable:true})));
+  // Lose the context for real instead of dispatching the event by hand. loseContext() marks
+  // the context lost synchronously and dispatches webglcontextlost afterwards, so a frame can
+  // run against a dead context in between; rendering there made three.js read a null uniform
+  // name and throw, and the hand-dispatched event could never reproduce it.
+  const lostImmediately=await page.locator('#game canvas.webgl-canvas').evaluate(canvas=>{
+    const gl=canvas.getContext('webgl2')||canvas.getContext('webgl');
+    gl.getExtension('WEBGL_lose_context').loseContext();
+    return gl.isContextLost();
+  });
+  expect(lostImmediately).toBe(true);
   await expect(page.locator('html')).not.toHaveClass(/presentation-webgl/);
   await expect(page.locator('#game .board')).toBeVisible();
   expect(await page.evaluate(()=>window.BrainBiteGame.getState().m.id)).toBe(1);
+  expect(errors).toEqual([]);
 });
 
 test('a restored WebGL context keeps the live 3D scene and the active mission',async({page})=>{
+  const errors=[];
+  page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/?presentation=webgl');
   await page.evaluate(()=>window.BrainBiteGame.startMission(1));
-  await expect(page.locator('#game canvas.webgl-canvas')).toHaveCount(1);
   const canvas=page.locator('#game canvas.webgl-canvas');
-  await canvas.evaluate(node=>node.dispatchEvent(new Event('webglcontextlost',{cancelable:true})));
-  await canvas.evaluate(node=>node.dispatchEvent(new Event('webglcontextrestored')));
+  await expect(canvas).toHaveCount(1);
+  // A real loss and a real restore, rather than synthetic events: this proves the renderer
+  // recovers from the browser's own restore, and that the 1.5s fallback window is cancelled.
+  const lost=await canvas.evaluate(node=>{
+    const gl=node.getContext('webgl2')||node.getContext('webgl');
+    window.__bbLoseContext=gl.getExtension('WEBGL_lose_context');
+    window.__bbLoseContext.loseContext();
+    return gl.isContextLost();
+  });
+  expect(lost).toBe(true);
+  await canvas.evaluate(()=>window.__bbLoseContext.restoreContext());
   await expect(page.locator('html')).toHaveClass(/presentation-webgl/);
   await expect(page.locator('#game canvas.webgl-canvas')).toHaveCount(1);
   await expect(page.locator('#feedback')).toContainText('reconnected');
@@ -155,6 +177,7 @@ test('a restored WebGL context keeps the live 3D scene and the active mission',a
   await page.waitForTimeout(1800);
   await expect(page.locator('html')).toHaveClass(/presentation-webgl/);
   await expect(page.locator('#game canvas.webgl-canvas')).toHaveCount(1);
+  expect(errors).toEqual([]);
 });
 
 test('repeated screen transitions dispose stale 3D canvases',async({page},testInfo)=>{

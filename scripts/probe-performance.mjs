@@ -96,17 +96,22 @@ try {
       await page.goto(`${baseURL}/?match=0&webgl=0&probe=${Date.now()}`, { waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => Boolean(window.BrainBiteGame?.getState));
       await page.waitForTimeout(300);
-      const saveMs = await page.evaluate(async () => {
+      // Enough samples for a p95 to mean something. The previous version took three saves and
+      // reported the median as "p95" against the p95 budget, so the tail it claimed to check
+      // was never measured. Each iteration mutates the state and awaits the same save path the
+      // app uses, so a slow save shows up instead of averaging away.
+      const saveStats = await page.evaluate(async () => {
         if (typeof save !== 'function' || typeof P !== 'function') return null;
         const samples = [];
-        for (let index = 0; index < 3; index += 1) {
-          P().updatedAt = Date.now();
+        for (let index = 0; index < 20; index += 1) {
+          P().updatedAt = Date.now() + index;
           const started = performance.now();
           await save();
           samples.push(performance.now() - started);
         }
         samples.sort((a, b) => a - b);
-        return samples[1];
+        const pick = fraction => samples[Math.min(samples.length - 1, Math.ceil(fraction * samples.length) - 1)];
+        return { median: pick(0.5), p95: pick(0.95), max: samples[samples.length - 1], samples: samples.length };
       });
 
       const violations = [...(home?.violations || []), ...(battle?.violations || [])];
@@ -120,10 +125,14 @@ try {
       const payloadViolation = payload.bytes > DEFAULT_PAYLOAD_BUDGET.assetBytes
         ? [{ metric: 'assetBytes', statistic: 'max', actual: payload.bytes, budget: DEFAULT_PAYLOAD_BUDGET.assetBytes, overBy: payload.bytes - DEFAULT_PAYLOAD_BUDGET.assetBytes }]
         : [];
-      const saveBudget = DEFAULT_PERFORMANCE_BUDGETS.save.p95;
-      const saveViolation = Number.isFinite(saveMs) && saveMs > saveBudget
-        ? [{ metric: 'save', statistic: 'p95', actual: saveMs, budget: saveBudget, overBy: saveMs - saveBudget }]
-        : [];
+      const saveBudget = DEFAULT_PERFORMANCE_BUDGETS.save;
+      const saveViolations = [];
+      if (saveStats && saveStats.p95 > saveBudget.p95) {
+        saveViolations.push({ metric: 'save', statistic: 'p95', actual: saveStats.p95, budget: saveBudget.p95, overBy: saveStats.p95 - saveBudget.p95 });
+      }
+      if (saveStats && saveStats.max > saveBudget.max) {
+        saveViolations.push({ metric: 'save', statistic: 'max', actual: saveStats.max, budget: saveBudget.max, overBy: saveStats.max - saveBudget.max });
+      }
       report = {
         schema: 'brainbite.performance-evidence.v1',
         capturedAt: new Date().toISOString(),
@@ -136,11 +145,12 @@ try {
         performance: { home, battle, runtime },
         payload,
         startupMs: Number.isFinite(startupMs) ? startupMs : null,
-        saveMs: Number.isFinite(saveMs) ? saveMs : null,
+        saveMs: saveStats ? saveStats.median : null,
+        saveStats,
         // Informational: these samples include cold-start saves, which are not what the
         // save budget describes. The controlled sample above is the gated one.
         runtimeReportedViolations: runtime?.violations || [],
-        budgetGate: { ...gate, headless: [...gate.headless, ...startupViolation, ...saveViolation, ...payloadViolation], pass: gate.pass && startupViolation.length === 0 && saveViolation.length === 0 && payloadViolation.length === 0 },
+        budgetGate: { ...gate, headless: [...gate.headless, ...startupViolation, ...saveViolations, ...payloadViolation], pass: gate.pass && startupViolation.length === 0 && saveViolations.length === 0 && payloadViolation.length === 0 },
       };
     } catch (error) {
       errors.push(`probe: ${error.message}`);
@@ -181,6 +191,7 @@ const summary = {
     payload: report.payload,
     startupMs: report.startupMs,
     saveMs: report.saveMs,
+    saveStats: report.saveStats,
     runtimeReportedViolations: report.runtimeReportedViolations,
     budgetGate: report.budgetGate,
   })),

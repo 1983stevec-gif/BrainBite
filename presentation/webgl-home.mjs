@@ -356,7 +356,7 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
   const classObserver = new MutationObserver(() => {
     applyQuality();
     syncMotionState();
-    if (reducedMotion && !disposed && !contextLost) renderer.render(scene, camera);
+    if (reducedMotion) renderFrame();
   });
   classObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
@@ -376,7 +376,7 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
       scene.add(root);
       onInstall?.(root);
       host.dispatchEvent(new CustomEvent('bb:webgl-asset-loaded', { detail: { asset } }));
-      if (reducedMotion) renderer.render(scene, camera);
+      if (reducedMotion) renderFrame();
     }).catch(error => {
       performanceBudget.recordAssetTiming({
         name: asset,
@@ -439,7 +439,7 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
     const anchor = new THREE.Vector3(portalPosition[0], 0.5, portalPosition[2] + 0.6).project(camera);
     portalButton.style.left = `${(anchor.x + 1) * w / 2}px`;
     portalButton.style.top = `${(1 - anchor.y) * h / 2}px`;
-    if (reducedMotion) renderer.render(scene, camera);
+    if (reducedMotion) renderFrame();
   };
   window.addEventListener('resize', onResize);
   const resizeObserver = new ResizeObserver(onResize);
@@ -489,6 +489,16 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
     frame();
   }
 
+  // Rendering consults the renderer's live context state, not only our own flag: a context
+  // can already be lost before `webglcontextlost` is dispatched, and rendering inside that
+  // window makes three.js read a null uniform name and throw. That exception used to escape
+  // the frame loop as an unhandled error. Skipping the frame keeps the loop alive and the
+  // event still arrives to start the restore window.
+  function renderFrame() {
+    if (disposed || contextLost || renderer.getContext().isContextLost()) return;
+    renderer.render(scene, camera);
+  }
+
   function frame() {
     if (disposed || contextLost) return;
     const now = performanceClock.now();
@@ -513,7 +523,7 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
     if (fill) fill.material.opacity = 0.42 + Math.sin(t * 3.5) * 0.14;
     water.position.y = 0.03 + Math.sin(t * 1.4) * 0.01;
     water.material.map.offset.y = t * 0.008;
-    renderer.render(scene, camera);
+    renderFrame();
     if (frameCount % 60 === 0) {
       performanceBudget.sampleMemory();
       performanceBudget.sampleRenderer();

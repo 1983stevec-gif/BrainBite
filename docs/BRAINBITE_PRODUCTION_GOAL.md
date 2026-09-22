@@ -392,6 +392,18 @@ Updated: 2026-09-22
     and script (three of five GLBs match; the kraken differs by one accessor and 4,456
     bytes, the mascot by 4 bytes), so assets are verified against the committed manifest
     rather than by rebuilding.
+  - Fixed a WebGL defect that the existing context-loss tests could not see. They dispatched
+    `webglcontextlost` by hand, but `loseContext()` marks the context lost synchronously and
+    dispatches the event afterwards, so frames ran against a dead context and three.js threw
+    `Cannot read properties of null (reading 'trim')` from `WebGLShadowMap.render`. The
+    exception escaped the frame loop as an unhandled error. Both scenes now route every
+    render through one guard that consults `renderer.getContext().isContextLost()` as well as
+    the event flag, and both tests now use a real loss and a real restore. Verified: the
+    premise holds 24/24, zero page errors across 24 real losses, webgl 32/32, suite 161/161.
+  - Corrected the save-latency metric. The probe took three saves, reported the middle one as
+    `statistic: "p95"`, and gated it against the p95 budget, so the tail it claimed to check
+    was never measured. It now takes 20 samples and reports real median/p95/max, gating p95
+    and max separately: desktop p95 6.6 ms, mobile p95 10.1 ms, max 10.3 ms against 250/1000.
   - Merged to `main` (PR #1, merge commit `6b43a59`) after all gates were green at
     `39db2bc`. Local `main` is byte-identical to the verified branch. **CI is green on
     `main` for the first time** — every earlier run on `main` (2026-09-02) had failed.

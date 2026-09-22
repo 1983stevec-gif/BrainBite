@@ -103,6 +103,33 @@ The installer is unsigned and is an internal closed-beta artifact.
   resulting connection refusal as a measurement, which is why its earlier evidence was
   empty and `certify:local`'s performance stage could not have measured anything.
 
+### A lost WebGL context could throw in front of a child
+
+The context-loss tests dispatched `webglcontextlost` by hand, which is not what a browser
+does. `loseContext()` marks the context lost **synchronously** and dispatches the event
+afterwards, so frames can run against a dead context in between. Rendering in that window
+made three.js read a null uniform name:
+
+```
+TypeError: Cannot read properties of null (reading 'trim')
+  at onFirstUse (three.module.js) -> WebGLProgram.getUniforms
+  -> setProgram -> renderBufferDirect -> WebGLShadowMap.render
+```
+
+The exception escaped the frame loop as an unhandled error, killing the loop. Both scenes now
+route every render through one guard that consults the renderer's live context state
+(`renderer.getContext().isContextLost()`), not only the event flag, and both tests use a real
+loss and a real restore instead of synthetic events. Verified: the premise holds 24/24, 0 page
+errors across 24 real context losses, webgl group 32/32, full suite 161/161.
+
+### The save latency "p95" was the median of three samples
+
+The probe took three saves, reported the middle one as `statistic: "p95"`, and gated it
+against the p95 budget, so the tail it claimed to check was never measured. It now takes 20
+samples and reports real median, p95 and max, gating p95 and max separately. Measured after
+the fix: desktop median 4.0 ms / p95 6.6 / max 7.2, mobile median 6.6 / p95 10.1 / max 10.2,
+against a 250 ms p95 and 1000 ms max budget. Tails under real device load remain unverified.
+
 ### The educator review tooling could never have recorded an approval
 
 Preparing the reviewer workflow exposed two defects that would have made the first review

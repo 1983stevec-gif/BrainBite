@@ -270,7 +270,7 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
       const x = list.length <= 1 ? 0 : -span / 2 + span * index / (list.length - 1);
       child.position.x = x / pillarAsset.scale.x;
     });
-    if (reducedMotion && !disposed && !webglContextLost) renderer.render(scene, camera);
+    if (reducedMotion) renderFrame();
   }
 
   function setEncounter(next = {}) {
@@ -278,7 +278,7 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
     // Do not mislabel the legacy math/language bosses as Fraction Kraken.
     kraken.visible = encounter.boss && encounter.bossName === 'Fraction Kraken';
     host.dataset.encounter = kraken.visible ? 'fraction-kraken' : encounter.boss ? 'boss' : 'activity';
-    if (reducedMotion && !disposed && !webglContextLost) renderer.render(scene, camera);
+    if (reducedMotion) renderFrame();
   }
 
   function highlight(value) {
@@ -364,7 +364,7 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
   const classObserver = new MutationObserver(() => {
     applyQuality();
     syncMotionState();
-    if (reducedMotion && !disposed && !webglContextLost) renderer.render(scene, camera);
+    if (reducedMotion) renderFrame();
   });
   classObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
@@ -381,7 +381,7 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
       scene.add(root);
       onInstall?.(root);
       host.dispatchEvent(new CustomEvent('bb:webgl-asset-loaded', { detail: { asset } }));
-      if (reducedMotion) renderer.render(scene, camera);
+      if (reducedMotion) renderFrame();
     }).catch(error => {
       performanceBudget.recordAssetTiming({
         name: asset,
@@ -436,7 +436,7 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
     if (disposed || webglContextLost) return;
     fitSceneCamera(camera, w / h, { span: 10.8, height: 6.5, target: [0, 1.2, 1], distance: 15.5 });
     renderer.setSize(w, h);
-    if (reducedMotion) renderer.render(scene, camera);
+    if (reducedMotion) renderFrame();
   };
   window.addEventListener('resize', onResize);
   const resizeObserver = new ResizeObserver(onResize);
@@ -463,6 +463,16 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
     frame();
   }
 
+  // Rendering consults the renderer's live context state, not only our own flag: a context
+  // can already be lost before `webglcontextlost` is dispatched, and rendering inside that
+  // window makes three.js read a null uniform name and throw. That exception used to escape
+  // the frame loop as an unhandled error. Skipping the frame keeps the loop alive and the
+  // event still arrives to start the restore window.
+  function renderFrame() {
+    if (disposed || webglContextLost || renderer.getContext().isContextLost()) return;
+    renderer.render(scene, camera);
+  }
+
   function frame() {
     if (disposed || webglContextLost) return;
     const now = performanceClock.now();
@@ -479,7 +489,7 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
     else mascot.position.y = 0.42 + bob;
     water.position.y = Math.sin(t * 1.2) * 0.015;
     water.material.map.offset.y = t * 0.008;
-    renderer.render(scene, camera);
+    renderFrame();
     if (frameCount % 60 === 0) {
       performanceBudget.sampleMemory();
       performanceBudget.sampleRenderer();
@@ -506,7 +516,7 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
         pendingCharacterReaction = state;
         host.dataset.characterState = state;
       }
-      if (reducedMotion && !disposed && !webglContextLost) renderer.render(scene, camera);
+      if (reducedMotion) renderFrame();
     },
     dispose() {
       if (disposed) return;
