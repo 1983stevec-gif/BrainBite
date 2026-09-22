@@ -25,11 +25,11 @@ for (const dir of ['tests', 'scripts']) {
 const LOOPBACK = /(?:127\.0\.0\.1|localhost):(\d{2,5})/g;
 const problems = [];
 for (const file of files) {
-  // The config itself defines the port; the accessibility contract and the local
-  // certification runner each manage their own server, and scratch files are ignored.
+  // The config itself defines the port, the accessibility contract manages its own server,
+  // and scratch files are ignored. The local certification runner used to be exempted here,
+  // which hid a server on port 4317 that no test ever reached.
   if (file === CONFIG
     || file.endsWith('accessibility-contract.test.mjs')
-    || file.endsWith('certify-local-release.mjs')
     || file.includes('/.tmp-')) continue;
   const lines = readFileSync(file, 'utf8').split('\n');
   lines.forEach((line, index) => {

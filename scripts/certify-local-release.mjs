@@ -3,7 +3,6 @@
  * External device, human-review, and production-host gates remain unverified.
  */
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { createConnection } from 'node:net';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
@@ -49,31 +48,6 @@ async function record(label, command, args, extraEnv = {}) {
   return entry;
 }
 
-async function waitForServer(port) {
-  const deadline = Date.now() + 15000;
-  while (Date.now() < deadline) {
-    const ready = await new Promise(resolveReady => {
-      const socket = createConnection({ port, host: '127.0.0.1' });
-      socket.once('connect', () => {
-        socket.destroy();
-        resolveReady(true);
-      });
-      socket.once('error', () => resolveReady(false));
-    });
-    if (ready) return;
-    await new Promise(resolveSleep => setTimeout(resolveSleep, 150));
-  }
-  throw new Error(`Timed out waiting for local server on port ${port}`);
-}
-
-async function serverIsReady(port) {
-  return new Promise(resolveReady => {
-    const socket = createConnection({ port, host: '127.0.0.1' });
-    socket.once('connect', () => { socket.destroy(); resolveReady(true); });
-    socket.once('error', () => resolveReady(false));
-  });
-}
-
 async function gitSnapshot() {
   const [branch, commit, status] = await Promise.all([
     run('git', ['branch', '--show-current']),
@@ -89,17 +63,15 @@ async function gitSnapshot() {
 
 await mkdir(resolve(output, '..'), { recursive: true });
 await mkdir(tempOutput, { recursive: true });
-const existingServer = await serverIsReady(4317);
-const server = existingServer ? null : spawn(nodeCommand, ['scripts/serve.mjs'], {
-  cwd: root,
-  env: { ...process.env, PORT: '4317' },
-  stdio: 'ignore',
-  windowsHide: true,
-});
-server?.unref();
 
+// No server is started here on purpose. Every stage below serves itself on the configured
+// test port: Playwright's global setup for the browser groups, the smoke runner for the
+// smokes, and the performance probe for its own measurements. This runner used to start a
+// server on port 4317 and wait for it, but nothing ever connected to 4317 — Playwright and
+// the smoke runner both serve 4318 — so the readiness gate proved nothing and the process
+// sat idle for the whole run. `check:test-ports` now scans this file instead of exempting
+// it, so a hardcoded port here cannot come back.
 try {
-  await waitForServer(4317);
   const validators = [
     ['content', 'check:content'],
     ['content-review', 'check:content-review'],
