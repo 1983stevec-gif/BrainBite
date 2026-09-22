@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "BrainBite only renders bundled content and exposes no native commands.",
+  "windows": ["main"],
+  "permissions": []
+}
+

@@ -1,0 +1,97 @@
+#!/usr/bin/env node
+// Builds the reviewer-facing packet for every record that is not yet production-eligible.
+//
+// The gate already validates exact source digests; what a human reviewer needs is the
+// content itself, in one place, with the identity to sign off. Output:
+//   release-evidence/content-review-packet.json   machine-readable, one entry per record
+//   release-evidence/content-review-packet.html   printable review sheet
+//
+// Usage: node scripts/gen-review-packet.mjs
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { createRequire } from 'node:module';
+import { digest } from './validate-content-review.mjs';
+import { describeContent, loadSources, repoRoot, resolveRecordValue } from './lib/content-sources.mjs';
+
+const require = createRequire(import.meta.url);
+const reviewManifest = require(resolve(repoRoot, 'content/content-review-manifest.js'));
+const sources = await loadSources();
+
+const records = Object.values(reviewManifest.records || {});
+const pending = [];
+const mismatched = [];
+
+for (const record of records) {
+  if (record.runtime?.production === true) continue;
+  const { value, reason } = resolveRecordValue(record, sources);
+  if (reason) { mismatched.push({ identity: record.identity, reason }); continue; }
+  const actual = digest(value);
+  const digestMatches = actual === record.digest?.value;
+  if (!digestMatches) mismatched.push({ identity: record.identity, reason: `source digest ${actual.slice(0, 12)} != manifest ${String(record.digest?.value).slice(0, 12)}` });
+  pending.push({
+    identity: record.identity,
+    kind: record.kind,
+    source: record.source,
+    digest: record.digest?.value,
+    digestMatches,
+    quarantine: record.quarantine?.status || 'unknown',
+    quarantineReasons: record.quarantine?.reasons || [],
+    runtimeStatus: record.runtime?.status || 'unknown',
+    verification: record.verification?.evidence || [],
+    content: describeContent(value),
+  });
+}
+
+const byKind = pending.reduce((totals, entry) => ({ ...totals, [entry.kind]: (totals[entry.kind] || 0) + 1 }), {});
+const report = {
+  schema: 'brainbite.content-review-packet.v1',
+  generatedAt: new Date().toISOString(),
+  totals: { records: records.length, pending: pending.length, byKind, digestMismatches: mismatched.length },
+  digestMismatches: mismatched,
+  pending,
+};
+
+const outputDir = resolve(repoRoot, 'release-evidence');
+await mkdir(outputDir, { recursive: true });
+await writeFile(resolve(outputDir, 'content-review-packet.json'), `${JSON.stringify(report, null, 2)}\n`);
+
+const escape = value => String(value ?? '').replace(/[&<>"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[character]));
+const rows = pending.map(entry => {
+  const content = entry.content;
+  return `<section class="record">
+  <h3>${escape(entry.identity)} <span class="kind">${escape(entry.kind)}</span></h3>
+  <dl>
+    <dt>Prompt</dt><dd>${escape(content.prompt) || '<em>none</em>'}</dd>
+    <dt>Answers</dt><dd>${escape((content.answers || []).join(', ')) || '<em>none</em>'}</dd>
+    <dt>Distractors</dt><dd>${escape((content.distractors || []).join(', ')) || '<em>none</em>'}</dd>
+    <dt>Explanation</dt><dd>${escape(content.explanation) || '<em>none</em>'}</dd>
+    <dt>Hint</dt><dd>${escape(content.hint) || '<em>none</em>'}</dd>
+    <dt>Skill / grade / difficulty</dt><dd>${escape([content.skill, content.grade, content.difficulty].filter(value => value !== null && value !== '').join(' · ')) || '<em>none</em>'}</dd>
+    <dt>Source</dt><dd><code>${escape(entry.source?.file)}${escape(entry.source?.path || '')}</code></dd>
+    <dt>Quarantine</dt><dd>${escape(entry.quarantine)}${entry.quarantineReasons.length ? ` — ${escape(entry.quarantineReasons.join(', '))}` : ''}</dd>
+    <dt>Digest</dt><dd><code>${escape(entry.digest)}</code> ${entry.digestMatches ? '' : '<strong>MISMATCH</strong>'}</dd>
+  </dl>
+</section>`;
+}).join('\n');
+
+const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>BrainBite content review packet</title>
+<style>
+ body{font:16px/1.5 system-ui,sans-serif;margin:2rem auto;max-width:60rem;padding:0 1rem;color:#101820}
+ h1{margin-bottom:.25rem} .meta{color:#556} .record{border:1px solid #ccd;border-radius:10px;padding:1rem 1.25rem;margin:1.25rem 0;break-inside:avoid}
+ h3{margin:0 0 .5rem} .kind{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:#667;font-weight:600}
+ dl{display:grid;grid-template-columns:11rem 1fr;gap:.25rem .75rem;margin:0}
+ dt{font-weight:600;color:#334} dd{margin:0} code{font-size:.85em;word-break:break-all}
+ .warn{background:#fff4e5;border-color:#e0a458}
+</style></head><body>
+<h1>BrainBite content review packet</h1>
+<p class="meta">Generated ${escape(report.generatedAt)} · ${pending.length} record(s) awaiting review · ${mismatched.length} digest mismatch(es)</p>
+<p>Sign off per record. Approval is recorded against the exact source digest shown, so editing the content afterwards invalidates the approval automatically.</p>
+${mismatched.length ? `<p class="warn"><strong>${mismatched.length} record(s) failed digest verification</strong> and must be regenerated before review: ${escape(mismatched.map(entry => entry.identity).join(', '))}</p>` : ''}
+${rows}
+</body></html>
+`;
+await writeFile(resolve(outputDir, 'content-review-packet.html'), html);
+
+console.log(JSON.stringify({ pending: pending.length, byKind, digestMismatches: mismatched.length, output: 'release-evidence/content-review-packet.{json,html}' }, null, 1));
+if (mismatched.length) process.exitCode = 1;

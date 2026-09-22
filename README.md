@@ -1,8 +1,8 @@
 # BrainBite v2.0
 
-BrainBite is a local-first educational PWA with 30 missions across Number Nebula, Wordwood, and Spanish Portal, plus one boss per world. It supports keyboard and touch play, profiles, progression, stars, Spark, Bite unlocks, cosmetics, adaptive review, Memory Drops, Practice Lab, parent-reviewed Snap-to-Game, parent controls, save recovery, accessibility preferences, audio, offline play, and optional parent-authenticated Firebase sync.
+BrainBite is a local-first educational game packaged as an installed Windows app. Its current game runtime uses JavaScript and Three.js inside a locked-down Tauri/WebView2 shell; the PWA-compatible browser surface is retained only for development and automated testing. The game supports keyboard and touch play, profiles, progression, adaptive review, rewards, parent controls, save recovery, accessibility preferences, audio, offline play, and optional parent-authenticated Firebase sync.
 
-## Run locally
+## Browser development only
 
 Requirements: Node.js 20 or newer.
 
@@ -11,11 +11,32 @@ npm install
 npm run serve
 ```
 
-Open `http://127.0.0.1:8080`. Run the complete release gate with:
+Open `http://127.0.0.1:4317`. Run the complete release gate with:
 
 ```powershell
 npm run release:check
 ```
+
+## Run as a Windows app
+
+The production Windows package is a Tauri 2/WebView2 app. It loads the same verified runtime from bundled assets and does not start or connect to a localhost web server. The local HTTP server above remains available only for browser development and automated tests.
+
+Requirements: the Node.js requirement above, the stable Rust MSVC toolchain, Microsoft C++ Build Tools, and WebView2 (included with supported Windows versions).
+
+```powershell
+npm install
+npm run native:verify
+npm run native:dev
+```
+
+Build the current-user NSIS installer and prove the built process does not bind a TCP listening port:
+
+```powershell
+npm run native:build
+npm run native:verify:runtime
+```
+
+The installer is written beneath `src-tauri/target/release/bundle/nsis/`. Optional Firebase sync still makes outbound HTTPS requests when a parent configures it; that is unrelated to serving the app itself.
 
 ## Firebase setup
 
@@ -34,6 +55,6 @@ Before launch, run the real-project two-browser procedure in `MANUAL_LAUNCH_GATE
 
 ## Data and privacy
 
-Gameplay is local-first. Cloud sync is opt-in and parent-authenticated. Snap-to-Game never treats extracted or generated answers as trusted: a parent must review topic, examples, correct answers, and distractors before saving. Account deletion deletes the signed-in family's cloud profile documents and then the Firebase Authentication account.
+Gameplay is local-first. Cloud sync is opt-in and parent-authenticated, and sends only a minimized progress projection. Worksheet images and worksheet text are never synchronized. Parent PIN verifiers, play-time ledgers, integration credentials, and authentication tokens remain device-local. Parent-authorized recovery exports are versioned and may preserve legacy Snap-to-Game records created by earlier builds. Account deletion deletes the signed-in family's cloud profile documents and then the Firebase Authentication account.
 
 See `TEST_RESULTS.md`, `RELEASE_NOTES.md`, `MANUAL_LAUNCH_GATES.md`, and `DEPLOYMENT.md` for release evidence and launch steps.

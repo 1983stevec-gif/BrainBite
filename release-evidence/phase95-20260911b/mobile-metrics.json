@@ -1,0 +1,261 @@
+{
+  "viewport": "mobile",
+  "errors": [],
+  "assets": [
+    "portal",
+    "mascot",
+    "jungle",
+    "mascot",
+    "kraken",
+    "pillars"
+  ],
+  "performance": {
+    "home": {
+      "metrics": {
+        "frame": {
+          "count": 4,
+          "average": 266.77499999990687,
+          "p95": 627.5999999996275,
+          "p99": 627.5999999996275,
+          "max": 627.5999999996275
+        },
+        "startup": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "sceneLoad": {
+          "count": 1,
+          "average": 322.5,
+          "p95": 322.5,
+          "p99": 322.5,
+          "max": 322.5
+        },
+        "save": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "memory": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        }
+      },
+      "budgets": {
+        "frame": {
+          "p95": 33.4,
+          "p99": 50,
+          "max": 100
+        },
+        "startup": {
+          "max": 3000
+        },
+        "sceneLoad": {
+          "p95": 1500,
+          "max": 3000
+        },
+        "save": {
+          "p95": 250,
+          "max": 1000
+        },
+        "memory": {
+          "max": 536870912
+        }
+      },
+      "violations": [
+        {
+          "metric": "frame",
+          "statistic": "p95",
+          "actual": 627.5999999996275,
+          "budget": 33.4,
+          "overBy": 594.1999999996275
+        },
+        {
+          "metric": "frame",
+          "statistic": "p99",
+          "actual": 627.5999999996275,
+          "budget": 50,
+          "overBy": 577.5999999996275
+        },
+        {
+          "metric": "frame",
+          "statistic": "max",
+          "actual": 627.5999999996275,
+          "budget": 100,
+          "overBy": 527.5999999996275
+        }
+      ],
+      "recommendation": {
+        "tier": "mobile",
+        "reasons": [
+          "Frame p95 627.5999999996275ms and p99 627.5999999996275ms fit the mobile thresholds.",
+          "Heap memory was unavailable and did not affect the recommendation."
+        ]
+      }
+    },
+    "battle": {
+      "metrics": {
+        "frame": {
+          "count": 18,
+          "average": 122.58333333333333,
+          "p95": 665.9000000003725,
+          "p99": 665.9000000003725,
+          "max": 665.9000000003725
+        },
+        "startup": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "sceneLoad": {
+          "count": 1,
+          "average": 319.59999999962747,
+          "p95": 319.59999999962747,
+          "p99": 319.59999999962747,
+          "max": 319.59999999962747
+        },
+        "save": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "memory": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        }
+      },
+      "budgets": {
+        "frame": {
+          "p95": 33.4,
+          "p99": 50,
+          "max": 100
+        },
+        "startup": {
+          "max": 3000
+        },
+        "sceneLoad": {
+          "p95": 1500,
+          "max": 3000
+        },
+        "save": {
+          "p95": 250,
+          "max": 1000
+        },
+        "memory": {
+          "max": 536870912
+        }
+      },
+      "violations": [
+        {
+          "metric": "frame",
+          "statistic": "p95",
+          "actual": 665.9000000003725,
+          "budget": 33.4,
+          "overBy": 632.5000000003726
+        },
+        {
+          "metric": "frame",
+          "statistic": "p99",
+          "actual": 665.9000000003725,
+          "budget": 50,
+          "overBy": 615.9000000003725
+        },
+        {
+          "metric": "frame",
+          "statistic": "max",
+          "actual": 665.9000000003725,
+          "budget": 100,
+          "overBy": 565.9000000003725
+        }
+      ],
+      "recommendation": {
+        "tier": "mobile",
+        "reasons": [
+          "Frame p95 665.9000000003725ms and p99 665.9000000003725ms fit the mobile thresholds.",
+          "Heap memory was unavailable and did not affect the recommendation."
+        ]
+      }
+    },
+    "runtime": {
+      "metrics": {
+        "frame": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "startup": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "sceneLoad": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "save": {
+          "count": 1,
+          "average": 2.400000000372529,
+          "p95": 2.400000000372529,
+          "p99": 2.400000000372529,
+          "max": 2.400000000372529
+        },
+        "memory": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        }
+      },
+      "budgets": {
+        "frame": {
+          "p95": 33.4,
+          "p99": 50,
+          "max": 100
+        },
+        "startup": {
+          "max": 3000
+        },
+        "sceneLoad": {
+          "p95": 1500,
+          "max": 3000
+        },
+        "save": {
+          "p95": 250,
+          "max": 1000
+        },
+        "memory": {
+          "max": 536870912
+        }
+      },
+      "violations": [],
+      "recommendation": {
+        "tier": "balanced",
+        "reasons": [
+          "No frame samples; using the conservative default."
+        ]
+      }
+    }
+  }
+}

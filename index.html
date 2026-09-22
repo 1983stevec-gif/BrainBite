@@ -1,16 +1,23 @@
 <!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#10131c"><title>BrainBite v2.0</title>
-<link rel="manifest" href="manifest.webmanifest"><link rel="stylesheet" href="styles.css">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; media-src 'self' blob:; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="theme-color" content="#0b1a12"><title>BrainBite v2.0</title>
+<link rel="manifest" href="manifest.webmanifest"><link rel="stylesheet" href="fonts.css"><link rel="stylesheet" href="styles.css">
 </head><body><a href="#main" class="skip">Skip to game</a><div class="app">
 <header><div><small>COLLINS VENTURES</small><h1>BrainBite</h1><p>v2.0 · Math + Words + Spanish</p></div><div><b id="profileName">Kid 1</b> · <b id="stars">0</b> Stars · <b id="score">0</b> Score</div></header>
-<nav>
-<button data-screen="home">Home</button><button data-screen="brainbase">BrainBase</button><button data-screen="math">Number Nebula</button><button data-screen="words">Wordwood</button><button data-screen="spanish">Spanish Portal</button>
-<button id="parentNav">Parent</button><button data-screen="practice">Practice Lab</button><button data-screen="snap">Snap-to-Game</button><button data-screen="bites">My Bites</button><button data-screen="profiles">Profiles</button><button data-screen="recovery">Recovery</button><button data-screen="account">Account & Sync</button><button data-screen="integrations">Integrations</button><button data-screen="controls">Parent Controls</button><button data-screen="diagnostics">Diagnostics</button><button data-screen="qa">BrainBite Lab</button><button data-screen="release">Release</button><button data-screen="settings">Settings</button>
+<nav id="childDock" class="child-dock" aria-label="Child navigation">
+<button data-screen="home"><span aria-hidden="true">&#8962;</span>Home</button>
+<button data-screen="worlds"><span aria-hidden="true">&#128506;</span>Worlds</button>
+<button data-screen="practice"><span aria-hidden="true">&#128214;</span>Practice</button>
+<button data-screen="brainbase"><span aria-hidden="true">&#127968;</span>BrainBase</button>
+<button data-screen="bites"><span aria-hidden="true">&#11088;</span>Collection</button>
+</nav>
+<nav id="parentShellNav" class="parent-shell-nav" aria-label="Parent dashboard" hidden>
+<button data-screen="parent">Progress</button><button data-screen="controls">Limits</button><button data-screen="profiles">Profiles</button><button data-screen="account">Account &amp; Sync</button><button data-screen="recovery">Recovery</button><button data-screen="advanced">Advanced</button><button id="parentExitToChild" type="button" class="parent-exit" aria-label="Back to kid hub">&#8592; Kid hub</button>
 </nav>
 <main id="main">
 <section id="home" class="screen show">
-<div class="dash-shell home-shell">
+<div class="dash-shell home-shell home-target">
 <div class="dash-top">
 <div class="dash-profile">
 <img id="homeAvatar" src="assets/art/nib.svg" alt="Active Bite avatar">
@@ -22,29 +29,36 @@
 </div>
 </div>
 <div class="dash-counters">
-<div class="dash-counter"><strong id="homeBrainBites">0</strong><span>BrainBites</span></div>
-<div class="dash-counter"><strong id="homeBrainifacts">0</strong><span>Brainifacts</span></div>
-<div class="dash-counter"><strong id="homeEnergy">5</strong><span>Full</span></div>
+<div class="dash-counter currency-star"><strong id="homeBrainBites">0</strong><span>BrainBites</span></div>
+<div class="dash-counter currency-gem"><strong id="homeBrainifacts">0</strong><span>Brainifacts</span></div>
 </div>
-<div class="dash-quick-actions">
-<button data-screen="diagnostics" aria-label="Home Achievements">Achievements</button>
-<button data-screen="settings" aria-label="Home Options">Settings</button>
-<button data-screen="parent" aria-label="Home Family">Parents</button>
+<div class="dash-quick-actions" aria-label="Child utilities">
+<button data-child-utility data-screen="profile" class="orb-btn orb-profile"><span class="orb-glyph" aria-hidden="true">&#128100;</span><span>Profile</span></button>
+<button data-child-utility data-screen="settings" class="orb-btn orb-settings"><span class="orb-glyph" aria-hidden="true">&#9881;</span><span>Settings</span></button>
+<button data-child-utility id="parentNav" data-screen="parent" class="orb-btn orb-parents"><span class="orb-glyph" aria-hidden="true">&#128106;</span><span>Parents</span></button>
 </div>
+</div>
+<div id="firstRunCard" class="first-run-card" hidden>
+<div class="first-run-step">
+<small>WELCOME</small>
+<h3 id="firstRunTitle">What should Bite call you?</h3>
+<p id="firstRunText">Your name shows up on your BrainBase and your trophies.</p>
+</div>
+<div class="first-run-controls">
+<label id="firstRunNameLabel">Your name <input id="firstRunName" maxlength="24" autocomplete="off" spellcheck="false"></label>
+<button id="firstRunConfirm" type="button">Let&#39;s go</button>
+</div>
+<p id="firstRunStatus" class="sr-only" role="status" aria-live="polite"></p>
 </div>
 <div class="home-grid">
-<section class="home-rail" aria-label="Main menu">
+<section class="home-rail home-primary-actions" aria-label="Primary activities">
 <h3>MAIN MENU</h3>
-<button id="continueBtn" class="rail-play" aria-label="Continue Adventure"><span class="rail-icon">▶</span><span><strong>PLAY</strong><small>Jungle Circuit</small></span></button>
-<button data-screen="practice" class="rail-brain" aria-label="Home Practice and Learn"><span class="rail-icon">B</span><span><strong>BRAIN BITE</strong><small>Practice &amp; Learn</small></span></button>
-<button data-screen="math" class="rail-quests" aria-label="Home Missions and Goals"><span class="rail-icon">Q</span><span><strong>QUESTS</strong><small>Missions &amp; Goals</small></span></button>
-<button data-screen="brainbase" class="rail-base" aria-label="Home BrainBase Hub"><span class="rail-icon">H</span><span><strong>BRAINBASE</strong><small>Your Home Hub</small></span></button>
-<button data-screen="bites" class="rail-shop" aria-label="Home Shop and Upgrades"><span class="rail-icon">S</span><span><strong>SHOP</strong><small>Cosmetics &amp; Upgrades</small></span></button>
-<button data-screen="math" class="rail-worlds" aria-label="Home Adventure Map"><span class="rail-icon">W</span><span><strong>WORLDS</strong><small>Adventure Map</small></span></button>
-<button data-screen="release" class="rail-news" aria-label="Home News and Events"><span class="rail-icon">N</span><span><strong>NEWS &amp; EVENTS</strong><small>Double BrainBites Weekend</small></span></button>
-<button id="memoryBtn" class="rail-memory"><span class="rail-icon">M</span><span><strong>MEMORY DROP</strong><small>Due review missions</small></span></button>
-<button id="installBtn" class="rail-install" hidden>Install BrainBite</button>
-<span id="updateStatus"></span>
+<button id="continueBtn" class="rail-play" aria-label="Continue Adventure"><span class="rail-icon">&#9654;</span><span><strong>PLAY</strong><small>Jungle Circuit</small></span><span class="rail-thumb" aria-hidden="true"></span></button>
+<button data-screen="practice" class="rail-brain" aria-label="Practice Lab"><span class="rail-icon" aria-hidden="true">&#128214;</span><span><strong>PRACTICE</strong><small>Build a learning activity</small></span></button>
+<button data-screen="worlds" class="rail-worlds" aria-label="Worlds"><span class="rail-icon" aria-hidden="true">&#128506;</span><span><strong>WORLDS</strong><small>Choose an adventure</small></span></button>
+<button data-screen="brainbase" class="rail-base" aria-label="BrainBase"><span class="rail-icon" aria-hidden="true">&#127968;</span><span><strong>BRAINBASE</strong><small>Your learning hub</small></span></button>
+<button data-screen="bites" class="rail-shop" aria-label="My Bites"><span class="rail-icon" aria-hidden="true">&#128722;</span><span><strong>COLLECTION &amp; SHOP</strong><small>Bites and cosmetics</small></span></button>
+<button data-screen="code" class="rail-code" aria-label="Code"><span class="rail-icon" aria-hidden="true">&lt;/&gt;</span><span><strong>CODE</strong><small>Code Bridge and Code Lab</small></span></button>
 </section>
 <section class="home-scene">
 <div class="home-stage">
@@ -65,7 +79,7 @@
 <h3 id="homeGoalTitle">Solve 5 missions</h3>
 <div class="goal-bar"><span id="homeGoalBar"></span></div>
 <p id="homeGoalText">Jungle Circuit is ready.</p>
-<p class="goal-reward">Reward: <b id="homeGoalReward">75 Star</b></p>
+<p class="goal-reward">Reward: <b id="homeGoalReward">75 &#11088;</b></p>
 </div>
 <div class="reward-card">
 <small>NEXT REWARD</small>
@@ -75,41 +89,47 @@
 </div>
 <div class="streak-card">
 <small>DAILY STREAK</small>
-<h3 id="homeStreak">Keep it up</h3>
+<h3 id="homeStreak"><span class="streak-flame" aria-hidden="true">&#128293;</span> Keep it up</h3>
 <div class="streak-dots" id="homeStreakDots"></div>
 <p id="launchHint" class="small"></p>
 </div>
 </aside>
 </div>
-<div class="home-bottom">
-<div class="home-news">
-<h3>NEWS &amp; EVENTS</h3>
-<p><b>DOUBLE BRAINBITES WEEKEND!</b></p>
-<p>Earn 2x BrainBites in all activities.</p>
-<div class="news-badges"><span>2x</span><span>Stars</span></div>
-</div>
-<div class="home-dock">
-<button data-screen="profiles" aria-label="Profile">Profile</button>
-<button data-screen="profiles" aria-label="Friends">Friends</button>
-<button data-screen="bites" aria-label="Collection">Collection</button>
-<button data-screen="diagnostics" aria-label="Badges">Badges</button>
-<button data-screen="release" aria-label="Leaderboards">Leaderboards</button>
-</div>
-<div class="home-promo">
-<h3>NEW UPDATE!</h3>
-<p>More secrets, quests, and rewards!</p>
-<button data-screen="release">SEE WHAT&apos;S NEW</button>
-</div>
-</div>
 </div>
 </section>
-<section id="brainbase" class="screen"><h2>BrainBase Greybox</h2><div id="brainbase-root"></div></section>
+<section id="brainbase" class="screen"><h2>BrainBase Greybox</h2><div id="brainbase-root"></div>
+<section class="bb-world-gateway" aria-label="BrainBase World Gateway">
+  <div class="bb-world-gateway-heading">
+    <div><p class="bb-world-gateway-kicker">BRAINBASE / EXPLORE</p><h3>World Gateway</h3></div>
+    <span class="bb-world-gateway-badge">Internal preview</span>
+  </div>
+  <details class="bb-world-gateway-card">
+    <summary aria-label="Bubble Reef: expand or collapse the internal visual preview">
+      <span class="bb-world-gateway-portal" aria-hidden="true"></span>
+      <span class="bb-world-gateway-copy"><strong>Bubble Reef</strong><span>A peek beneath the waves.</span></span>
+      <span class="bb-world-gateway-action">View preview</span>
+    </summary>
+    <div class="bb-world-gateway-preview">
+      <div class="bb-world-gateway-seascape" role="img" aria-label="Bubble Reef concept preview: glowing bubbles above a colorful coral seabed"></div>
+      <p>Explore a first look at Bubble Reef. This visual preview does not launch a mission; gameplay and rewards are still under internal review.</p>
+      <button id="bubbleReefLivePreviewBtn" class="bb-world-gateway-live" type="button" hidden>Open live 3D preview</button>
+      <p id="bubbleReefLivePreviewStatus" class="small" role="status" aria-live="polite"></p>
+    </div>
+  </details>
+</section>
+</section>
+<section id="worlds" class="screen"><h2>Worlds</h2><p class="screen-intro">Choose a world to see its missions and continue your adventure.</p><div class="world-chooser cards"><button data-screen="math" aria-label="Number Nebula"><strong>Number Nebula</strong><span>Math missions</span></button><button data-screen="words" aria-label="Wordwood"><strong>Wordwood</strong><span>Reading and word missions</span></button><button data-screen="spanish" aria-label="Spanish Portal"><strong>Spanish Portal</strong><span>Spanish missions</span></button></div></section>
+<section id="code" class="screen"><h2>Code</h2><p class="screen-intro">Choose a guided coding path.</p><div class="code-chooser cards"><button data-screen="codebridge" aria-label="Code Bridge"><strong>Code Bridge</strong><span>Learn with guided commands</span></button><button data-screen="codelab" aria-label="Code Lab"><strong>Code Lab</strong><span>Build and replay a local project</span></button></div></section>
+<section id="profile" class="screen"><h2>Profile</h2><div class="panel child-profile-panel"><p>Playing as <strong id="childActiveProfile">Kid 1</strong>.</p><p class="small">Switch learners here. Adding, exporting, or deleting profiles requires a parent.</p><div id="childProfileList" aria-label="Learner profiles"></div></div></section>
+<section id="codebridge" class="screen"><h2>Code Bridge</h2><div class="panel code-bridge-panel"><p>Write a small safe program to power the Jungle Circuit bridge. Only the commands listed below can run.</p><button id="codeSuggest" type="button">Suggest Next Lesson</button><span id="codeLessonLabel" class="small"></span><textarea id="codeProgram" rows="8" spellcheck="false" aria-label="Code Bridge program"># Open the bridge
+bridge.open()
+player.move()</textarea><div class="code-bridge-actions"><button id="codeRun">Run</button><button id="codeStep">Step</button><button id="codeReset">Reset</button></div><p class="small">Allowed: <code>bridge.open()</code>, <code>bridge.close()</code>, <code>player.move()</code>, <code>player.jump()</code>, <code>gate.unlock()</code>, <code>light.on()</code>, <code>platform.move(1-5)</code></p><p id="codeBridgeFeedback" role="status" aria-live="polite">Ready.</p><pre id="codeBridgeState" class="code-bridge-output"></pre><pre id="codeBridgeTrace" class="code-bridge-output"></pre></div></section>
 <section id="math" class="screen"><h2>Number Nebula</h2><div id="mathList"></div></section>
 <section id="words" class="screen"><h2>Wordwood</h2><div id="wordsList"></div></section>
 <section id="spanish" class="screen"><h2>Spanish Portal</h2><div id="spanishList"></div></section>
 
 <section id="parent" class="screen"><h2>Parent Dashboard</h2>
-<div id="parentGate" class="panel"><h3>Parent Gate</h3><p>Enter your 4-digit parent PIN.</p><input id="parentPinInput" inputmode="numeric" maxlength="4" placeholder="PIN"><button id="unlockParent">Unlock</button><p id="parentGateMsg"></p></div>
+<div id="parentGate" class="panel"><h3>Parent Gate</h3><p id="parentGatePrompt">Set up a 6-10 digit family PIN to protect parent areas on this device.</p><label>PIN <input id="parentPinInput" type="password" inputmode="numeric" minlength="6" maxlength="10" autocomplete="current-password"></label><label id="confirmParentPinLabel">Confirm PIN <input id="confirmParentPin" type="password" inputmode="numeric" minlength="6" maxlength="10" autocomplete="new-password"></label><button id="unlockParent">Set PIN</button><p id="parentGateMsg" role="status" aria-live="polite"></p></div>
 <div id="parentContent" hidden>
 <div class="cards"><div><h3>Math</h3><p id="parentMath">0%</p></div><div><h3>Words</h3><p id="parentWords">0%</p></div><div><h3>Spanish</h3><p id="parentSpanish">0%</p></div></div>
 <div class="panel"><h3>Recommended Next</h3><p id="recommendedSkill">Play more missions to generate a recommendation.</p></div>
@@ -118,27 +138,32 @@
 <div class="panel"><h3>Weekly Summary</h3><div id="weeklySummary"></div></div>
 <div class="panel"><h3>Skill Priority</h3><div id="skillPriority"></div></div>
 <div class="panel"><h3>Homework Loop</h3><div id="homeworkSummary"></div></div>
-<div class="panel"><h3>Parent Settings</h3><label>Change PIN <input id="newParentPin" inputmode="numeric" maxlength="4" placeholder="4 digits"></label><button id="saveParentPin">Save PIN</button></div>
+<div class="panel"><h3>Parent Settings</h3><label>Current PIN <input id="changeCurrentParentPin" type="password" inputmode="numeric" minlength="6" maxlength="10" autocomplete="current-password"></label><label>New PIN <input id="newParentPin" type="password" inputmode="numeric" minlength="6" maxlength="10" autocomplete="new-password"></label><label>Confirm new PIN <input id="changeConfirmParentPin" type="password" inputmode="numeric" minlength="6" maxlength="10" autocomplete="new-password"></label><button id="saveParentPin">Change PIN</button><button id="lockParent" type="button">Lock Parent Areas</button><p id="parentPinStatus" role="status" aria-live="polite"></p></div>
+</div></section>
+<section id="advanced" class="screen"><h2>Advanced</h2><p class="screen-intro">Parent-authorized setup and support tools.</p><div class="advanced-links cards"><button data-screen="integrations" aria-label="Integrations"><strong>Integrations</strong><span>Cloud provider setup</span></button><button data-screen="diagnostics" aria-label="Diagnostics"><strong>Diagnostics</strong><span>Save, offline, and session health</span></button><button data-screen="release" aria-label="Release"><strong>Release</strong><span>Readiness status</span></button><button data-screen="qa" class="development-only" aria-label="BrainBite Lab" hidden><strong>BrainBite Lab</strong><span>Development-only tools</span></button></div>
+<div class="panel"><h3>App &amp; Display</h3>
+<button id="installBtn" type="button" hidden>Install BrainBite on this device</button>
+<button id="applyUpdate" type="button" hidden>Reload to update BrainBite</button>
+<p id="updateStatus" class="small" role="status" aria-live="polite"></p>
+<div id="parentPresentationControl" class="parent-presentation" hidden></div>
+<p class="small" id="parentPresentationNote" hidden>Scene presentation is a device setting for this installation.</p>
 </div></section>
 
 <section id="practice" class="screen"><h2>Practice Lab</h2><div class="panel"><label>Subject <select id="practiceSubject"><option value="math">Math</option><option value="words">Words</option><option value="spanish">Spanish</option><option value="reading">Reading</option><option value="spelling">Spelling</option><option value="vocabulary">Vocabulary</option><option value="grammar">Grammar</option></select></label><label>Grade <select id="practiceGrade"><option value="K">K</option><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select></label><label>Topic <input id="practiceTopic" placeholder="e.g. fractions, synonyms, colors"></label><label>Difficulty <select id="practiceDifficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><label><input id="homeworkMode" type="checkbox"> Homework mode</label><button id="buildPractice">Build Practice</button><p id="practiceResult"></p></div></section>
 
-<section id="snap" class="screen"><h2>Snap-to-Game</h2><div class="panel"><p>Upload a worksheet image, review the topic and answers, then save practice. Image text extraction remains optional and must be reviewed before use.</p><button id="extractTextBtn">Extract Text (local helper)</button><textarea id="ocrText" rows="7" placeholder="Paste or extract worksheet text here for review"></textarea><button id="parseWorksheetText">Parse Reviewed Text</button><p id="parseResult"></p><input id="snapFile" type="file" accept="image/*"><img id="snapPreview" hidden><label>Topic <input id="snapTopic" placeholder="e.g. multiplication by 7"></label><label>Example items <textarea id="snapItems" rows="4" placeholder="7×4=28&#10;7×5=35"></textarea></label><label>Correct answers (comma separated) <input id="snapCorrect" placeholder="28, 35, 42"></label><label>Wrong answers (comma separated) <input id="snapWrong" placeholder="27, 34, 41"></label><button id="saveSnap">Validate & Save Practice</button><p id="snapResult"></p></div></section>
-
 <section id="bites" class="screen"><h2>My Bites</h2><div class="cards" id="biteCards"></div><div class="panel"><h3>Spark Shop</h3><p>You have <b id="sparkCount">0</b> Spark. Cosmetics never change gameplay power.</p><div id="shopList"></div></div></section>
-<section id="profiles" class="screen"><h2>Family Profiles</h2><div id="profileList"></div><div class="panel"><input id="newProfile" placeholder="New profile name"><button id="addProfile">Add Profile</button><button id="exportActiveProfile">Export Active Profile</button><button id="deleteActiveProfile" class="danger">Delete Active Profile</button></div></section>
+<section id="profiles" class="screen"><h2>Family Profiles</h2><div id="profileList"></div><div class="panel"><label>New profile name <input id="newProfile"></label><button id="addProfile">Add Profile</button><button id="exportActiveProfile">Export Active Profile</button><button id="deleteActiveProfile" class="danger">Delete Active Profile</button><p id="profileActionStatus" role="status" aria-live="polite"></p></div></section>
 
-<section id="recovery" class="screen"><h2>Progress Recovery</h2><div class="panel"><p id="saveHealth"></p><button id="backupBtn">Create Backup</button><button id="restoreBtn">Restore Backup</button><button id="exportBtn">Export Versioned Progress</button><input id="importFile" type="file" accept="application/json"></div></section>
+<section id="recovery" class="screen"><h2>Progress Recovery</h2><div class="panel"><p id="saveHealth"></p><button id="backupBtn">Create Backup</button><button id="restoreBtn">Restore Backup</button><button id="exportBtn">Export Versioned Progress</button><label>Import a progress file <input id="importFile" type="file" accept="application/json"></label></div></section>
 
 <section id="account" class="screen"><h2>Account & Sync</h2>
 <div class="cards"><div class="panel"><h3>Mode</h3><p id="syncMode">Local-first</p></div><div class="panel"><h3>Queue</h3><p id="syncQueueCount">0 pending</p></div><div class="panel"><h3>Last Sync</h3><p id="lastSync">Never</p></div></div>
 <div class="panel"><h3>Parent Account</h3><label>Parent email <input id="localAccountEmail" type="email" autocomplete="email" placeholder="parent@example.com"></label><label>Password <input id="parentPassword" type="password" minlength="8" autocomplete="current-password"></label><div class="cloud-actions"><button id="createCloudAccount">Create Firebase Account</button><button id="signInCloud">Sign In</button><button id="signOutCloud">Sign Out</button><button id="saveLocalAccount">Save Email Locally</button></div><p id="localAccountStatus" role="status" aria-live="polite"></p></div>
-<div class="panel"><h3>Cloud Sync</h3><p>Progress stays local until a dedicated BrainBite Firebase project is connected. Offline changes queue safely for retry.</p><div class="cloud-actions"><button id="pushCloudSync">Push to Cloud</button><button id="pullCloudSync">Pull from Cloud</button><button id="retryQueue">Retry Pending Sync</button><button id="exportCloudSnapshot">Export Account Data</button><button id="deleteCloudAccount" class="danger">Delete Cloud Data &amp; Account</button><button id="simulateSync">Run Local Sync Simulation</button><button id="testConflictMerge">Test Conflict Merge</button><button id="clearSyncQueue">Clear Queue</button></div><p id="mergeResult" role="status" aria-live="polite"></p></div>
+<div class="panel"><h3>Cloud Sync</h3><p>Progress stays local until a dedicated BrainBite Firebase project is connected. Offline changes queue safely for retry.</p><div class="cloud-actions"><button id="pushCloudSync">Push to Cloud</button><button id="pullCloudSync">Pull from Cloud</button><button id="retryQueue">Retry Pending Sync</button><button id="exportCloudSnapshot">Export Account Data</button><button id="deleteCloudAccount" class="danger">Delete Cloud Data &amp; Account</button></div><p id="mergeResult" role="status" aria-live="polite"></p></div>
 </section>
 <section id="integrations" class="screen"><h2>Integrations</h2>
 <div class="cards">
 <div class="panel"><h3>Cloud Backend</h3><p id="cloudProviderStatus">Not configured</p></div>
-<div class="panel"><h3>OCR Provider</h3><p id="ocrProviderStatus">Not configured</p></div>
 <div class="panel"><h3>Environment</h3><p id="envStatus">Local</p></div>
 </div>
 <div class="panel">
@@ -149,13 +174,6 @@
 <button id="saveCloudConfig">Save Cloud Config</button>
 <p id="cloudConfigMsg"></p><p class="small">For Firebase, use only public web-app configuration values. Never place Admin SDK/service-account secrets in the browser.</p>
 </div>
-<div class="panel">
-<h3>OCR Provider Settings</h3>
-<label>Provider <select id="ocrProvider"><option value="none">None</option><option value="custom">Custom HTTPS endpoint</option></select></label>
-<label>Endpoint URL <input id="ocrEndpoint" placeholder="https://.../ocr"></label>
-<button id="saveOcrConfig">Save OCR Config</button>
-<p id="ocrConfigMsg"></p>
-</div>
 <div class="panel"><h3>Quick Firebase Setup</h3>
 <ol><li>Create a Firebase project.</li><li>Enable Email/Password Authentication.</li><li>Create Firestore.</li><li>Deploy the included <code>firebase/firestore.rules</code>.</li><li>Paste Project ID + Web API key above.</li></ol>
 <button id="copyFirebaseChecklist">Copy Setup Checklist</button><span id="copySetupMsg"></span>
@@ -164,12 +182,12 @@
 </section>
 <section id="controls" class="screen"><h2>Parent Controls</h2>
 <div class="panel">
-<label>Daily session goal (minutes) <input id="dailyMinutes" type="number" min="5" max="180" step="5"></label>
+<label>Daily play limit (minutes) <input id="dailyMinutes" type="number" min="5" max="180" step="5"></label>
 <label>Max single session (minutes) <input id="maxSessionMinutes" type="number" min="5" max="120" step="5"></label>
-<label><input id="requireParentForSnap" type="checkbox"> Require parent unlock for Snap-to-Game</label>
 <label><input id="requireParentForPractice" type="checkbox"> Require parent unlock for Practice Lab</label>
 <button id="saveControls">Save Controls</button>
 <p id="controlsStatus"></p>
+<p id="timeLedgerWarning" class="limit-warn" role="alert" hidden></p>
 </div>
 <div class="panel"><h3>Today</h3><p id="todayUsage">0 minutes played</p><p id="sessionLimitStatus"></p></div>
 </section>
@@ -181,12 +199,13 @@
 </div>
 <div class="panel"><h3>Session Analytics</h3><div id="diagSessions"></div></div>
 <div class="panel"><h3>Release Blockers</h3><div id="releaseBlockers"></div></div>
-<button id="runSelfCheck">Run Self-Check</button><button id="runLaunchCheck">Run Launch Check</button><div id="launchCheckResult"></div>
+<div class="panel"><h3>Recent Issues</h3><p class="small">Local only, newest last. Never includes learner names, answers, or prompts.</p><div id="diagIssues"></div></div>
+<div id="launchCheckResult"></div>
 </section>
 <section id="settings" class="screen"><h2>Settings</h2><div class="panel"><label><input id="reducedMotion" type="checkbox"> Reduced motion</label><label><input id="cameraMotionReduction" type="checkbox"> Camera motion reduction</label><label><input id="largeTargets" type="checkbox"> Large touch targets</label><label><input id="highContrast" type="checkbox"> High contrast</label><label><input id="captions" type="checkbox"> Captions</label><label><input id="dyslexicFont" type="checkbox"> Dyslexic-friendly font</label><label>Text size <select id="textScale"><option value="0.9">Small</option><option value="1" selected>Default</option><option value="1.1">Large</option><option value="1.25">Extra large</option></select></label><label>Quality tier <select id="qualityTier"><option value="ultra">Ultra</option><option value="high">High</option><option value="balanced" selected>Balanced</option><option value="performance">Performance</option><option value="mobile">Mobile</option></select></label><label><input id="soundOn" type="checkbox" checked> Sound effects</label><label><input id="musicOn" type="checkbox"> Background music</label><label>Enemy speed <select id="enemySpeed"><option value="slow">Slow</option><option value="normal">Normal</option><option value="fast">Fast</option></select></label></div></section>
 
 <section id="game" class="screen">
-<div class="battle-shell">
+<div class="battle-shell battle-target">
 <div class="battle-top">
 <div class="battle-profile">
 <img id="nib" src="assets/art/nib.svg" alt="Current Bite character">
@@ -194,31 +213,31 @@
 <small id="worldLabel"></small>
 <h2 id="battleProfileName">Alex</h2>
 <div class="battle-meta"><span><b id="battleProfileLevel">Level 12</b></span><span><b id="battleProfileStars">3,450</b> BrainBites</span></div>
+<div class="goal-card battle-inline-goal">
+<small>CURRENT GOAL</small>
+<h3 id="battleGoalTitle">Solve the mission</h3>
+<div class="goal-bar"><span id="battleGoalBar"></span></div>
+<p id="battleGoalText">Choose the correct tile to continue.</p>
+</div>
 </div>
 </div>
 <div class="battle-prompt">
-<button id="speakPrompt">Repeat Prompt</button>
+<button id="speakPrompt" aria-label="Repeat prompt" title="Repeat prompt">&#128266;</button>
+<button id="speakFeedback" class="speak-feedback" aria-label="Read the feedback aloud" title="Read the feedback aloud">&#128483;</button>
 <h2 id="prompt"></h2>
 <p id="feedback" role="status" aria-live="polite">Ready.</p>
+<p id="firstRunHint" class="first-run-hint" hidden></p>
 <div class="battle-meta"><span><b id="lives">3</b> lives</span><span><b id="combo">0</b> combo</span><span><b id="targets">0/0</b> targets</span></div>
 <p id="captionText" class="small" hidden></p>
 </div>
 <div class="battle-combo">
 <small>Combo</small>
 <strong id="comboBanner">x0</strong>
-<div class="battle-stars" aria-hidden="true"><span>★</span><span>★</span><span>☆</span></div>
+<div class="battle-stars" aria-hidden="true"><span>&#9733;</span><span>&#9733;</span><span>&#9734;</span></div>
 </div>
-<button id="exitBtn" class="battle-pause" aria-label="Exit">Pause</button>
+<button id="exitBtn" class="battle-pause" aria-label="Exit" title="Pause">&#10074;&#10074;</button>
 </div>
 <div class="battle-main">
-<aside class="battle-left">
-<div class="goal-card">
-<small>CURRENT GOAL</small>
-<h3 id="battleGoalTitle">Solve the mission</h3>
-<div class="goal-bar"><span id="battleGoalBar"></span></div>
-<p id="battleGoalText">Choose the correct tile to continue.</p>
-</div>
-</aside>
 <div class="battle-scene">
 <div class="battle-frame">
 <div id="board" class="board" role="grid" aria-label="Game board"></div>
@@ -226,29 +245,42 @@
 <div class="touch" aria-label="Touch movement controls"><button data-d="u" aria-label="Move up">▲</button><div><button data-d="l" aria-label="Move left">◀</button><button data-d="d" aria-label="Move down">▼</button><button data-d="r" aria-label="Move right">▶</button></div></div>
 </div>
 <aside class="battle-right">
-<div id="bossBox" hidden class="boss-card"><h3 id="bossName">Boss</h3><progress id="bossHealth" max="100" value="100" aria-label="Boss health"></progress><p id="bossPhase">Phase 1</p></div>
-<div class="reward-card">
+<div id="bossBox" class="boss-card"><div class="boss-art" aria-hidden="true"></div><div class="boss-copy"><h3 id="bossName">Fraction Kraken</h3><progress id="bossHealth" max="100" value="100" aria-label="Boss health"></progress><p id="bossPhase">Phase 1 of 6</p></div></div>
+<div class="reward-card battle-toast">
 <small>RIGHT NOW</small>
-<h3 id="battleRewardTitle">Great job!</h3>
-<div class="goal-bar"><span id="battleRewardBar"></span></div>
-<p id="battleRewardText">+25 BrainBites</p>
+<div class="toast-row"><span class="toast-medal" aria-hidden="true">&#129351;</span><div><h3 id="battleRewardTitle">Great job!</h3><p id="battleRewardText">+25 BrainBites</p></div></div>
 </div>
-<div class="minimap-card"><h3>Jungle Circuit</h3><div class="minimap"></div></div>
+<div class="minimap-card"><h3 id="minimapTitle">Jungle Circuit</h3><div id="minimapNodes" class="minimap" role="img" aria-label="Mission route map"></div></div>
 </aside>
 </div>
 <div class="battle-bottom">
-<div class="battle-dock">
-<button data-screen="brainbase">BrainBase</button>
-<button data-screen="math">Quests</button>
-<button data-screen="bites">Inventory</button>
-<button data-screen="diagnostics">Stats</button>
-<button data-screen="settings">Settings</button>
+<div class="battle-health" aria-label="Health">
+<span class="health-heart" aria-hidden="true">&#10084;</span>
+<div class="health-track"><span id="healthFill" class="health-fill"></span></div>
+<strong id="healthText">3 / 3</strong>
 </div>
 </div>
 </div>
 </section>
-<section id="qa" class="screen"><h2>BrainBite Lab</h2>
+<section id="timeup" class="screen time-up-screen" aria-labelledby="timeUpHeading">
+<div class="time-up-card">
+<div class="time-up-mark" aria-hidden="true">&#9203;</div>
+<p class="time-up-kicker">BREAK TIME</p>
+<h2 id="timeUpHeading">Time for a recharge</h2>
+<p id="timeUpMessage" role="status" aria-live="polite">Today&apos;s play time is finished. Great work today!</p>
+<p id="timeRemaining">No play time remains. A parent can add 15 active minutes.</p>
+<div class="time-up-parent">
+<label for="timeUpParentPin">Parent PIN</label>
+<input id="timeUpParentPin" type="password" inputmode="numeric" minlength="6" maxlength="10" autocomplete="current-password">
+<button id="timeUpParentOverride" type="button">Parent: add 15 minutes</button>
+</div>
+<button id="timeUpReturnHome" type="button" class="time-up-home">Return home</button>
+<p id="timeUpStatus" role="status" aria-live="polite"></p>
+</div>
+</section>
+<section id="qa" class="screen" hidden><h2>BrainBite Lab</h2>
 <p class="small">Development-only controls for learner simulation, progression, recovery, and profile isolation.</p>
+<div id="labDeveloperTools" class="panel"></div>
 <div class="cards">
 <div class="panel"><h3>Learner</h3><p id="labActiveLearner">No learner loaded.</p><p id="labStage">Stage: unknown</p><p id="labQueue">Offline queue: 0</p></div>
 <div class="panel"><h3>Mastery</h3><p id="labMastery">No skill selected.</p><p id="labReview">No review scheduled.</p></div>
@@ -307,9 +339,32 @@
 <div class="cards">
 <div class="panel"><h3>Core App</h3><p class="diag-ok">Built</p></div>
 <div class="panel"><h3>Firebase</h3><p id="releaseFirebase">Open</p></div>
-<div class="panel"><h3>OCR</h3><p id="releaseOcr">Optional / Open</p></div>
 </div>
 <div class="panel"><h3>Final Gates</h3><div id="finalGates"></div></div>
 <div class="panel"><h3>Backup Before Release</h3><button id="downloadReleaseBackup">Download Full Backup</button><button id="downloadDiagnostics">Download Diagnostics</button></div>
 </section>
-</main><footer><a href="privacy.html">Privacy</a> · <a href="support.html">Support</a> · <a href="terms.html">Terms</a></footer></div><script src="app.js"></script><script type="module" src="brainbite-core.mjs"></script><script>if('serviceWorker'in navigator){navigator.serviceWorker.register('./service-worker.js').catch(()=>{});}</script></body></html>
+
+<div id="sensitiveActionBackdrop" class="sensitive-action-backdrop" hidden>
+<section id="sensitiveActionDialog" class="sensitive-action-dialog" role="dialog" aria-modal="true" aria-labelledby="sensitiveActionTitle" aria-describedby="sensitiveActionDescription" tabindex="-1">
+<h2 id="sensitiveActionTitle">Confirm parent action</h2>
+<p id="sensitiveActionDescription"></p>
+<label id="sensitiveActionConfirmationLabel" hidden><span id="sensitiveActionConfirmationPrompt"></span><input id="sensitiveActionConfirmation" autocomplete="off" spellcheck="false"></label>
+<label>Family PIN <input id="sensitiveActionPin" type="password" inputmode="numeric" minlength="6" maxlength="10" autocomplete="off"></label>
+<p id="sensitiveActionStatus" class="sensitive-action-status" role="alert" aria-live="assertive"></p>
+<div class="sensitive-action-buttons"><button id="sensitiveActionCancel" type="button">Cancel</button><button id="sensitiveActionConfirm" type="button" class="danger">Continue</button></div>
+</section>
+</div>
+<section id="codelab" class="screen"><h2>Code Lab</h2><div class="panel code-bridge-panel"><p>Build and replay a small local project. Code Lab runs the same safe command set as Code Bridge and never executes arbitrary JavaScript.</p><label>Project name <input id="codeLabName" value="my-bridge" maxlength="40"></label><textarea id="codeLabProgram" rows="8" spellcheck="false" aria-label="Code Lab project program"># Build the route
+bridge.open()
+gate.unlock()</textarea><div class="code-bridge-actions"><button id="codeLabRun">Run Project</button><button id="codeLabReset">Reset Project</button><button id="codeLabExport">Export Project</button><button id="codeLabImport">Import Project</button><input id="codeLabImportFile" type="file" accept="application/json" aria-label="Import a Code Lab project file" hidden></div><p id="codeLabFeedback" role="status" aria-live="polite">Ready.</p><pre id="codeLabState" class="code-bridge-output"></pre></div></section>
+</main><div id="landscapePrompt" class="landscape-prompt" role="dialog" aria-labelledby="landscapePromptTitle" hidden>
+<div class="landscape-prompt-card">
+<span class="landscape-prompt-icon" aria-hidden="true">&#128241;</span>
+<div>
+<h2 id="landscapePromptTitle">Turn your device upright</h2>
+<p>BrainBite battles fit better in portrait, so the answers stay big enough to tap.</p>
+<p id="landscapePromptStatus" class="sr-only" role="status" aria-live="polite"></p>
+</div>
+<button id="landscapePromptDismiss" type="button">Play anyway</button>
+</div>
+</div><footer><a href="privacy.html">Privacy</a> · <a href="support.html">Support</a> · <a href="terms.html">Terms</a></footer></div><script src="content/storage-copies.js"></script><script src="content/experience-registry.js"></script><script src="content/content-review-manifest.js"></script><script src="content/content-control-gate.js"></script><script src="app.js"></script><script type="module" src="presentation/boot.mjs"></script><script type="module" src="brainbite-core.mjs"></script><script type="module" src="content/typing-progression.mjs"></script><script type="module" src="content/code-bridge.mjs"></script><script type="module" src="content/code-bridge-curriculum.mjs"></script><script type="module" src="content/code-lab.mjs"></script><script type="module" src="content/programmable-bits.mjs"></script><script type="module" src="content/programmable-bit-curriculum.mjs"></script><script src="sw-register.js"></script></body></html>

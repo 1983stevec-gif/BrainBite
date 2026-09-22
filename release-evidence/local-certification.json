@@ -1,0 +1,185 @@
+{
+  "schema": "brainbite.local-certification.v1",
+  "generatedAt": "2026-09-22T19:03:51.812Z",
+  "branch": "batch-9-webgl-spike",
+  "commit": "57864b495ea9e967a02ec56496999b92e1653a3f",
+  "workingTreeClean": true,
+  "scope": "local automated release certification",
+  "results": [
+    {
+      "label": "content",
+      "command": "npm.cmd run check:content",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1284,
+      "output": "\n> brainbite@2.0.0 check:content\n> node scripts/validate-content.mjs\n\nOK experience-registry.js\nOK concept-morph-v1.8.json\nOK content-manifest.json\nOK curriculum-map-v1.4.json\nOK french-core-v1.json\nOK german-core-v1.json\nOK italian-core-v1.json\nOK japanese-core-v1.json\nOK language-depth-v1.8.json\nOK language-question-bank-v1.7.json\nOK language-question-bank-v1.9.json\nOK math-35-v1.json\nOK math-6-v1.json\nOK math-core-v1.json\nOK math-curated-v3.json\nOK math-expanded-v2.json\nOK math-k2-v1.json\nOK math-question-bank-v1.7.json\nOK math-question-bank-v1.9.json\nOK spanish-core-v1.json\nOK spanish-curated-v3.json\nOK spanish-expanded-v2.json\nOK words-35-v1.json\nOK words-6-v1.json\nOK words-core-v1.json\nOK words-curated-v3.json\nOK words-expanded-v2.json\nOK words-k2-v1.json\nOK words-question-bank-v1.7.json\nOK words-question-bank-v1.9.json\nOK content/skill-links.v1.json\nValidated registry plus 29 packs and 70 question sets.\nAnswer counts (JSON packs): raw-valid=40 taxonomy-linked=17 quarantined/unlinked=23.\nAll raw-answer sets: raw-valid=70 (registry=30, json=40).\n"
+    },
+    {
+      "label": "content-review",
+      "command": "npm.cmd run check:content-review",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1959,
+      "output": "\n> brainbite@2.0.0 check:content-review\n> node scripts/validate-code-bridge-content.mjs && node scripts/validate-programmable-bit-content.mjs && node scripts/validate-content-review.mjs\n\nOK Coding Bridge curriculum: 4 lessons validated; runtime status internal-review.\nOK Programmable Bit curriculum: 4 lessons validated; runtime status internal-review.\nOK content/content-review-manifest.js\nValidated 105 records: 30 missions, 35 generated templates, 40 JSON pack items.\nJSON pack control state: linked=17 non-production, quarantined=23.\n"
+    },
+    {
+      "label": "runtime",
+      "command": "npm.cmd run check:runtime",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1064,
+      "output": "\n> brainbite@2.0.0 check:runtime\n> node scripts/validate-runtime.mjs\n\nRuntime structure validation passed.\n"
+    },
+    {
+      "label": "release-structure",
+      "command": "npm.cmd run check:release",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1169,
+      "output": "\n> brainbite@2.0.0 check:release\n> node scripts/validate-release.mjs\n\nRelease structure validation passed.\n"
+    },
+    {
+      "label": "firebase-structure",
+      "command": "npm.cmd run check:firebase",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1081,
+      "output": "\n> brainbite@2.0.0 check:firebase\n> node scripts/validate-firebase.mjs\n\nFirebase rules structure and security contract validated.\n"
+    },
+    {
+      "label": "launch-structure",
+      "command": "npm.cmd run check:launch",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1131,
+      "output": "\n> brainbite@2.0.0 check:launch\n> node scripts/validate-launch.mjs\n\nLaunch candidate structure validated.\n"
+    },
+    {
+      "label": "final-hardening",
+      "command": "npm.cmd run check:final",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1049,
+      "output": "\n> brainbite@2.0.0 check:final\n> node scripts/validate-final.mjs\n\nFinal hardening structure validated.\n"
+    },
+    {
+      "label": "firebase-security",
+      "command": "npm.cmd run check:firebase:security",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1071,
+      "output": "\n> brainbite@2.0.0 check:firebase:security\n> node scripts/validate-firebase-security.mjs\n\nFirebase ownership, schema bounds, secret rejection, and tombstone invariants validated structurally.\nRun tests/firebase-security-rules.test.mjs with FIRESTORE_EMULATOR_HOST for executable rule behavior evidence.\n"
+    },
+    {
+      "label": "release-evidence",
+      "command": "npm.cmd run check:evidence",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 2963,
+      "output": "\n> brainbite@2.0.0 check:evidence\n> node scripts/validate-evidence.mjs\n\nRelease evidence validated.\n"
+    },
+    {
+      "label": "unit-tests",
+      "command": "npm.cmd run test:unit",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 41948,
+      "output": "Blender rejection diagnostics and removes staging output (17.6868ms)\n✔ normalization rejects unchanged output paired with a fabricated minimal report (20.2213ms)\n✔ text hashing ignores CRLF versus LF so the manifest is platform independent (6.9915ms)\n✔ binary assets are hashed byte for byte and are never normalized (5.1386ms)\n✔ a manifest covers every file in the package directory (6.9602ms)\n✔ sample summaries compute nearest-rank percentiles and aggregate metrics (1.8249ms)\n✔ empty samples have explicit null statistics and no violations (0.9419ms)\n✔ timers use the injected clock and report every exceeded budget (0.7284ms)\n✔ memory sampling accepts performance-like sources and skips unavailable memory (0.3711ms)\n✔ tier recommendation accounts for frame tails and available memory evidence (0.3557ms)\n✔ convenience recorders keep presentation timings independent (0.1956ms)\n✔ long-task observer records main-thread stalls and disconnects safely (0.2623ms)\n✔ renderer sampling records injected memory and render-call statistics (0.2801ms)\n✔ asset timing summary aggregates durations, bytes, and the slowest asset (0.72ms)\n✔ resource timing sampling is idempotent across repeated reports (1.1929ms)\n✔ renderer and asset sources skip unavailable values with explicit empty summaries (0.2134ms)\n✔ renderer and asset budget overruns are reported as violations (0.1786ms)\n✔ budget violations split into headless-judgeable and device-only evidence (0.1908ms)\n✔ the payload budget is a positive, environment-independent byte ceiling (0.0964ms)\n(node:44208) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///D:/Codex/Brainbite/vendor/three/three.module.js is not specified and it doesn't parse as CommonJS.\nReparsing as ES module because module syntax was detected. This incurs a performance overhead.\nTo eliminate this warning, add \"type\": \"module\" to \\\\?\\D:\\Codex\\Brainbite\\package.json.\n(Use `node --trace-warnings ...` to show where the warning was created)\n✔ programmable Bit presentation is reusable, event-reactive, and disposable (5.4847ms)\n✔ jungle scenery is deterministic and uses three instanced batches (5.9915ms)\n✔ scene disposal releases instance buffers and shared resources exactly once (0.399ms)\n✔ tree batching preserves every original geometry, material, and world transform (5.0085ms)\n✔ camera fitting retains horizontal landmarks from portrait to widescreen (0.6864ms)\n✔ graphics tiers cap real renderer pixel ratio and shadow allocation (0.235ms)\n✔ character animation freezes at rest under reduced motion and releases actions (1.9805ms)\n✔ character animation exposes semantic states without requiring extra clips (0.6177ms)\n✔ reduced-motion reactions are deterministic for every semantic state (0.9434ms)\n✔ character reaction disposal restores transforms and is safe without an idle clip (0.2725ms)\n✔ shipped Bite GLB contains the six-bone rig, idle clip, and no starter hat (4.5304ms)\n✔ Programmable Bit lessons are deterministic and bounded to allowlisted actions (1.1792ms)\n✔ Programmable Bit lessons unlock in prerequisite order and select deterministically (0.2497ms)\n✔ Programmable Bit lesson validation rejects empty IDs, malformed prerequisites, and unsafe actions (1.1648ms)\n✔ Programmable Bit lessons remain explicitly in production internal review (0.3487ms)\n✔ programmable Bits execute only declarative bounded actions (1.7138ms)\n✔ programmable Bits reset deterministically and reject oversized behavior (0.2691ms)\n✔ programmable Bits reject ambiguous IDs and inherited or sparse behavior (0.1896ms)\n✔ startup readiness is recorded once in the existing startup budget (2.199ms)\n✔ screen changes record labeled navigation samples in the scene-load budget (0.2982ms)\n✔ telemetry keeps the performance-budget report contract additive (0.2023ms)\n✔ rotation keeps three distinct generations and moves the primary to backup (0.7676ms)\n✔ rotation writes the oldest slot first so an interrupted write leaves a snapshot (1.2009ms)\n✔ rotation survives a corrupt primary and a corrupt backup (0.1444ms)\n✔ readAll prefers the primary and falls back only when a copy is unreadable (0.2287ms)\n✔ readEvery returns every readable generation oldest first (0.2544ms)\n✔ converge writes every slot and is idempotent (0.1626ms)\n✔ a storage that throws propagates so the caller can report it (0.3654ms)\n✔ a failed read never produces a partial generation set (0.1596ms)\n✔ typing scoring reports normalized accuracy and WPM (0.819ms)\n✔ assistance is distinct from independent typing evidence (0.2483ms)\n✔ rapid random answers cannot become mastery (0.2435ms)\n✔ mastery requires repeated independent evidence rather than one lucky answer (0.7561ms)\n✔ invalid, duplicate, and implausibly rapid evidence cannot grant mastery (0.2117ms)\n✔ BrainBase exposes a truthful, accessible Bubble Reef preview gateway (8.8595ms)\n✔ complete pipeline reports deterministic module reuse coverage (3.782ms)\n✔ missing or unimported modules lower coverage instead of being inferred (0.6032ms)\n✔ static WebGL and performance signals require every declared token (0.4054ms)\n✔ retained performance metadata stays diagnostic and devices stay unverified (0.3271ms)\n✔ missing and malformed artifacts are reported without manufacturing evidence (0.2897ms)\n(node:37244) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///D:/Codex/Brainbite/vendor/three/three.module.js is not specified and it doesn't parse as CommonJS.\nReparsing as ES module because module syntax was detected. This incurs a performance overhead.\nTo eliminate this warning, add \"type\": \"module\" to \\\\?\\D:\\Codex\\Brainbite\\package.json.\n(Use `node --trace-warnings ...` to show where the warning was created)\n✔ world profiles are valid, deterministic, and isolated copies (2.2256ms)\n✔ invalid world profiles are rejected without affecting the registry (0.4154ms)\n✔ Bubble Reef decor is reusable and disposable (5.7988ms)\nℹ tests 201\nℹ suites 0\nℹ pass 201\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 40937.8272\n"
+    },
+    {
+      "label": "release-browser",
+      "command": "npm.cmd exec -- playwright test tests/release.spec.js --reporter=json --retries=1",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 266919,
+      "output": "s:1413:5 › sync history stays bounded, prioritizes deletes, and deterministically normalizes legacy events\n[44/92] tests\\release.spec.js:1455:5 › canonical tombstones remain retryable beyond the bounded sync queue\n[45/92] tests\\release.spec.js:1477:5 › retry pending sync applies merged remote evidence to memory and recovery copies\n[46/92] tests\\release.spec.js:1514:5 › retry pending sync applies remote tombstone immediately without pulling\n[47/92] tests\\release.spec.js:1538:5 › sync preserves events queued while a retry is in flight\n[48/92] tests\\release.spec.js:1567:5 › low-end devices surface the reduced-cost mode hint and class\n[49/92] tests\\release.spec.js:1577:5 › production fonts are self-hosted, precached, and the content security policy is restrictive\n[50/92] tests\\release.spec.js:1614:5 › automated WCAG scan has no serious or critical violations on primary screens\n[51/92] tests\\release.spec.js:1634:5 › PWA manifest, service worker, cache boundary, and offline reload work\n[52/92] tests\\release.spec.js:1645:5 › content review gate launches exact-digest registry missions and internal-review curriculum\n[53/92] tests\\release.spec.js:1668:5 › release mode overrides an internal-review URL request while allowing canonical registry missions\n[54/92] tests\\release.spec.js:1675:5 › Phase 3.2 frozen gate API resists post-bootstrap monkey-patching\n[55/92] tests\\release.spec.js:1702:5 › Phase 3.2 altered generated payloads cannot borrow a reviewed template identity\n[56/92] tests\\release.spec.js:1714:5 › production mode allows canonical registry missions but fails closed for generated prototypes\n[57/92] tests\\release.spec.js:1737:5 › non-localhost production host launches and completes a canonical registry mission\n[58/92] tests\\release.spec.js:1759:5 › cloud authorization retries once and then requires a fresh sign-in\n[59/92] tests\\release.spec.js:1790:5 › Firestore size preflight rejects oversized profile and tombstone before any fetch\n[60/92] tests\\release.spec.js:1821:5 › Phase 3.2 review manifest and gate helper remain available through the offline cache\n[61/92] tests\\release.spec.js:1842:5 › attempt events retain the active profile identity while excluding child or answer data\n[62/92] tests\\release.spec.js:1892:5 › single-learner struggle records review telemetry without quarantine or retry lock\n[63/92] tests\\release.spec.js:1938:5 › BrainBite Lab remains hidden and inert in release mode despite public URL flags\n[64/92] tests\\release.spec.js:1953:5 › quarantined records remain rejected by the runtime gate\n[65/92] tests\\release.spec.js:1965:5 › live mission answers record canonical evidence and profile-scoped offline events\n[66/92] tests\\release.spec.js:2016:5 › Phase 3.1 activity evidence, sessions, and practice stay isolated between profiles\n[67/92] tests\\release.spec.js:2055:5 › Phase 3.1 Practice Lab locked missions complete as non-progression practice\n[68/92] tests\\release.spec.js:2138:5 › P1 non-progression practice never awards progression currency, including retries\n[69/92] tests\\release.spec.js:2232:5 › P1 Foundation imports never resurrect tombstoned profiles\n[70/92] tests\\release.spec.js:2323:5 › Phase 3.1 parent weekly and priority UI uses canonical LearningCore evidence\n[71/92] tests\\release.spec.js:2350:5 › P1 parent Words mastery card projects canonical reading evidence\n[72/92] tests\\release.spec.js:2379:5 › Phase 3.1 legacy profile skills, sessions, and practice import once across reloads\n[73/92] tests\\release.spec.js:2433:5 › Phase 3.1 guided homework and independent curriculum practice record canonical evidence without rewards\n[74/92] tests\\release.spec.js:2557:5 › Phase 2.2 child play works before PIN setup and an expired limit blocks launch without mutation\n[75/92] tests\\release.spec.js:2574:5 › Phase 2.2 session expiry stops safely and active checkpoints are capped\n[76/92] tests\\release.spec.js:2588:5 › Phase 2.2 visibility checkpoint records the active edge and excludes hidden time\n[77/92] tests\\release.spec.js:2610:5 › Phase 2.2 reload continuity, inactivity rollover, and parent extension persist\n[78/92] tests\\release.spec.js:2639:5 › Phase 2.2 storage recovery and backward clocks cannot reduce usage or enter exports\n[79/92] tests\\release.spec.js:2657:5 › Phase 2.2 a newer valid backup cannot be reduced by a stale primary\n[80/92] tests\\release.spec.js:2669:5 › Phase 2.2 profile ledgers stay isolated and controls correct session limits\n[81/92] tests\\release.spec.js:2682:5 › Phase 2.2 fallback lock keeps concurrent tab checkpoints additive\n[82/92] tests\\release.spec.js:2700:5 › Phase 2.2 simultaneous page exits reconcile additively exactly once\n[83/92] tests\\release.spec.js:2712:5 › Phase 2.2 hidden then pagehide preserves the active edge while the persistence lock is held\n[84/92] tests\\release.spec.js:2741:5 › Phase 2.3 profile deletion cancels safely, checks name and fresh PIN, then preserves profile isolation\n[85/92] tests\\release.spec.js:2773:5 › Phase 2.3 fresh destructive step-up shares the persisted five-attempt lockout\n[86/92] tests\\release.spec.js:2790:5 › Phase 2.3 dialog traps focus, cancels with Escape, clears secrets, and restores its invoker\n[87/92] tests\\release.spec.js:2809:5 › Phase 2.3 announces PBKDF2 verification and cannot mutate while fresh PIN approval is busy\n[88/92] tests\\release.spec.js:2828:5 › Phase 2.3 restore keeps a distinct rollback snapshot and a failed replacement preserves current state\n[89/92] tests\\release.spec.js:2860:5 › Phase 2.3 import rejects invalid identities before rollback mutation and supports valid modern and legacy stores\n[90/92] tests\\release.spec.js:2894:5 › Phase 2.3 production excludes debug controls and locked parent tools cannot be opened directly\n[91/92] tests\\release.spec.js:2903:5 › Phase 2.3 Lab queue discard requires exact confirmation and a fresh PIN\n[92/92] tests\\release.spec.js:2923:5 › Phase 2.3 cloud deletion reports a partial remote outcome and defers local cleanup until retry succeeds\n  92 passed (4.3m)\n",
+      "testsPassed": 92,
+      "testsFlaky": 0,
+      "testsFailed": 0,
+      "note": "92 passed, 0 flaky, 0 failed."
+    },
+    {
+      "label": "activity-browser",
+      "command": "npm.cmd exec -- playwright test tests/activity-families.spec.js tests/bubble-reef-preview.spec.js --reporter=json --retries=1",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 34798,
+      "output": "\nRunning 23 tests using 1 worker\n\n[1/23] tests\\activity-families.spec.js:13:5 › Target Smash exposes bounded physical choices and records one attempt per choice\n[2/23] tests\\activity-families.spec.js:34:5 › Letter Trail enforces sequence order and records mistakes once\n[3/23] tests\\activity-families.spec.js:60:5 › a wrong answer explains why using the reviewed explanation\n[4/23] tests\\activity-families.spec.js:81:5 › assisted play keeps the guided hint ahead of the explanation\n[5/23] tests\\activity-families.spec.js:102:5 › the wrong-answer explanation can be read aloud\n[6/23] tests\\activity-families.spec.js:129:5 › Knowledge Platforms enforces platform order and records one attempt per interaction\n[7/23] tests\\activity-families.spec.js:154:5 › completed family activities reject stale replay interactions\n[8/23] tests\\activity-families.spec.js:170:5 › typing encounter renders, submits through the runtime bridge, and records evidence\n[9/23] tests\\activity-families.spec.js:186:5 › typing assisted launches and completion are idempotent\n[10/23] tests\\activity-families.spec.js:204:5 › typing encounter restart preserves typing mode after zero lives\n[11/23] tests\\activity-families.spec.js:219:5 › Code Bridge runs an allowlisted program and records one coding attempt\n[12/23] tests\\activity-families.spec.js:237:5 › Code Bridge rejects unsupported commands without awarding evidence\n[13/23] tests\\activity-families.spec.js:247:5 › Code Bridge suggests the next prerequisite-aware lesson\n[14/23] tests\\activity-families.spec.js:260:5 › Code Bridge hides unreviewed lesson suggestions in production mode\n[15/23] tests\\activity-families.spec.js:270:5 › Code Lab runs and persists a safe profile-local project\n[16/23] tests\\activity-families.spec.js:287:5 › Programmable Bit editor saves profile-local behavior and simulates it\n[17/23] tests\\activity-families.spec.js:306:5 › Programmable Bit editor fails safely on malformed persisted behavior\n[18/23] tests\\activity-families.spec.js:314:5 › Programmable Bit profile merges preserve both device-local definitions\n[19/23] tests\\activity-families.spec.js:323:5 › Programmable Bit editor persists an explicit active Bit selection\n[20/23] tests\\activity-families.spec.js:337:5 › Programmable Bit lessons load reviewed behavior without awarding mastery\n[21/23] tests\\activity-families.spec.js:349:5 › Programmable Bit lessons remain hidden behind production review gate\n[22/23] tests\\bubble-reef-preview.spec.js:3:5 › Bubble Reef preview remounts one home canvas and normalizes invalid profiles\n[23/23] tests\\bubble-reef-preview.spec.js:36:5 › BrainBase gateway opens the live Bubble Reef preview only in internal review\n  23 passed (28.8s)\n",
+      "testsPassed": 23,
+      "testsFlaky": 0,
+      "testsFailed": 0,
+      "note": "23 passed, 0 flaky, 0 failed."
+    },
+    {
+      "label": "webgl-browser",
+      "command": "npm.cmd exec -- playwright test tests/webgl.spec.js tests/webgl-accessibility.spec.js tests/webgl-assets.spec.js --reporter=json --retries=1",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 215317,
+      "output": "\nRunning 32 tests using 1 worker\n\n[1/32] tests\\webgl-accessibility.spec.js:32:7 › WebGL accessibility and motion controls › 3D home portal is accessible and bridges to the existing PLAY action\n[2/32] tests\\webgl-accessibility.spec.js:43:7 › WebGL accessibility and motion controls › prefers-reduced-motion stops the home animation loop\n[3/32] tests\\webgl-accessibility.spec.js:52:7 › WebGL accessibility and motion controls › profile reduced-motion and camera-motion reduction stop the battle loop\n[4/32] tests\\webgl-accessibility.spec.js:77:7 › WebGL accessibility and motion controls › service worker defers optional presentation assets to runtime caching\n[5/32] tests\\webgl-assets.spec.js:5:5 › parsed GLB documents are cached and every mount receives an independent clone\n[6/32] tests\\webgl-assets.spec.js:29:5 › generated GLBs are served and loaded by both live scenes\n[7/32] tests\\webgl-assets.spec.js:48:5 › a failed GLB request keeps the procedural scene operational\n[8/32] tests\\webgl-assets.spec.js:56:5 › ordinary missions do not present the Fraction Kraken encounter\n[9/32] tests\\webgl-assets.spec.js:67:5 › responsive scene resize keeps the portal and canvas inside their host\n[10/32] tests\\webgl-assets.spec.js:86:5 › cached 3D scenes reopen offline with their shared environment dependency\n[11/32] tests\\webgl-assets.spec.js:104:5 › animated Bite and real quality budgets load in both scenes\n[12/32] tests\\webgl-assets.spec.js:123:5 › live WebGL scenes expose frame and scene-load budget evidence\n[13/32] tests\\webgl.spec.js:6:5 › fresh BrainBite launch renders live 3D, with explicit classic override\n[14/32] tests\\webgl.spec.js:23:5 › live 3D scenes mount the reusable programmable Bit companion\n[15/32] tests\\webgl.spec.js:35:5 › 3D battle keyboard answers update existing gameplay and keep one scene\n[16/32] tests\\webgl.spec.js:49:5 › 3D battle consumes a correct target and resists repeated answers\n[17/32] tests\\webgl.spec.js:64:5 › 3D Bite reacts to correct and incorrect answer evidence\n[18/32] tests\\webgl.spec.js:74:5 › reduced-motion Bite reactions apply a visible deterministic pose\n[19/32] tests\\webgl.spec.js:86:5 › runtime answer classes do not overlap for Homophone Hollow\n[20/32] tests\\webgl.spec.js:96:5 › 3D fraction choices rotate through every unique correct target\n[21/32] tests\\webgl.spec.js:116:5 › 3D boss HUD is hidden for regular missions and preserves real boss state\n[22/32] tests\\webgl.spec.js:133:5 › context loss restores classic gameplay without losing the active mission\n[23/32] tests\\webgl.spec.js:143:5 › a restored WebGL context keeps the live 3D scene and the active mission\n[24/32] tests\\webgl.spec.js:160:5 › repeated screen transitions dispose stale 3D canvases\n[25/32] tests\\webgl.spec.js:175:5 › live portal shader compiles after the authored asset is installed\n[26/32] tests\\webgl.spec.js:195:7 › live HUD stays above the scene and subject navigation works on desktop\n[27/32] tests\\webgl.spec.js:195:7 › live HUD stays above the scene and subject navigation works on short laptop\n[28/32] tests\\webgl.spec.js:195:7 › live HUD stays above the scene and subject navigation works on phone\n[29/32] tests\\webgl.spec.js:226:5 › desktop portal stays clear of side HUD panels after resize\n[30/32] tests\\webgl.spec.js:247:5 › phone HUD stays compact without hiding subject navigation or answer controls\n[31/32] tests\\webgl.spec.js:281:7 › phone dock labels remain inside their buttons at double text scale (360px)\n[32/32] tests\\webgl.spec.js:281:7 › phone dock labels remain inside their buttons at double text scale (390px)\n  32 passed (3.6m)\n",
+      "testsPassed": 32,
+      "testsFlaky": 0,
+      "testsFailed": 0,
+      "note": "32 passed, 0 flaky, 0 failed."
+    },
+    {
+      "label": "brainbase-match-browser",
+      "command": "npm.cmd exec -- playwright test tests/brainbase.spec.js tests/match.spec.js --reporter=json --retries=1",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 19368,
+      "output": "\nRunning 14 tests using 1 worker\n\n[1/14] tests\\brainbase.spec.js:12:5 › BrainBase greybox flow runs end-to-end and persists the hub upgrade\n[2/14] tests\\match.spec.js:16:7 › MATCH presentation › home plate mounts and portal starts fraction battle plate\n[3/14] tests\\match.spec.js:24:7 › MATCH presentation › PLAY continues migrated legacy lastMission (DOM for non-fractions)\n[4/14] tests\\match.spec.js:50:7 › MATCH presentation › pillar answers score via LearningCore (hit and miss)\n[5/14] tests\\match.spec.js:63:7 › MATCH presentation › pause returns to MATCH home hub\n[6/14] tests\\match.spec.js:71:7 › MATCH presentation › settings passthrough restores nav then Home remounts MATCH\n[7/14] tests\\match.spec.js:81:7 › MATCH presentation › mission complete returns to MATCH home hub\n[8/14] tests\\match.spec.js:96:7 › MATCH presentation › non-fractions mission uses DOM battle under MATCH\n[9/14] tests\\match.spec.js:106:7 › MATCH presentation › words and spanish missions also use DOM battle under MATCH\n[10/14] tests\\match.spec.js:117:7 › MATCH presentation › plate dock keeps child destinations open and parent tools behind the gate\n[11/14] tests\\match.spec.js:133:7 › MATCH presentation › keyboard 1-4 selects MATCH pillars\n[12/14] tests\\match.spec.js:142:7 › MATCH presentation › captions show on MATCH fraction battle when enabled\n[13/14] tests\\match.spec.js:154:7 › MATCH presentation › live HUD and battle dock sync on MATCH battle\n[14/14] tests\\match.spec.js:168:7 › MATCH presentation › reduced motion setting disables MATCH FX animations\n  14 passed (17.4s)\n",
+      "testsPassed": 14,
+      "testsFlaky": 0,
+      "testsFailed": 0,
+      "note": "14 passed, 0 flaky, 0 failed."
+    },
+    {
+      "label": "smoke-runner",
+      "command": "C:\\Program Files\\nodejs\\node.exe scripts/smoke-runner.mjs",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 60771,
+      "output": "PASS    smoke-completion-pusher.mjs              5771ms  ] | SMOKE PASS\nPASS    smoke-export-a11y.mjs                    3782ms  } | EXPORT/A11Y PREP PASS\nPASS    smoke-export-only.mjs                    2851ms  } | EXPORT_SMOKE PASS\nPASS    smoke-gate84-viewports.mjs               8056ms  ] | MATRIX PASS\nPASS    smoke-gate84-windows.mjs                 7859ms  } | GATE84 WINDOWS CHROME+EDGE PASS\nPASS    smoke-match-lifecycle.mjs                3129ms  } | MATCH LIFECYCLE SMOKE PASS\nPASS    smoke-match-multiworld.mjs               2399ms  } | MATCH_MULTIWORLD PASS\nPASS    smoke-offline-reload.mjs                 3842ms  } | OFFLINE RELOAD SMOKE PASS\nPASS    smoke-parent-practice-privacy.mjs        2528ms  } | PARENT_PRACTICE_PRIVACY PASS\nPASS    smoke-pwa-installability.mjs             3557ms  } | PWA INSTALLABILITY CHROME+EDGE PASS\nPASS    smoke-webgl-boot.mjs                    16857ms  } | WEBGL BOOT SMOKE PASS\n\n11/11 smoke checks passed; evidence in release-evidence/smoke-report.json\n",
+      "quality": "headless",
+      "smokesPassed": 11,
+      "smokesTotal": 11,
+      "note": "11/11 smoke checks passed."
+    },
+    {
+      "label": "performance-probe",
+      "command": "C:\\Program Files\\nodejs\\node.exe scripts/probe-performance.mjs",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 32411,
+      "output": "{\"viewport\":\"desktop\",\"errors\":0,\"warnings\":0,\"durationMs\":15136}\n{\"viewport\":\"mobile\",\"errors\":0,\"warnings\":0,\"durationMs\":15936}\n{\"viewport\":\"desktop\",\"headlessViolations\":0,\"deviceOnlyViolations\":12,\"pass\":true}\n  device-only (unverified): frame.p95 379 > 33.4\n  device-only (unverified): frame.p99 379 > 50\n  device-only (unverified): frame.max 379 > 100\n  device-only (unverified): longTask.p95 376 > 100\n  device-only (unverified): longTask.max 597 > 250\n  device-only (unverified): frame.p95 284 > 33.4\n  device-only (unverified): frame.p99 373 > 50\n  device-only (unverified): frame.max 373 > 100\n  device-only (unverified): longTask.p95 441 > 100\n  device-only (unverified): longTask.max 1406 > 250\n  device-only (unverified): sceneLoad.p95 2279 > 1500\n  device-only (unverified): assetLoad.p95 2194 > 1500\n{\"viewport\":\"mobile\",\"headlessViolations\":0,\"deviceOnlyViolations\":14,\"pass\":true}\n  device-only (unverified): frame.p95 107 > 33.4\n  device-only (unverified): frame.p99 562 > 50\n  device-only (unverified): frame.max 562 > 100\n  device-only (unverified): longTask.p95 159 > 100\n  device-only (unverified): longTask.max 888 > 250\n  device-only (unverified): sceneLoad.p95 1584 > 1500\n  device-only (unverified): assetLoad.p95 1530 > 1500\n  device-only (unverified): frame.p95 93 > 33.4\n  device-only (unverified): frame.p99 203 > 50\n  device-only (unverified): frame.max 203 > 100\n  device-only (unverified): longTask.p95 313 > 100\n  device-only (unverified): longTask.max 1109 > 250\n  device-only (unverified): sceneLoad.p95 1870 > 1500\n  device-only (unverified): assetLoad.p95 1790 > 1500\n",
+      "quality": "headless-judged",
+      "headlessBudgetViolations": 0,
+      "deviceOnlyBudgetViolations": 26,
+      "payloadBytes": 3298824,
+      "note": "26 device-only budget(s) recorded as unverified; payload 3222 KB."
+    }
+  ],
+  "summary": {
+    "total": 16,
+    "passed": 16,
+    "failed": 0
+  },
+  "externalGates": [
+    {
+      "id": "gate-8.4-mobile",
+      "status": "UNVERIFIED",
+      "reason": "Requires real phone/tablet/Chromebook devices."
+    },
+    {
+      "id": "gate-8.5-review",
+      "status": "UNVERIFIED",
+      "reason": "Requires educator, Spanish, legal/privacy, and screen-reader sign-off."
+    },
+    {
+      "id": "gate-8.6-production",
+      "status": "UNVERIFIED",
+      "reason": "Requires production domain, HTTPS, support contact, and live account deletion/export."
+    }
+  ]
+}

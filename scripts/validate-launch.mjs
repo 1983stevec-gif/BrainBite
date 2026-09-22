@@ -4,7 +4,8 @@ let fail=false;
 for(const f of required){if(!fs.existsSync(f)){console.error('Missing',f);fail=true}}
 
 const app=fs.readFileSync('app.js','utf8');
-for(const t of ['retryPendingSync','deleteAuthAccount','parseWorksheetText','launchChecks']){if(!app.includes(t)){console.error('Missing runtime feature',t);fail=true}}
+for(const t of ['retryPendingSync','deleteAuthAccount','cloudStoreProjection','RETIRED_SCREEN_IDS','launchChecks']){if(!app.includes(t)){console.error('Missing runtime feature',t);fail=true}}
+for(const retired of ['function parseWorksheetText','extractTextBtn','saveSnap']){if(app.includes(retired)){console.error('Retired worksheet runtime remains',retired);fail=true}}
 
 const index=fs.readFileSync('index.html','utf8');
 for(const href of ['privacy.html','support.html','terms.html']){

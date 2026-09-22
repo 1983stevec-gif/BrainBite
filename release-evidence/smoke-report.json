@@ -1,0 +1,100 @@
+{
+  "schema": "brainbite.smoke-report.v1",
+  "capturedAt": "2026-09-22T19:03:19.355Z",
+  "baseURL": "http://127.0.0.1:4318",
+  "totals": {
+    "scripts": 11,
+    "passed": 11,
+    "failed": 0
+  },
+  "results": [
+    {
+      "script": "smoke-completion-pusher.mjs",
+      "status": "pass",
+      "durationMs": 5771,
+      "exitCode": 0,
+      "signal": null,
+      "tail": "] | SMOKE PASS"
+    },
+    {
+      "script": "smoke-export-a11y.mjs",
+      "status": "pass",
+      "durationMs": 3782,
+      "exitCode": 0,
+      "signal": null,
+      "tail": "} | EXPORT/A11Y PREP PASS"
+    },
+    {
+      "script": "smoke-export-only.mjs",
+      "status": "pass",
+      "durationMs": 2851,
+      "exitCode": 0,
+      "signal": null,
+      "tail": "} | EXPORT_SMOKE PASS"
+    },
+    {
+      "script": "smoke-gate84-viewports.mjs",
+      "status": "pass",
+      "durationMs": 8056,
+      "exitCode": 0,
+      "signal": null,
+      "tail": "] | MATRIX PASS"
+    },
+    {
+      "script": "smoke-gate84-windows.mjs",
+      "status": "pass",
+      "durationMs": 7859,
+      "exitCode": 0,
+      "signal": null,
+      "tail": "} | GATE84 WINDOWS CHROME+EDGE PASS"
+    },
+    {
+      "script": "smoke-match-lifecycle.mjs",
+      "status": "pass",
+      "durationMs": 3129,
+      "exitCode": 0,
+      "signal": null,
+      "tail": "} | MATCH LIFECYCLE SMOKE PASS"
+    },
+    {
+      "script": "smoke-match-multiworld.mjs",
+      "status": "pass",
+      "durationMs": 2399,
+      "exitCode": 0,
+      "signal": null,
+      "tail": "} | MATCH_MULTIWORLD PASS"
+    },
+    {
+      "script": "smoke-offline-reload.mjs",
+      "status": "pass",
+      "durationMs": 3842,
+      "exitCode": 0,
+      "signal": null,
+      "tail": "} | OFFLINE RELOAD SMOKE PASS"
+    },
+    {
+      "script": "smoke-parent-practice-privacy.mjs",
+      "status": "pass",
+      "durationMs": 2528,
+      "exitCode": 0,
+      "signal": null,
+      "tail": "} | PARENT_PRACTICE_PRIVACY PASS"
+    },
+    {
+      "script": "smoke-pwa-installability.mjs",
+      "status": "pass",
+      "durationMs": 3557,
+      "exitCode": 0,
+      "signal": null,
+      "tail": "} | PWA INSTALLABILITY CHROME+EDGE PASS"
+    },
+    {
+      "script": "smoke-webgl-boot.mjs",
+      "status": "pass",
+      "durationMs": 16857,
+      "exitCode": 0,
+      "signal": null,
+      "tail": "} | WEBGL BOOT SMOKE PASS"
+    }
+  ]
+}

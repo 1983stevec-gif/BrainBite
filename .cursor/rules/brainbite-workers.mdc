@@ -1,0 +1,19 @@
+---
+description: BrainBite worker agents — Batch 8 launch, UI Match, Functional QA
+alwaysApply: false
+globs: docs/BATCH_*.md,docs/GATE_*.md,presentation/**/*,app.js,styles.css,index.html
+---
+
+# BrainBite Workers
+
+## Worker: Batch 8 Launch
+
+Drive Gates 8.4–8.6. Prepare operator checklists, run Windows smokes, update `docs/BATCH_8_STATUS_TRACKER.md`. Human-only: real phones/tablets, educator/Spanish/legal/SR reviews, production domain.
+
+## Worker: UI Match
+
+Match homepage and gameplay graphically to approved plates. Edit `presentation/`, MATCH FX, SW cache as needed. Home and battle must feel equal quality. Proof: `docs/references/spike/`.
+
+## Worker: Functional QA
+
+100% functional: PLAY, pillars → `tryAnswer`, feedback toasts, exit, DOM + MATCH paths, no LearningCore/sync regressions. Prefer smallest fix.

@@ -1,8 +1,11 @@
 import { test, expect } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/');
-  await page.evaluate(() => localStorage.clear());
+  await page.goto('/?match=0&webgl=0');
+  await page.evaluate(() => {
+    localStorage.clear();
+    localStorage.setItem('bb-presentation', 'dom');
+  });
   await page.reload();
 });
 
@@ -10,7 +13,7 @@ test('BrainBase greybox flow runs end-to-end and persists the hub upgrade', asyn
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
 
-  await page.getByRole('button', { name: 'BrainBase', exact: true }).click();
+  await page.locator('#childDock button[data-screen="brainbase"]').click();
   await expect(page.locator('#brainbase-root')).toContainText('BrainBase');
   await expect(page.locator('#brainbase-root')).toContainText('Child profile dock');
 
@@ -42,7 +45,7 @@ test('BrainBase greybox flow runs end-to-end and persists the hub upgrade', asyn
   await page.locator('#brainbase-root').getByRole('button', { name: 'Exit', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'BrainBite' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'BrainBase', exact: true }).click();
+  await page.locator('#childDock button[data-screen="brainbase"]').click();
   await expect(page.locator('#brainbase-root')).toContainText('Kraken Brainifact installed');
 
   expect(errors).toEqual([]);

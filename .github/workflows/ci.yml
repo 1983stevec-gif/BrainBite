@@ -1,14 +1,48 @@
 name: BrainBite CI
 on: [push, pull_request]
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install
-      - run: npm run check:content
+          cache: npm
+      - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - run: npm run check:content
+      - run: npm run check:content-review
+      - run: npm run check:static
+      - run: npm run check:evidence:ci
+      - run: npm run check:runtime
+      - run: npm run check:release
+      - run: npm run check:firebase
+      - run: npm run check:launch
+      - run: npm run check:final
+      - run: npm run check:firebase:security
+      # Full release gate used locally; CI keeps content + e2e (DOM + MATCH).
+      - run: npm run test:unit
       - run: npm run test:e2e
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          if-no-files-found: ignore
+          retention-days: 14
+      # One runner owns the smoke inventory, starts its own server, and writes evidence.
+      - run: npm run smoke
+      - name: Upload smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-report
+          path: release-evidence/smoke-report.json
+          if-no-files-found: ignore
+          retention-days: 14

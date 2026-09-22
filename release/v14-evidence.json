@@ -1,15 +1,17 @@
 {
   "product": "BrainBite",
-  "version": "2.0.0-functional-core.14",
-  "date": "2026-09-02",
-  "stage": "batch-8-gates-8-1-through-8-3-complete",
-  "localSourceState": "real-git-checkout-on-main",
+  "version": "2.0.0-batch-9-certification.2",
+  "date": "2026-09-22",
+  "stage": "closed-beta-candidate-local-verification-complete-external-gates-open",
+  "localSourceState": "real-git-working-tree",
   "sourceRepo": "https://github.com/1983stevec-gif/BrainBite",
   "git": {
-    "branch": "main",
-    "commit": "1f47d66",
+    "branch": "batch-9-webgl-spike",
+    "commit": "cdd04c622af3aa0d4913f6f9234456cdd3dced69",
     "remote": "origin",
-    "pushState": "pushed"
+    "pushState": "pushed",
+    "pushedRef": "origin/batch-9-webgl-spike",
+    "workingTreeClean": true
   },
   "batch8": {
     "gate81RealGitCheckout": "PASS",
@@ -25,33 +27,43 @@
     "result": "PASS",
     "contentPacksValidated": 29,
     "questionSetsValidated": 40,
-    "unitTests": 16,
-    "playwrightTests": 22
+    "unitTests": 198,
+    "playwrightTests": 161,
+    "smokeChecks": 11,
+    "headlessBudgetViolations": 0,
+    "packageFiles": 96
   },
   "verifiedSurface": [
-    "profile isolation",
-    "BrainBase progression",
-    "30 missions across 3 worlds",
-    "3 boss encounters",
-    "adaptive LearningCore",
+    "profile isolation across learners, sessions, rewards, and review schedules",
+    "BrainBase progression and persistent hub upgrade",
+    "30 missions across 3 worlds with 3 boss encounters",
+    "adaptive LearningCore with evidence-based mastery",
     "remediation and spaced review",
-    "reward idempotency",
-    "save, backup, and recovery snapshots",
+    "reward idempotency and duplicate-grant resistance",
+    "save, backup, and recovery snapshots with distinct generations",
+    "cross-tab evidence reconciliation in all three lock modes",
     "offline queue replay and duplicate rejection",
-    "PWA service worker offline reload",
+    "PWA service worker offline reload and offline 3D reopen",
     "Firebase family isolation through mocked REST tests",
-    "accessibility preferences and automated WCAG scan",
-    "low-end device class and performance mode hint"
+    "accessibility preferences and automated WCAG scan across 21 screens plus the battle HUD",
+    "first-run choreography from name to guided first mission",
+    "self-hosted fonts with a restrictive content security policy and zero external requests",
+    "closed-beta runtime package completeness and integrity"
   ],
   "manualGateRequired": [
     "real Firebase project sync and account deletion",
     "real device touch/audio/install/offline reconnect QA",
     "screen-reader QA",
-    "educator curriculum review",
+    "educator curriculum review of the 75 pending content records",
     "fluent Spanish review",
     "legal/privacy review",
-    "production domain and support contact verification"
+    "production domain and support contact verification",
+    "sustained device performance evidence"
   ],
-  "nextPhase": "Batch 8 - external launch validation and real-device certification",
-  "nextPhaseDoc": "docs/BATCH_8_EXTERNAL_LAUNCH_PLAN.md"
+  "nextPhase": "Batch 6 - external device, review, and production certification",
+  "nextPhaseDoc": "docs/GATE_8_4_OPERATOR_CHECKLIST.md",
+  "notes": [
+    "Evidence describes this line of work; see docs/CLOSED_BETA_READINESS.md for the defect ledger, external gates, and rollback procedure.",
+    "Headless-judgeable performance budgets pass; frame pacing, long-task tails, scene load, and asset load remain device-only and unverified."
+  ]
 }

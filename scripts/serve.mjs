@@ -1,9 +1,11 @@
 import { createReadStream, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, normalize, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const root = resolve(process.cwd());
-const port = Number(process.env.PORT || 8080);
+const DEFAULT_PORT = 4318;
+const port = Number(process.env.PORT || DEFAULT_PORT);
 const mime = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
@@ -17,7 +19,8 @@ const mime = {
   '.webmanifest': 'application/manifest+json',
 };
 
-createServer((request, response) => {
+export function createBrainBiteServer({ port = Number(process.env.PORT || DEFAULT_PORT), host = '127.0.0.1' } = {}) {
+ const server=createServer((request, response) => {
   try {
     const url = new URL(request.url || '/', 'http://localhost');
     const requested = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
@@ -38,6 +41,23 @@ createServer((request, response) => {
   } catch {
     response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Not found');
   }
-}).listen(port, '127.0.0.1', () => {
-  console.log(`BrainBite test server listening on http://127.0.0.1:${port}`);
-});
+ });
+ return new Promise((resolve,reject)=>{
+   server.once('error',reject);
+   server.listen(port,host,()=>{server.off('error',reject);resolve(server)});
+ });
+}
+
+async function runCli(){
+ const server=await createBrainBiteServer({port});
+ console.log(`BrainBite test server listening on http://127.0.0.1:${port}`);
+ const shutdown=()=>{
+   server.close(()=>process.exit(0));
+   server.closeAllConnections?.();
+   setTimeout(()=>process.exit(0),1000).unref();
+ };
+ process.once('SIGINT',shutdown);
+ process.once('SIGTERM',shutdown);
+}
+
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))runCli().catch(error=>{console.error(error);process.exit(1)});
