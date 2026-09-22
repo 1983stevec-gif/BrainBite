@@ -1,0 +1,23 @@
+# Normalize line endings.
+#
+# Without this, checkouts inherited the host's line endings (core.autocrlf=true on the
+# Windows workstation, LF on Linux CI), and files edited by different tools ended up with
+# mixed endings. That made content hashes platform-dependent: the release package manifest
+# passed locally and failed in CI on six files.
+#
+# `text=auto eol=lf` stores and checks out LF for every text file, so the repository, a
+# Windows checkout, and a Linux checkout all contain identical bytes.
+* text=auto eol=lf
+
+# Binary assets must never be converted.
+*.glb binary
+*.woff2 binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.blend binary
+*.zip binary
+*.docx binary

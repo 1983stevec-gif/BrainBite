@@ -12,7 +12,7 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { extname, resolve } from 'node:path';
 
 const repoRoot = resolve(import.meta.dirname, '..');
 const stageRoot = resolve(repoRoot, '.native-site-manifest');
@@ -31,8 +31,17 @@ export async function collectPackageFiles(root) {
   return files.sort();
 }
 
+// Text files are hashed with LF endings regardless of how the checkout wrote them, so the
+// manifest is identical on Windows and Linux. It passed locally and failed in CI on six
+// files before this, because the Windows working copy had mixed CRLF/LF endings while CI
+// checked out LF.
+const TEXT_EXTENSIONS = new Set(['.html', '.js', '.mjs', '.css', '.json', '.svg', '.webmanifest', '.md', '.txt', '.xml', '.yml', '.yaml']);
+
 export async function hashFile(absolute) {
-  const bytes = await readFile(absolute);
+  const raw = await readFile(absolute);
+  const bytes = TEXT_EXTENSIONS.has(extname(absolute).toLowerCase())
+    ? Buffer.from(raw.toString('utf8').replace(/\r\n/g, '\n'), 'utf8')
+    : raw;
   return { sha256: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.length };
 }
 

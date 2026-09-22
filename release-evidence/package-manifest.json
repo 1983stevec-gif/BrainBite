@@ -1,10 +1,10 @@
 {
   "schema": "brainbite.package-manifest.v1",
-  "generatedAt": "2026-09-22T14:29:20.723Z",
+  "generatedAt": "2026-09-22T16:44:52.368Z",
   "files": {
     "app.js": {
-      "sha256": "a070036dfd8b8131598733fcd6641a92c8283722ba26bac7bb102c38153b6ab2",
-      "bytes": 245765
+      "sha256": "ee251143bf9597ebd11acb0dcb46c9f21315affc31c594599f8c3f0902c1f36c",
+      "bytes": 244957
     },
     "assets/art/bite-village.svg": {
       "sha256": "10de1eed7772e502d1ac29f41c00e7b51b9dbea230312ece358a0184ebb2e49a",
@@ -263,16 +263,16 @@
       "bytes": 4577
     },
     "index.html": {
-      "sha256": "8c9085c50e13ff150dec510894545cdd92cd8fcbd89972b7bf7991437602f39a",
-      "bytes": 34326
+      "sha256": "8cf0f9ca57dd74b7eecf226438ac694082192bc6db32eb9f3181a2235b95a5bc",
+      "bytes": 34056
     },
     "manifest.webmanifest": {
       "sha256": "e008f60c5e4d15a276ae1e7ede78e4c94a68a01f0eda5c8d0c81ddb3694dd499",
       "bytes": 504
     },
     "presentation/boot.mjs": {
-      "sha256": "4af1faf85e01094c2644c8ba968a8b0bcfdf4b7fdffb4f375847cc2d8fb6bae0",
-      "bytes": 2907
+      "sha256": "0b2d397cdd2671ee0eca17a42b695e648d21852bd46b7239680e3a414193b5a9",
+      "bytes": 2854
     },
     "presentation/bubble-reef-base-contribution.mjs": {
       "sha256": "0a16e7dcf9f671ad9bd6fd46988b3f6ab10edc5dc665fe71985026b81cf88cf5",
@@ -287,8 +287,8 @@
       "bytes": 6313
     },
     "presentation/capability.mjs": {
-      "sha256": "3f5694a90688b7e85faa7444dea427102fa253c410a7644d4998f47eafd15689",
-      "bytes": 1633
+      "sha256": "9d802dd2f28fa5720d0e4ceea931bfb623be4c01212b4a6093deb8e3fee89d68",
+      "bytes": 1631
     },
     "presentation/character-animation.mjs": {
       "sha256": "ab0f152903febed3fd5b84e4219d31c0d7bff986cbd00c97c594d8f6969261cf",
@@ -351,8 +351,8 @@
       "bytes": 3059
     },
     "service-worker.js": {
-      "sha256": "e0d9c3b7b8d529b378172f68cda614bfcc8938cb13c925fdc2789ceecc1b8715",
-      "bytes": 4836
+      "sha256": "8f0e38ec9f51b79e1dfca5db6e8d87485c1c5fb5431801ad694fd25d54ee365f",
+      "bytes": 4783
     },
     "styles.css": {
       "sha256": "7059e0eb867ae3833dfd298c63450c25873ee5bc8eb23272b1e015d4471b4a73",
@@ -383,8 +383,8 @@
       "bytes": 8818
     },
     "vendor/three/three.module.js": {
-      "sha256": "da7f8aecb0b1e4a55e820cce5dc5a5a8eb13dc379758f215e8fb07937be7a6a3",
-      "bytes": 1369252
+      "sha256": "ce1fa418de16a19495a9f72495580e3015d7745c296d3ce0485897f902ddedfb",
+      "bytes": 1314681
     }
   }
 }
