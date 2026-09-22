@@ -13,6 +13,7 @@
     "native:verify": "npm run native:stage && node scripts/native/verify-shell.mjs && node --test tests/native-packaging.test.mjs",
     "native:verify:runtime": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/native/verify-no-listener.ps1",
     "probe:performance": "node scripts/probe-performance.mjs",
+    "measure:payload": "node scripts/measure-payload.mjs",
     "asset:intake": "node scripts/intake-glb.mjs",
     "fonts:self-host": "node scripts/self-host-fonts.mjs",
     "check:css": "node scripts/check-dead-css.mjs",

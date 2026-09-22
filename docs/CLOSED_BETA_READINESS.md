@@ -119,15 +119,17 @@ CI is green on the branch (`9m11s` for the pull request run).
 
 | Item | Severity | Note |
 |---|---|---|
-| 3D payload 3.2 MB, of which **53% is duplicated geometry** | P2 | See the payload section below. Within the documented 8–12 MB Batch 9 target |
+| 3D payload: 53% of vertices are duplicated geometry | **Closed, no change made** | Measured; it compresses to 374 KB brotli and Draco measured as a wash. See section 5 |
+| Rebuilding the Blender kit is not byte-reproducible | P3 | Same Blender 5.2.40 and the same committed script: three of five GLBs rebuild byte-identically, the kraken differs by one accessor and 4,456 bytes, the mascot by 4 bytes. Verify assets against the committed manifest (`--verify-only`); do not expect a rebuild to match |
 | Device-only budgets unverified: frame pacing, long-task tails, scene load, asset load | P2 (external) | Recorded in every probe run; requires real hardware |
 | `app.js` remains a large classic script with a full re-render on save | P3 | Measured `render()` at 5–6 ms, so it is not a current bottleneck |
 
-## 5. 3D payload: measured duplication
+## 5. 3D payload: measured, and deliberately not "fixed"
 
-The runtime package ships 3,183 KB of 3D assets. Analysing the GLB accessors shows that
-over half of it is the same geometry copied instead of referenced, because every part is
-created with its own mesh datablock in the Blender pipeline.
+The runtime package ships 3,183 KB of 3D assets, which is 78% of the 4,096 KB budget.
+Analysing the GLB accessors shows that over half of it is the same geometry copied
+instead of referenced, because every part is created with its own mesh datablock in the
+Blender pipeline.
 
 | Asset | KB | primitives | distinct geometries | redundant vertices | largest duplicate group |
 |---|---:|---:|---:|---:|---:|
@@ -138,20 +140,38 @@ created with its own mesh datablock in the Blender pipeline.
 | jungle props | 254 | 28 | 14 | 574 of 5,603 (10%) | 5× |
 | **total** | **3,183** | 192 | 54 | **34,273 of 64,069 (53%)** | |
 
-Two different fixes, because the assets differ:
+### Why this is not worth a risky change
 
-1. **Kraken, pillars, portal, jungle (1,803 KB)** carry no `JOINTS_0`/`WEIGHTS_0`, so they
-   are not skinned. Their repeated spheres can share one mesh datablock referenced by many
-   nodes (Blender linked duplicates), which removes roughly 55/43/14/10% of their vertex
-   data with no visual change.
-2. **The mascot (1,284 KB)** is skinned: each of its 56 parts is a separate mesh bound
-   100% to one bone, and Blender stores weights per mesh vertex, so parts on different
-   bones cannot share geometry as they stand. The correct fix is a single merged skinned
-   mesh with one vertex group per bone, which is the normal shape for a game character.
+`npm run measure:payload` reports what the assets cost to download:
 
-Either change requires a Blender re-export plus visual verification against the current
-render, so it belongs in a session that can capture before/after screenshots. The payload
-budget (4,096 KB) and `npm run probe:performance` will measure the result.
+| | raw | gzip | brotli |
+|---|---:|---:|---:|
+| all five 3D assets | 3,087 KB | 769 KB | **374 KB** |
+
+Compression removes 75% (gzip) and 88% (brotli) of the raw bytes, because the redundancy
+measured above is exactly what a compressor removes: duplicated spheres and repeated
+float32 buffers. GitHub Pages serves brotli, so the real download is about 374 KB. The
+probe deliberately gates the **raw** column, so the budget stays meaningful on a host that
+does not compress.
+
+Draco was implemented, measured, and then reverted:
+
+- The compressed GLBs came to **693 KB** (78% off) and Blender re-imported all five
+  successfully, so the pipeline works.
+- Reading them needs a decoder: 245 KB for the wasm build or 500 KB for the JS build.
+  That puts the total at 938–1,193 KB against 374–769 KB compressed — **a wash, or worse.**
+- It also costs two CSP relaxations: `'wasm-unsafe-eval'` for WebAssembly compilation, and
+  a blob worker because three's `DRACOLoader` builds its worker from a Blob. This app
+  deliberately ships `script-src 'self'; worker-src 'self'`.
+
+Blender-side mesh sharing cannot help either. `export_apply` has to stay on (the bevel and
+armature modifiers depend on it), and it makes the exporter evaluate every object
+separately, so sharing a mesh datablock deduplicates nothing in the exported GLB.
+
+The duplication therefore costs nothing measurable: triangles are 39,656 of 250,000 and
+memory is 20 MB of 512 MB. It is recorded here so a future session does not re-open it
+without new information — a decoder that is already present for another reason would
+change the arithmetic.
 
 ## 6. External gates — not part of this package
 

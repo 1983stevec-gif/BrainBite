@@ -376,10 +376,22 @@ Updated: 2026-09-22
     line-ending-independent text hashing) and a hardcoded `D:/Codex/Brainbite` path in the
     PWA installability smoke (fixed, with `check:host-paths` added to `check:static`).
     Both CI runs are now green (`9m11s`).
-  - Measured the 3D payload: 3,183 KB of which **53% (34,273 of 64,069 vertices) is
-    duplicated geometry**. The kraken, pillars, portal, and jungle assets are unskinned and
-    can share meshes; the mascot is skinned and needs a merged skinned mesh. Recorded in
-    `docs/CLOSED_BETA_READINESS.md` section 5.
+  - Measured the 3D payload and closed it as a non-problem. It is 3,183 KB raw with 53% of
+    vertices (34,273 of 64,069) duplicated geometry, but it compresses to 769 KB gzip and
+    **374 KB brotli**, because duplicated spheres and repeated float32 buffers are exactly
+    what a compressor removes. `npm run measure:payload` reports the three columns.
+  - Draco was implemented and measured before being reverted: the compressed GLBs came to
+    693 KB (78% off) and Blender re-imported all five, but the decoder adds 245 KB (wasm)
+    or 500 KB (JS), making the total 938-1,193 KB against 374-769 KB compressed — a wash —
+    and it would cost two CSP relaxations (`'wasm-unsafe-eval'` plus a blob worker for
+    three's `DRACOLoader`) on an app that deliberately ships `script-src 'self'`.
+  - Blender-side mesh sharing cannot reduce the GLBs either: `export_apply` must stay on
+    for the bevel and armature modifiers, and it makes the exporter evaluate each object
+    separately. Recorded in `docs/CLOSED_BETA_READINESS.md` section 5.
+  - Also recorded: rebuilding the kit is not byte-reproducible on the same Blender version
+    and script (three of five GLBs match; the kraken differs by one accessor and 4,456
+    bytes, the mascot by 4 bytes), so assets are verified against the committed manifest
+    rather than by rebuilding.
   - `CHECKSUMS.json` retired: 45 of its 176 entries pointed at files that no longer exist
     (old `.wav` audio, removed tests and scripts) and 20 digests were stale. Replaced by a
     generated `release-evidence/package-manifest.json` derived from the same allowlist that
