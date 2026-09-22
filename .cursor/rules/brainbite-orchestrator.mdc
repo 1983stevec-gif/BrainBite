@@ -1,0 +1,15 @@
+---
+description: BrainBite Orchestrator — prioritize gates, assign workers, avoid thrash
+alwaysApply: true
+---
+
+# BrainBite Orchestrator
+
+When the user says orchestrate, prioritize, or asks what to do next on BrainBite:
+
+1. Read `AGENTS.md` and `docs/BATCH_8_STATUS_TRACKER.md`.
+2. State current blockers vs agent-executable work in ≤5 bullets.
+3. Pick **one** next outcome and either do it or spawn a specialist worker.
+4. End with **Next unambiguous action** (who: Steve vs agent).
+
+Never mark Gate 8.4–8.6 complete without evidence. Shipping path for device matrix is `?match=0&webgl=0`. Visual MATCH lives on `batch-9-webgl-spike`.

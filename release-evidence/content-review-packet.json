@@ -1,0 +1,2949 @@
+{
+  "schema": "brainbite.content-review-packet.v1",
+  "generatedAt": "2026-09-22T01:27:45.890Z",
+  "totals": {
+    "records": 105,
+    "pending": 75,
+    "byKind": {
+      "generated-template": 35,
+      "json-pack-item": 40
+    },
+    "digestMismatches": 0
+  },
+  "digestMismatches": [],
+  "pending": [
+    {
+      "identity": "generated-template:math-k-counting",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"math-k-counting\"]",
+        "sourceId": "math-k-counting"
+      },
+      "digest": "b9eca70aa24d564475d568bec1954dae389d6901995d294a7c0e93917d37b49c",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Count the stars: star, star, star, star, star. How many stars are there?",
+        "answers": [
+          "5"
+        ],
+        "distractors": [
+          "4",
+          "6",
+          "7"
+        ],
+        "explanation": "There are five stars because each of the five listed stars is counted once.",
+        "hint": "Touch each word \"star\" once as you count.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:math-1-addition",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"math-1-addition\"]",
+        "sourceId": "math-1-addition"
+      },
+      "digest": "73b038a358be831272be449cb4bbb5f71fa19f3de801043f8833a7d174aab333",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Mina has 7 shells and finds 5 more. How many shells does she have now?",
+        "answers": [
+          "12"
+        ],
+        "distractors": [
+          "10",
+          "11",
+          "13"
+        ],
+        "explanation": "Adding the two groups gives 7 + 5 = 12 shells.",
+        "hint": "Start at 7 and count on 5 more.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:math-2-place-value",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"math-2-place-value\"]",
+        "sourceId": "math-2-place-value"
+      },
+      "digest": "976dd70b99ad8b2c3c9046b430a85d9ccbe73a4fbf1d57b6856ffb5dff6c72d2",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "In the number 472, what value does the digit 7 represent?",
+        "answers": [
+          "70"
+        ],
+        "distractors": [
+          "7",
+          "700",
+          "72"
+        ],
+        "explanation": "The 7 is in the tens place, so its value is 7 tens, or 70.",
+        "hint": "Name the places from right to left: ones, tens, hundreds.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:math-3-multiplication",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"math-3-multiplication\"]",
+        "sourceId": "math-3-multiplication"
+      },
+      "digest": "1e47a2952eb6fa41fdb81696d5027217c34d53db801f9e729a12f70579c56b2a",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "There are 4 bags with 6 marbles in each bag. How many marbles are there?",
+        "answers": [
+          "24"
+        ],
+        "distractors": [
+          "10",
+          "20",
+          "26"
+        ],
+        "explanation": "Four equal groups of six make 4 x 6 = 24 marbles.",
+        "hint": "Add 6 four times or use the fact 4 x 6.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:math-4-fractions",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"math-4-fractions\"]",
+        "sourceId": "math-4-fractions"
+      },
+      "digest": "81f2bfc9ed917e7a5848a5d30f4f83c2b6009f5a2fe08c9b1078bffafa335cff",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Which fraction is equivalent to 1/2?",
+        "answers": [
+          "2/4"
+        ],
+        "distractors": [
+          "1/3",
+          "2/3",
+          "3/4"
+        ],
+        "explanation": "Multiplying the numerator and denominator of 1/2 by 2 gives 2/4.",
+        "hint": "Equivalent fractions name the same part of a whole.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:math-5-decimals",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"math-5-decimals\"]",
+        "sourceId": "math-5-decimals"
+      },
+      "digest": "03e4e958f2a8b57877182cdbd0fb4f2110318f61bf0b0a15e97a2d8adac244f0",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Which decimal is equal to 3/10?",
+        "answers": [
+          "0.3"
+        ],
+        "distractors": [
+          "0.03",
+          "3.0",
+          "0.13"
+        ],
+        "explanation": "Three tenths is written as 0.3 because the 3 is in the tenths place.",
+        "hint": "A denominator of 10 points to the tenths place.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:math-6-ratios",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"math-6-ratios\"]",
+        "sourceId": "math-6-ratios"
+      },
+      "digest": "7009a1a5489bc19190fe9d21d303f06d3121b6ddac8a9c859d9b60fda8d3762c",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Which ratio is equivalent to 2:3?",
+        "answers": [
+          "4:6"
+        ],
+        "distractors": [
+          "3:4",
+          "4:5",
+          "6:4"
+        ],
+        "explanation": "Multiplying both parts of 2:3 by 2 gives the equivalent ratio 4:6.",
+        "hint": "Equivalent ratios multiply or divide both parts by the same number.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:reading-k-phonological",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"reading-k-phonological\"]",
+        "sourceId": "reading-k-phonological"
+      },
+      "digest": "4170f01dcd44a288e64d2fc5de763aebd1de19445ed3f1beedf5e53f4dede831",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Which word begins with the /m/ sound?",
+        "answers": [
+          "moon"
+        ],
+        "distractors": [
+          "sun",
+          "cat",
+          "fish"
+        ],
+        "explanation": "Moon begins with the /m/ sound.",
+        "hint": "Say each word slowly and listen to its first sound.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:reading-1-decoding",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"reading-1-decoding\"]",
+        "sourceId": "reading-1-decoding"
+      },
+      "digest": "810835255200e8c57e0d8cdc4a8d0956296ddba97ab174f6acdac0c7e9730a4f",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Blend these sounds in order: /s/ /u/ /n/. Which word do they make?",
+        "answers": [
+          "sun"
+        ],
+        "distractors": [
+          "sit",
+          "run",
+          "fun"
+        ],
+        "explanation": "The sounds /s/, /u/, and /n/ blend to make sun.",
+        "hint": "Say the sounds without pausing between them.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:reading-2-fluency",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"reading-2-fluency\"]",
+        "sourceId": "reading-2-fluency"
+      },
+      "digest": "e3d15136127c621e6caf79f0d7fd1fe86720e186600870a2c4484ec8f152dc29",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "The sentence is \"Watch out!\" Which choice describes a fluent reading?",
+        "answers": [
+          "Read it smoothly with a strong warning voice."
+        ],
+        "distractors": [
+          "Read one letter at a time.",
+          "Pause after every word for five seconds.",
+          "Use a cheerful question voice."
+        ],
+        "explanation": "The exclamation mark and warning words call for smooth reading with a strong warning voice.",
+        "hint": "Use the words and punctuation to choose an expressive voice.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:reading-3-main-idea",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"reading-3-main-idea\"]",
+        "sourceId": "reading-3-main-idea"
+      },
+      "digest": "605e3b826bd77a8a0441742b21803596f0e397359d09130e1bf4a9a017f16e8c",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bees visit flowers to collect nectar. As they move, they carry pollen between flowers. This helps many plants make seeds. What is the main idea?",
+        "answers": [
+          "Bees help plants while collecting nectar."
+        ],
+        "distractors": [
+          "Bees only visit red flowers.",
+          "Seeds are a kind of pollen.",
+          "All insects make honey."
+        ],
+        "explanation": "Every sentence supports the idea that bees help plants as they collect nectar.",
+        "hint": "Choose the idea supported by the whole passage, not one small detail.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:reading-4-inference",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"reading-4-inference\"]",
+        "sourceId": "reading-4-inference"
+      },
+      "digest": "f058e049c0643699faf528b8431b9a37f4f0ca50d8b50d4e2a98dd0f66d23967",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Lena zipped her coat, pulled on mittens, and saw her breath form a cloud outside. What can you infer about the weather?",
+        "answers": [
+          "It is cold outside."
+        ],
+        "distractors": [
+          "It is very hot outside.",
+          "It is raining hard.",
+          "It is windy indoors."
+        ],
+        "explanation": "A coat, mittens, and visible breath are clues that the outdoor air is cold.",
+        "hint": "Combine the clothing and breath clues.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:reading-5-evidence",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"reading-5-evidence\"]",
+        "sourceId": "reading-5-evidence"
+      },
+      "digest": "d9f01aacc087254fe277ab6bfd3410e95c86f2d493b9b45ce8c2f0efc9cbd634",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Passage: \"Niko practiced the violin every day. At the concert, he played the difficult song without a mistake.\" Which sentence best supports the claim that Niko was well prepared?",
+        "answers": [
+          "Niko practiced the violin every day."
+        ],
+        "distractors": [
+          "The concert had a difficult song.",
+          "Niko owned a violin.",
+          "The song was played at a concert."
+        ],
+        "explanation": "Daily practice is direct evidence that Niko prepared for the concert.",
+        "hint": "Find the sentence that shows what Niko did to prepare.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:reading-6-argument",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"reading-6-argument\"]",
+        "sourceId": "reading-6-argument"
+      },
+      "digest": "c7228c64dedf7062b741faa5d6ee21eb3b9a2c1a78903f377c7f26ea64e70bef",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Claim: The school should add a refill station for water bottles. Which reason most directly supports the claim?",
+        "answers": [
+          "A refill station would reduce disposable plastic bottle waste."
+        ],
+        "distractors": [
+          "Many students like the color blue.",
+          "The gym floor was replaced last year.",
+          "Some classes begin before lunch."
+        ],
+        "explanation": "Reducing disposable bottle waste is a relevant benefit of adding a refill station.",
+        "hint": "Choose a reason that explains a benefit of the proposed action.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:spelling-k-sight",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"spelling-k-sight\"]",
+        "sourceId": "spelling-k-sight"
+      },
+      "digest": "9a6f2c05473b95957b5cf3edbdaf5122a05a8dfc28193fdd073f643485a89de6",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Which choice correctly spells the sight word \"the\"?",
+        "answers": [
+          "the"
+        ],
+        "distractors": [
+          "teh",
+          "tne",
+          "tha"
+        ],
+        "explanation": "The sight word is spelled t-h-e.",
+        "hint": "Look at the order of all three letters.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:spelling-1-cvc",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"spelling-1-cvc\"]",
+        "sourceId": "spelling-1-cvc"
+      },
+      "digest": "076d121255f6979ea6115c33b18f796090e0976f491c0969a0c928d55d494700",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Which word correctly spells the CVC word for an animal that says meow?",
+        "answers": [
+          "cat"
+        ],
+        "distractors": [
+          "cta",
+          "kat",
+          "cot"
+        ],
+        "explanation": "Cat uses the sounds /k/, /a/, and /t/ in consonant-vowel-consonant order.",
+        "hint": "Say each sound: /k/ /a/ /t/.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:spelling-2-digraphs",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"spelling-2-digraphs\"]",
+        "sourceId": "spelling-2-digraphs"
+      },
+      "digest": "c565f438d26ae3336dd975dd61e4168b497c07973c241429ddec188dcd76f386",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Which word correctly spells the word /ship/, using the two-letter sound /sh/?",
+        "answers": [
+          "ship"
+        ],
+        "distractors": [
+          "sip",
+          "chip",
+          "thip"
+        ],
+        "explanation": "The letters s and h work together to spell the first sound in ship.",
+        "hint": "Listen for /sh/ at the beginning.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:spelling-3-prefixes",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"spelling-3-prefixes\"]",
+        "sourceId": "spelling-3-prefixes"
+      },
+      "digest": "4f072523dd4a352ea99b5f5e40a752680458127e35046f4393c7cd864b3130f2",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Add a prefix to happy to make a word meaning \"not happy.\" Which spelling is correct?",
+        "answers": [
+          "unhappy"
+        ],
+        "distractors": [
+          "rehappy",
+          "dishappy",
+          "inhappy"
+        ],
+        "explanation": "The prefix un- means not, so un + happy is spelled unhappy.",
+        "hint": "Use the prefix un- for \"not.\"",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:spelling-4-suffixes",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"spelling-4-suffixes\"]",
+        "sourceId": "spelling-4-suffixes"
+      },
+      "digest": "e94a87e23a4fb4d92ba85e048d07d6bdae74994985dbd7e9622cae69d57dac1c",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Add the suffix -ed to jump. Which spelling correctly shows that the action happened in the past?",
+        "answers": [
+          "jumped"
+        ],
+        "distractors": [
+          "jumpt",
+          "jumpd",
+          "jumpied"
+        ],
+        "explanation": "The base word jump keeps its spelling when -ed is added: jumped.",
+        "hint": "Write the whole base word before adding -ed.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:spelling-5-patterns",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"spelling-5-patterns\"]",
+        "sourceId": "spelling-5-patterns"
+      },
+      "digest": "7b721d620fed2cc95e6cf2b8eba7d7398292a9903733fc004b38a4ff25e85db0",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Which word is spelled correctly?",
+        "answers": [
+          "neighbor"
+        ],
+        "distractors": [
+          "nieghbor",
+          "neigbor",
+          "neighbur"
+        ],
+        "explanation": "Neighbor uses the letter pattern eigh followed by bor.",
+        "hint": "Check the vowel pattern in the first syllable.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:spelling-6-academic",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"spelling-6-academic\"]",
+        "sourceId": "spelling-6-academic"
+      },
+      "digest": "b78d0d0520e745ddfad1ae5b797efe3eaa5203116e226b65f6db755ae4809626",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Which choice correctly spells the academic word meaning \"needed\"?",
+        "answers": [
+          "necessary"
+        ],
+        "distractors": [
+          "neccessary",
+          "necessery",
+          "necesary"
+        ],
+        "explanation": "Necessary is spelled n-e-c-e-s-s-a-r-y.",
+        "hint": "Notice one c and two s letters.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:vocabulary-k-categories",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"vocabulary-k-categories\"]",
+        "sourceId": "vocabulary-k-categories"
+      },
+      "digest": "7c7d88db49502fdc1e94480484f80f6909d21517b395e44342ca5cf602fefe75",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Which word names an animal?",
+        "answers": [
+          "rabbit"
+        ],
+        "distractors": [
+          "spoon",
+          "sock",
+          "chair"
+        ],
+        "explanation": "A rabbit is an animal; the other choices are objects.",
+        "hint": "Think about which choice can move and grow on its own.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:vocabulary-1-meaning",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"vocabulary-1-meaning\"]",
+        "sourceId": "vocabulary-1-meaning"
+      },
+      "digest": "0ed80ab98bbece09ab14cd3608c34dd36fc2a414d8cd301c627c0df8497102ce",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "What does the word tiny mean?",
+        "answers": [
+          "very small"
+        ],
+        "distractors": [
+          "very loud",
+          "very fast",
+          "very wet"
+        ],
+        "explanation": "Tiny means very small.",
+        "hint": "Think of something that can fit in your hand.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:vocabulary-2-synonyms",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"vocabulary-2-synonyms\"]",
+        "sourceId": "vocabulary-2-synonyms"
+      },
+      "digest": "1d6c4536937ef5e24bca1852fe56f7e24dff5cea8dc98dc216b5cf50dbaece59",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Which word is a synonym for happy?",
+        "answers": [
+          "glad"
+        ],
+        "distractors": [
+          "angry",
+          "tired",
+          "empty"
+        ],
+        "explanation": "Glad and happy have similar meanings.",
+        "hint": "A synonym has nearly the same meaning.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:vocabulary-3-context",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"vocabulary-3-context\"]",
+        "sourceId": "vocabulary-3-context"
+      },
+      "digest": "1abc95ccc27b8ad5b62d06f7b5f305fc2c69f72b42171a38ee7f55a47bab028c",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "The narrow path was only wide enough for one person. What does narrow mean in this sentence?",
+        "answers": [
+          "not wide"
+        ],
+        "distractors": [
+          "very noisy",
+          "made of stone",
+          "hard to see"
+        ],
+        "explanation": "The clue \"only wide enough for one person\" shows that narrow means not wide.",
+        "hint": "Use the words after narrow as a definition clue.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:vocabulary-4-multiple",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"vocabulary-4-multiple\"]",
+        "sourceId": "vocabulary-4-multiple"
+      },
+      "digest": "69799b095227a0a6a2527534027abd64e2fa8d49399222ef0b62a70be4777637",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "In the sentence \"Ava swung the bat and hit the ball,\" what does bat mean?",
+        "answers": [
+          "a piece of sports equipment"
+        ],
+        "distractors": [
+          "a flying mammal",
+          "to blink quickly",
+          "a winter coat"
+        ],
+        "explanation": "The words swung and hit the ball show that bat means sports equipment.",
+        "hint": "Use the action and the ball as context clues.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:vocabulary-5-roots",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"vocabulary-5-roots\"]",
+        "sourceId": "vocabulary-5-roots"
+      },
+      "digest": "44e2a874d3b7ffe77d4e0a265ba1c88c4f4e4f31f228c1e7bd467448f46d3a48",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "The Latin root spect means \"look.\" What does inspect mean?",
+        "answers": [
+          "to look at closely"
+        ],
+        "distractors": [
+          "to speak very softly",
+          "to carry something away",
+          "to build something again"
+        ],
+        "explanation": "The prefix in- and root spect form inspect, meaning to look at closely.",
+        "hint": "Use the meaning of spect in the word.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:vocabulary-6-academic",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"vocabulary-6-academic\"]",
+        "sourceId": "vocabulary-6-academic"
+      },
+      "digest": "d272447322f213bfe574db697c7d4fde436b20e90c459c39057d03dbc4bd1cd1",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "In an essay, what does it mean to contrast two ideas?",
+        "answers": [
+          "to explain how they differ"
+        ],
+        "distractors": [
+          "to list them alphabetically",
+          "to prove both are false",
+          "to repeat both word for word"
+        ],
+        "explanation": "To contrast ideas is to explain their differences.",
+        "hint": "Think about differences rather than similarities.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:grammar-k-sentence",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"grammar-k-sentence\"]",
+        "sourceId": "grammar-k-sentence"
+      },
+      "digest": "913acfe7e8c1e7471370345a7ffc9a474cd3979f8bf05b1c4d6630f14c4febbc",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Which choice is a complete sentence?",
+        "answers": [
+          "Birds fly."
+        ],
+        "distractors": [
+          "The blue bird",
+          "Under the tree",
+          "Running fast"
+        ],
+        "explanation": "Birds fly names who and tells what they do, so it expresses a complete thought.",
+        "hint": "Look for a choice that tells a whole idea.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:grammar-1-capitalization",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"grammar-1-capitalization\"]",
+        "sourceId": "grammar-1-capitalization"
+      },
+      "digest": "96590aaccfd7e8003724ef83534e37825a38c46029c169fe378b8dd732886fa6",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Which sentence uses capital letters correctly?",
+        "answers": [
+          "Maya feeds her fish."
+        ],
+        "distractors": [
+          "maya feeds the fish.",
+          "Maya Feeds a fish.",
+          "My friend maya feeds fish."
+        ],
+        "explanation": "Maya is a name at the start of the sentence, so it begins with a capital M; the other words do not need capitals.",
+        "hint": "Capitalize the first word and a person's name.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:grammar-2-punctuation",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"grammar-2-punctuation\"]",
+        "sourceId": "grammar-2-punctuation"
+      },
+      "digest": "27609644773fb57b55724cccac9f239d97949a44f6697505d2711c99e072c623",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Which punctuation mark completes the question \"Where is my backpack\"?",
+        "answers": [
+          "?"
+        ],
+        "distractors": [
+          ".",
+          "!",
+          ","
+        ],
+        "explanation": "A direct question ends with a question mark.",
+        "hint": "The sentence asks for information.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:grammar-3-parts",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"grammar-3-parts\"]",
+        "sourceId": "grammar-3-parts"
+      },
+      "digest": "bde3622db1b6fcd0115c95798e52ebc890ae5a52df9d3d943397f10c8f4548ed",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "In the sentence \"The bright kite soared,\" which word is an adjective?",
+        "answers": [
+          "bright"
+        ],
+        "distractors": [
+          "kite",
+          "soared",
+          "the"
+        ],
+        "explanation": "Bright is an adjective because it describes the noun kite.",
+        "hint": "Find the word that describes the kite.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:grammar-4-agreement",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"grammar-4-agreement\"]",
+        "sourceId": "grammar-4-agreement"
+      },
+      "digest": "18c8358a04050fed902fe70aff3175ce2d99d19210fed77658c10d1e4d6c9ec5",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Which sentence has correct subject-verb agreement?",
+        "answers": [
+          "The dogs bark at the mail carrier."
+        ],
+        "distractors": [
+          "The dogs barks at the mail carrier.",
+          "The dogs is barking at the mail carrier.",
+          "The dogs was loud at the mail carrier."
+        ],
+        "explanation": "The plural subject dogs agrees with the plural verb bark.",
+        "hint": "A plural subject takes the verb form without -s here.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:grammar-5-combining",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"grammar-5-combining\"]",
+        "sourceId": "grammar-5-combining"
+      },
+      "digest": "c8e6d3fa9cb668131e530d5f167e6e1ef094f58b0f96410baef9d9620fb6c731",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Combine these sentences without changing their meaning: \"Kai finished his homework. Kai played soccer.\"",
+        "answers": [
+          "After Kai finished his homework, he played soccer."
+        ],
+        "distractors": [
+          "Kai finished his homework, because soccer.",
+          "Finishing homework and Kai played soccer.",
+          "Kai played homework after he finished soccer."
+        ],
+        "explanation": "The answer joins both complete ideas and keeps their original time order.",
+        "hint": "Use a joining word that shows which action happened first.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "generated-template:grammar-6-clauses",
+      "kind": "generated-template",
+      "source": {
+        "file": "brainbite-core.mjs",
+        "export": "CURRICULUM_ITEM_TEMPLATES",
+        "path": "$.CURRICULUM_ITEM_TEMPLATES[\"grammar-6-clauses\"]",
+        "sourceId": "grammar-6-clauses"
+      },
+      "digest": "2e5eba1967f87264a2c75e61dc1afe4f0eccea2cc6d0271f80aa305c6ad2c458",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "internal-review",
+      "verification": [
+        "brainbite-core.validateGeneratedChallenge",
+        "brainbite-core.verifyCurriculumAnswer",
+        "template-semantic-verification"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "In the sentence \"When the rain stopped, we walked home,\" which words form the independent clause?",
+        "answers": [
+          "we walked home"
+        ],
+        "distractors": [
+          "When the rain stopped",
+          "When the rain",
+          "stopped, we"
+        ],
+        "explanation": "We walked home has a subject and verb and can stand alone as a complete thought.",
+        "hint": "Find the group of words that makes sense by itself.",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:language-question-bank-v1.7.json::$.sets[0]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/language-question-bank-v1.7.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[0]",
+        "sourceId": "language-question-bank-v1.7.json::$.sets[0]"
+      },
+      "digest": "ba4a772b6882b9ac4755a31d06329ff681de5c48b2c739a92e39b9a367f07f28",
+      "digestMatches": true,
+      "quarantine": "quarantined",
+      "quarantineReasons": [
+        "no-canonical-language-skill"
+      ],
+      "runtimeStatus": "quarantined",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:quarantine-reason"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite Spanish colors",
+        "answers": [
+          "rojo",
+          "azul",
+          "verde"
+        ],
+        "distractors": [
+          "perro",
+          "pan",
+          "casa"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:language-question-bank-v1.7.json::$.sets[1]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/language-question-bank-v1.7.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[1]",
+        "sourceId": "language-question-bank-v1.7.json::$.sets[1]"
+      },
+      "digest": "ea19228c63e89e23671c0d08c790b6378a943130e098b38336467d4e06bea49d",
+      "digestMatches": true,
+      "quarantine": "quarantined",
+      "quarantineReasons": [
+        "no-canonical-language-skill"
+      ],
+      "runtimeStatus": "quarantined",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:quarantine-reason"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite French greetings",
+        "answers": [
+          "bonjour",
+          "merci",
+          "au revoir"
+        ],
+        "distractors": [
+          "chat",
+          "rouge",
+          "pain"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:language-question-bank-v1.7.json::$.sets[2]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/language-question-bank-v1.7.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[2]",
+        "sourceId": "language-question-bank-v1.7.json::$.sets[2]"
+      },
+      "digest": "e16c737013d51ea24eb41d893fe8cc1a51c7b7fe16fb424830c7c3d4e1863521",
+      "digestMatches": true,
+      "quarantine": "quarantined",
+      "quarantineReasons": [
+        "no-canonical-language-skill"
+      ],
+      "runtimeStatus": "quarantined",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:quarantine-reason"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite German colors",
+        "answers": [
+          "rot",
+          "blau",
+          "grün"
+        ],
+        "distractors": [
+          "Hund",
+          "Brot",
+          "Haus"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:language-question-bank-v1.7.json::$.sets[3]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/language-question-bank-v1.7.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[3]",
+        "sourceId": "language-question-bank-v1.7.json::$.sets[3]"
+      },
+      "digest": "da2cbedc8a7336c314b55d01314df28bf05d044cd9e88435e7a2597d9a4b435c",
+      "digestMatches": true,
+      "quarantine": "quarantined",
+      "quarantineReasons": [
+        "no-canonical-language-skill"
+      ],
+      "runtimeStatus": "quarantined",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:quarantine-reason"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite Italian animals",
+        "answers": [
+          "gatto",
+          "cane",
+          "pesce"
+        ],
+        "distractors": [
+          "rosso",
+          "pane",
+          "casa"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:language-question-bank-v1.7.json::$.sets[4]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/language-question-bank-v1.7.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[4]",
+        "sourceId": "language-question-bank-v1.7.json::$.sets[4]"
+      },
+      "digest": "06061737b504ce188ffc470552005caeeea1b72a257d939af5fc9d789812d9a9",
+      "digestMatches": true,
+      "quarantine": "quarantined",
+      "quarantineReasons": [
+        "no-canonical-language-skill"
+      ],
+      "runtimeStatus": "quarantined",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:quarantine-reason"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite Japanese animal words",
+        "answers": [
+          "ねこ",
+          "いぬ",
+          "さかな"
+        ],
+        "distractors": [
+          "あか",
+          "みず",
+          "いえ"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:language-question-bank-v1.9.json::$.sets[0]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/language-question-bank-v1.9.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[0]",
+        "sourceId": "language-question-bank-v1.9.json::$.sets[0]"
+      },
+      "digest": "1c909c2febd1f0395b3aa2bc15eb92172b91400488cb7b1a9f8556c86e97da8c",
+      "digestMatches": true,
+      "quarantine": "quarantined",
+      "quarantineReasons": [
+        "no-canonical-language-skill"
+      ],
+      "runtimeStatus": "quarantined",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:quarantine-reason"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite Spanish family words",
+        "answers": [
+          "madre",
+          "padre",
+          "hermana"
+        ],
+        "distractors": [
+          "rojo",
+          "pan",
+          "parque"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:language-question-bank-v1.9.json::$.sets[1]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/language-question-bank-v1.9.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[1]",
+        "sourceId": "language-question-bank-v1.9.json::$.sets[1]"
+      },
+      "digest": "67debab27e8b033036c299882ce0fbb06414984e5a01bd5030501cf2eaceaaee",
+      "digestMatches": true,
+      "quarantine": "quarantined",
+      "quarantineReasons": [
+        "no-canonical-language-skill"
+      ],
+      "runtimeStatus": "quarantined",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:quarantine-reason"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite French colors",
+        "answers": [
+          "rouge",
+          "bleu",
+          "vert"
+        ],
+        "distractors": [
+          "chat",
+          "pain",
+          "maison"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:language-question-bank-v1.9.json::$.sets[2]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/language-question-bank-v1.9.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[2]",
+        "sourceId": "language-question-bank-v1.9.json::$.sets[2]"
+      },
+      "digest": "c9e457c81ae168f9ac8e92f78a670effeba8bd94e8cd7186577713ace73907aa",
+      "digestMatches": true,
+      "quarantine": "quarantined",
+      "quarantineReasons": [
+        "no-canonical-language-skill"
+      ],
+      "runtimeStatus": "quarantined",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:quarantine-reason"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite German greetings",
+        "answers": [
+          "hallo",
+          "danke",
+          "tschüss"
+        ],
+        "distractors": [
+          "rot",
+          "Hund",
+          "Haus"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:language-question-bank-v1.9.json::$.sets[3]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/language-question-bank-v1.9.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[3]",
+        "sourceId": "language-question-bank-v1.9.json::$.sets[3]"
+      },
+      "digest": "e3fd87514c58d97dea8263fd4a494423205b4eddacb933e4d9798c91fef11c82",
+      "digestMatches": true,
+      "quarantine": "quarantined",
+      "quarantineReasons": [
+        "no-canonical-language-skill"
+      ],
+      "runtimeStatus": "quarantined",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:quarantine-reason"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite Italian food words",
+        "answers": [
+          "pane",
+          "latte",
+          "formaggio"
+        ],
+        "distractors": [
+          "gatto",
+          "rosso",
+          "casa"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:language-question-bank-v1.9.json::$.sets[4]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/language-question-bank-v1.9.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[4]",
+        "sourceId": "language-question-bank-v1.9.json::$.sets[4]"
+      },
+      "digest": "a0999539806743e58009608761fe43cd2f89c02a39d307c5401958f480ab141a",
+      "digestMatches": true,
+      "quarantine": "quarantined",
+      "quarantineReasons": [
+        "no-canonical-language-skill"
+      ],
+      "runtimeStatus": "quarantined",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:quarantine-reason"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite Japanese colors",
+        "answers": [
+          "あか",
+          "あお",
+          "みどり"
+        ],
+        "distractors": [
+          "ねこ",
+          "いぬ",
+          "みず"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:math-curated-v3.json::$.skills.fractions_half[0]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/math-curated-v3.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.skills.fractions_half[0]",
+        "sourceId": "math-curated-v3.json::$.skills.fractions_half[0]"
+      },
+      "digest": "8d6ef8e61d002383bc5e0a4712c5b216ddc13ea0e97315fcb26dc33631ecc8af",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "non-production",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:linked-taxonomy-metadata"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite all values equal to one half",
+        "answers": [
+          "1/2",
+          "2/4",
+          "3/6",
+          "0.5"
+        ],
+        "distractors": [
+          "1/3",
+          "2/3",
+          "0.25",
+          "0.75"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:math-curated-v3.json::$.skills.fractions_half[1]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/math-curated-v3.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.skills.fractions_half[1]",
+        "sourceId": "math-curated-v3.json::$.skills.fractions_half[1]"
+      },
+      "digest": "90818d2d51eb13da7c6c9f56c16ebf9ab96eb5029d98dc7e50de424e96f99933",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "non-production",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:linked-taxonomy-metadata"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite pictures or values showing half",
+        "answers": [
+          "50%",
+          "4/8"
+        ],
+        "distractors": [
+          "25%",
+          "3/8"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:math-curated-v3.json::$.skills.addition_20[0]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/math-curated-v3.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.skills.addition_20[0]",
+        "sourceId": "math-curated-v3.json::$.skills.addition_20[0]"
+      },
+      "digest": "1bbd7c62f866a2d05427ac862a789a45fe998e2faab06b1b12471ba5e199c438",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "non-production",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:linked-taxonomy-metadata"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite expressions equal to 20",
+        "answers": [
+          "11+9",
+          "13+7",
+          "16+4",
+          "18+2"
+        ],
+        "distractors": [
+          "10+9",
+          "12+7",
+          "15+4",
+          "17+2"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:math-expanded-v2.json::$.questionSets.addition_20[0]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/math-expanded-v2.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.questionSets.addition_20[0]",
+        "sourceId": "math-expanded-v2.json::$.questionSets.addition_20[0]"
+      },
+      "digest": "ec1649b9366da8a12d00c255b8ef12039cd0f85247af063f1b19c1cfd98ac2d3",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "non-production",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:linked-taxonomy-metadata"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite sums that equal 20",
+        "answers": [
+          "10+10",
+          "12+8",
+          "15+5",
+          "14+6"
+        ],
+        "distractors": [
+          "9+9",
+          "11+8",
+          "13+6",
+          "16+5"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:math-expanded-v2.json::$.questionSets.addition_20[1]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/math-expanded-v2.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.questionSets.addition_20[1]",
+        "sourceId": "math-expanded-v2.json::$.questionSets.addition_20[1]"
+      },
+      "digest": "8fb806ddc0e355d52f77c22ae11b8f762e60cdaf9f882261ac3a6bfaf2f46320",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "non-production",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:linked-taxonomy-metadata"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite missing addends that make 20",
+        "answers": [
+          "?=8 in 12+?",
+          "?=5 in 15+?"
+        ],
+        "distractors": [
+          "?=7 in 12+?",
+          "?=4 in 15+?"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:math-expanded-v2.json::$.questionSets.fractions_half[0]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/math-expanded-v2.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.questionSets.fractions_half[0]",
+        "sourceId": "math-expanded-v2.json::$.questionSets.fractions_half[0]"
+      },
+      "digest": "1440335db6be26251ffaa2730e4157d349d36109e6a6f3bcb3a502a0a09fc81f",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "non-production",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:linked-taxonomy-metadata"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite all representations of one half",
+        "answers": [
+          "1/2",
+          "2/4",
+          "0.5",
+          "50%"
+        ],
+        "distractors": [
+          "1/3",
+          "3/4",
+          "0.25",
+          "25%"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:math-question-bank-v1.7.json::$.sets[0]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/math-question-bank-v1.7.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[0]",
+        "sourceId": "math-question-bank-v1.7.json::$.sets[0]"
+      },
+      "digest": "87b1552c334ae9839c67326b980a44eaad2e0b16236435a1a44f23df7a095a14",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "non-production",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:linked-taxonomy-metadata"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite expressions equal to 20",
+        "answers": [
+          "9+11",
+          "8+12",
+          "7+13",
+          "6+14"
+        ],
+        "distractors": [
+          "9+10",
+          "8+11",
+          "7+12",
+          "6+13"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "addition_20",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:math-question-bank-v1.7.json::$.sets[1]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/math-question-bank-v1.7.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[1]",
+        "sourceId": "math-question-bank-v1.7.json::$.sets[1]"
+      },
+      "digest": "9049cba3545a375e4721d468895b3e7681ac4c292217f5dead9898aa921b0c23",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "non-production",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:linked-taxonomy-metadata"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite products equal to 24",
+        "answers": [
+          "6×4",
+          "3×8",
+          "2×12"
+        ],
+        "distractors": [
+          "5×4",
+          "3×7",
+          "4×7"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "multiplication",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:math-question-bank-v1.7.json::$.sets[2]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/math-question-bank-v1.7.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[2]",
+        "sourceId": "math-question-bank-v1.7.json::$.sets[2]"
+      },
+      "digest": "ea9a691f46d8152dbc43b8ccaa79c1242406a8702bd7df67b2e6080f60277a93",
+      "digestMatches": true,
+      "quarantine": "quarantined",
+      "quarantineReasons": [
+        "no-canonical-division-skill"
+      ],
+      "runtimeStatus": "quarantined",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:quarantine-reason"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite expressions equal to 6",
+        "answers": [
+          "24÷4",
+          "18÷3",
+          "42÷7"
+        ],
+        "distractors": [
+          "20÷4",
+          "16÷2",
+          "35÷7"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "division",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:math-question-bank-v1.7.json::$.sets[3]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/math-question-bank-v1.7.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[3]",
+        "sourceId": "math-question-bank-v1.7.json::$.sets[3]"
+      },
+      "digest": "5a3fb107494945e9ee523539f7429fabf7eac3577e76b16c29a0a51c358e4001",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "non-production",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:linked-taxonomy-metadata"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite values greater than one half",
+        "answers": [
+          "3/4",
+          "2/3",
+          "0.75"
+        ],
+        "distractors": [
+          "1/4",
+          "1/3",
+          "0.4"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "fractions_half",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:math-question-bank-v1.7.json::$.sets[4]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/math-question-bank-v1.7.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[4]",
+        "sourceId": "math-question-bank-v1.7.json::$.sets[4]"
+      },
+      "digest": "ab9de5e338a17cb780ee658ae1fcfaa4793075aaad056077df09b362cc3684c9",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "non-production",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:linked-taxonomy-metadata"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite values equal to 0.5",
+        "answers": [
+          "0.50",
+          "1/2",
+          "50%"
+        ],
+        "distractors": [
+          "0.05",
+          "5%",
+          "1/5"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "decimals",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:math-question-bank-v1.7.json::$.sets[5]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/math-question-bank-v1.7.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[5]",
+        "sourceId": "math-question-bank-v1.7.json::$.sets[5]"
+      },
+      "digest": "7e66f2fb4f9398f7e119c546fd14ebe95c4f86c770eaf5f56ddfe67404ddaa99",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "non-production",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:linked-taxonomy-metadata"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite ratios equivalent to 1:2",
+        "answers": [
+          "2:4",
+          "3:6",
+          "5:10"
+        ],
+        "distractors": [
+          "2:3",
+          "4:6",
+          "5:8"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "ratios",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:math-question-bank-v1.9.json::$.sets[0]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/math-question-bank-v1.9.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[0]",
+        "sourceId": "math-question-bank-v1.9.json::$.sets[0]"
+      },
+      "digest": "6f8998ff9b9352ebd6e5e2ff7b19ecd361464c08f75279a8008777658adb1342",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "non-production",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:linked-taxonomy-metadata"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite products equal to 36",
+        "answers": [
+          "6×6",
+          "4×9",
+          "3×12"
+        ],
+        "distractors": [
+          "5×7",
+          "8×4",
+          "2×17"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "multiplication",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:math-question-bank-v1.9.json::$.sets[1]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/math-question-bank-v1.9.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[1]",
+        "sourceId": "math-question-bank-v1.9.json::$.sets[1]"
+      },
+      "digest": "78359fb9cdca94bf624e710e31da85adc275b0d4280ef1a5aac652c98cad2959",
+      "digestMatches": true,
+      "quarantine": "quarantined",
+      "quarantineReasons": [
+        "no-canonical-division-skill"
+      ],
+      "runtimeStatus": "quarantined",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:quarantine-reason"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite expressions equal to 8",
+        "answers": [
+          "32÷4",
+          "40÷5",
+          "56÷7"
+        ],
+        "distractors": [
+          "28÷4",
+          "45÷5",
+          "63÷7"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "division",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:math-question-bank-v1.9.json::$.sets[2]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/math-question-bank-v1.9.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[2]",
+        "sourceId": "math-question-bank-v1.9.json::$.sets[2]"
+      },
+      "digest": "6e664d83d5efdd58e98d222d3ede4d6b1904627f3cf1ef581d273a1f601b24e1",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "non-production",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:linked-taxonomy-metadata"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite fractions greater than 3/4",
+        "answers": [
+          "4/5",
+          "7/8",
+          "9/10"
+        ],
+        "distractors": [
+          "2/3",
+          "3/5",
+          "1/2"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "fractions",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:math-question-bank-v1.9.json::$.sets[3]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/math-question-bank-v1.9.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[3]",
+        "sourceId": "math-question-bank-v1.9.json::$.sets[3]"
+      },
+      "digest": "6ab423469633ad1527980b20bec6aa1bfe748de3c5df9fd945479aa65402d945",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "non-production",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:linked-taxonomy-metadata"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite decimals less than 0.5",
+        "answers": [
+          "0.4",
+          "0.25",
+          "0.09"
+        ],
+        "distractors": [
+          "0.5",
+          "0.6",
+          "0.75"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "decimals",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:math-question-bank-v1.9.json::$.sets[4]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/math-question-bank-v1.9.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[4]",
+        "sourceId": "math-question-bank-v1.9.json::$.sets[4]"
+      },
+      "digest": "5c21e2f4827ef7a4519bf8e387b541625e49a59a0c6f3351ba53c2a8303b1e0a",
+      "digestMatches": true,
+      "quarantine": "quarantined",
+      "quarantineReasons": [
+        "no-canonical-integer-skill"
+      ],
+      "runtimeStatus": "quarantined",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:quarantine-reason"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite integers less than -2",
+        "answers": [
+          "-3",
+          "-5",
+          "-10"
+        ],
+        "distractors": [
+          "-2",
+          "0",
+          "4"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "integers",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:words-curated-v3.json::$.skills.context_clues[0]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/words-curated-v3.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.skills.context_clues[0]",
+        "sourceId": "words-curated-v3.json::$.skills.context_clues[0]"
+      },
+      "digest": "a1064f70f5adda17e0fe3d319cca702dd0e7a3d6d44eb931dd6975dca841a14b",
+      "digestMatches": true,
+      "quarantine": "quarantined",
+      "quarantineReasons": [
+        "source-skill-content-mismatch-needs-review"
+      ],
+      "runtimeStatus": "quarantined",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:quarantine-reason"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite words that could replace enormous",
+        "answers": [
+          "huge",
+          "giant",
+          "massive"
+        ],
+        "distractors": [
+          "tiny",
+          "quiet",
+          "slow",
+          "early"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:words-curated-v3.json::$.skills.context_clues[1]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/words-curated-v3.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.skills.context_clues[1]",
+        "sourceId": "words-curated-v3.json::$.skills.context_clues[1]"
+      },
+      "digest": "432db3381b4ddae407d103568945aa3eba36b0cd520f94efb34daacc29fc0a50",
+      "digestMatches": true,
+      "quarantine": "quarantined",
+      "quarantineReasons": [
+        "source-skill-content-mismatch-needs-review"
+      ],
+      "runtimeStatus": "quarantined",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:quarantine-reason"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite words that mean very tired",
+        "answers": [
+          "exhausted",
+          "weary"
+        ],
+        "distractors": [
+          "excited",
+          "bright",
+          "noisy",
+          "rapid"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:words-curated-v3.json::$.skills.homophones[0]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/words-curated-v3.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.skills.homophones[0]",
+        "sourceId": "words-curated-v3.json::$.skills.homophones[0]"
+      },
+      "digest": "f44fe5b39808f037f899092d6fc775d4b1c7b0d12e235c349994b1d5b89807c0",
+      "digestMatches": true,
+      "quarantine": "quarantined",
+      "quarantineReasons": [
+        "no-canonical-homophone-skill"
+      ],
+      "runtimeStatus": "quarantined",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:quarantine-reason"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite the word that sounds like pair",
+        "answers": [
+          "pear"
+        ],
+        "distractors": [
+          "peer",
+          "par",
+          "pour",
+          "pure"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:words-expanded-v2.json::$.questionSets.context_clues[0]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/words-expanded-v2.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.questionSets.context_clues[0]",
+        "sourceId": "words-expanded-v2.json::$.questionSets.context_clues[0]"
+      },
+      "digest": "1511bbc94ba9789037090e8fc509d8780a4b50a4631de5fa1d3659b724d68cb0",
+      "digestMatches": true,
+      "quarantine": "quarantined",
+      "quarantineReasons": [
+        "source-skill-content-mismatch-needs-review"
+      ],
+      "runtimeStatus": "quarantined",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:quarantine-reason"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite words meaning very tired",
+        "answers": [
+          "exhausted",
+          "weary"
+        ],
+        "distractors": [
+          "excited",
+          "tiny",
+          "loud",
+          "early"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:words-expanded-v2.json::$.questionSets.homophones[0]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/words-expanded-v2.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.questionSets.homophones[0]",
+        "sourceId": "words-expanded-v2.json::$.questionSets.homophones[0]"
+      },
+      "digest": "64c038b1a897432de30a03d054e13b7cfa5e75e9aed7fd3259ece37ba138015f",
+      "digestMatches": true,
+      "quarantine": "quarantined",
+      "quarantineReasons": [
+        "no-canonical-homophone-skill"
+      ],
+      "runtimeStatus": "quarantined",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:quarantine-reason"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite the word that sounds like SEA",
+        "answers": [
+          "see"
+        ],
+        "distractors": [
+          "say",
+          "saw",
+          "sew",
+          "so"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:words-question-bank-v1.7.json::$.sets[0]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/words-question-bank-v1.7.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[0]",
+        "sourceId": "words-question-bank-v1.7.json::$.sets[0]"
+      },
+      "digest": "be9d5b9250486ff1253cf993a8d9c8cb704441fbbcda19ea24df2cc7d4630bca",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "non-production",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:linked-taxonomy-metadata"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite synonyms for BRAVE",
+        "answers": [
+          "bold",
+          "courageous",
+          "fearless"
+        ],
+        "distractors": [
+          "timid",
+          "quiet",
+          "tiny"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "synonyms",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:words-question-bank-v1.7.json::$.sets[1]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/words-question-bank-v1.7.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[1]",
+        "sourceId": "words-question-bank-v1.7.json::$.sets[1]"
+      },
+      "digest": "c25cf9974ddbc084034c6ba5e3fb48a03358f98413b99a4a7fe2fa3d42accb94",
+      "digestMatches": true,
+      "quarantine": "quarantined",
+      "quarantineReasons": [
+        "no-canonical-antonym-skill"
+      ],
+      "runtimeStatus": "quarantined",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:quarantine-reason"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite antonyms for ANCIENT",
+        "answers": [
+          "modern",
+          "new",
+          "recent"
+        ],
+        "distractors": [
+          "old",
+          "historic",
+          "aged"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "antonyms",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:words-question-bank-v1.7.json::$.sets[2]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/words-question-bank-v1.7.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[2]",
+        "sourceId": "words-question-bank-v1.7.json::$.sets[2]"
+      },
+      "digest": "6e1afaa3f88acac84c4f738d4990b42f5f686d6da45ccad3bfe1814ee437b03a",
+      "digestMatches": true,
+      "quarantine": "quarantined",
+      "quarantineReasons": [
+        "source-skill-content-mismatch-needs-review"
+      ],
+      "runtimeStatus": "quarantined",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:quarantine-reason"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite words meaning very hungry",
+        "answers": [
+          "famished",
+          "starving"
+        ],
+        "distractors": [
+          "sleepy",
+          "silent",
+          "tiny"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "context_clues",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:words-question-bank-v1.7.json::$.sets[3]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/words-question-bank-v1.7.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[3]",
+        "sourceId": "words-question-bank-v1.7.json::$.sets[3]"
+      },
+      "digest": "efe45d6e1d9a03bf5313e32390098214fd44850a000c0dadf384f958be945121",
+      "digestMatches": true,
+      "quarantine": "quarantined",
+      "quarantineReasons": [
+        "no-canonical-homophone-skill"
+      ],
+      "runtimeStatus": "quarantined",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:quarantine-reason"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite the word sounding like KNIGHT",
+        "answers": [
+          "night"
+        ],
+        "distractors": [
+          "net",
+          "note",
+          "neat"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "homophones",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:words-question-bank-v1.7.json::$.sets[4]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/words-question-bank-v1.7.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[4]",
+        "sourceId": "words-question-bank-v1.7.json::$.sets[4]"
+      },
+      "digest": "392f9e05dc24a6b22fbd7b2e19f6972bba051fdead6fa16b849c849bf55f07a5",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "non-production",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:linked-taxonomy-metadata"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite words connected to the root BIO (life)",
+        "answers": [
+          "biology",
+          "biography"
+        ],
+        "distractors": [
+          "geometry",
+          "telephone",
+          "aquatic"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "roots",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:words-question-bank-v1.9.json::$.sets[0]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/words-question-bank-v1.9.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[0]",
+        "sourceId": "words-question-bank-v1.9.json::$.sets[0]"
+      },
+      "digest": "d95a26f331e78fdba8b16b0dba9090d7c278ffc6ebe66f821fe4c928d5a467a4",
+      "digestMatches": true,
+      "quarantine": "clear",
+      "quarantineReasons": [],
+      "runtimeStatus": "non-production",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:linked-taxonomy-metadata"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite words related to GEO (earth)",
+        "answers": [
+          "geology",
+          "geography"
+        ],
+        "distractors": [
+          "biology",
+          "phonics",
+          "aquatic"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "roots",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:words-question-bank-v1.9.json::$.sets[1]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/words-question-bank-v1.9.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[1]",
+        "sourceId": "words-question-bank-v1.9.json::$.sets[1]"
+      },
+      "digest": "fcd5e8ab727736b06896ed7dc462956ce56dae5c33ae42f387bc19763d71c1a4",
+      "digestMatches": true,
+      "quarantine": "quarantined",
+      "quarantineReasons": [
+        "no-canonical-figurative-language-skill"
+      ],
+      "runtimeStatus": "quarantined",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:quarantine-reason"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite similes",
+        "answers": [
+          "fast as lightning",
+          "quiet as a mouse"
+        ],
+        "distractors": [
+          "the wind screamed",
+          "time is a thief"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "figurative_language",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    },
+    {
+      "identity": "json-pack-item:words-question-bank-v1.9.json::$.sets[2]",
+      "kind": "json-pack-item",
+      "source": {
+        "file": "content/words-question-bank-v1.9.json",
+        "sidecar": "content/skill-links.v1.json",
+        "path": "$.sets[2]",
+        "sourceId": "words-question-bank-v1.9.json::$.sets[2]"
+      },
+      "digest": "5ebb78aaa02cbfcd4739e92752920b2ba685cfdff5381163b5efc328a6843e1f",
+      "digestMatches": true,
+      "quarantine": "quarantined",
+      "quarantineReasons": [
+        "source-skill-content-mismatch-needs-review"
+      ],
+      "runtimeStatus": "quarantined",
+      "verification": [
+        "scripts/validate-content.mjs:answer-shape",
+        "skill-links.v1:quarantine-reason"
+      ],
+      "content": {
+        "kind": "prompt",
+        "prompt": "Bite words that could mean cautious",
+        "answers": [
+          "careful",
+          "wary"
+        ],
+        "distractors": [
+          "reckless",
+          "noisy",
+          "rapid"
+        ],
+        "explanation": "",
+        "hint": "",
+        "skill": "context",
+        "difficulty": null,
+        "grade": null,
+        "subject": null
+      }
+    }
+  ]
+}

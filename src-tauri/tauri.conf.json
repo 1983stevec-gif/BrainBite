@@ -1,0 +1,43 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "BrainBite",
+  "version": "2.0.0",
+  "identifier": "com.collinsventures.brainbite",
+  "build": {
+    "beforeDevCommand": "npm run native:stage",
+    "beforeBuildCommand": "npm run native:stage",
+    "frontendDist": "../.native-site"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "BrainBite",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 640,
+        "resizable": true,
+        "fullscreen": false,
+        "useHttpsScheme": true
+      }
+    ],
+    "security": {
+      "capabilities": ["default"],
+      "csp": "default-src 'self'; base-uri 'self'; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; form-action 'self'; frame-ancestors 'none'; img-src 'self' asset: data: blob:; manifest-src 'self'; media-src 'self' asset: data: blob:; object-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; worker-src 'self' blob:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": ["icons/icon.ico"],
+    "category": "Education",
+    "shortDescription": "Local-first learning adventures for kids",
+    "longDescription": "BrainBite is a local-first educational game with parent-controlled optional cloud sync.",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  }
+}

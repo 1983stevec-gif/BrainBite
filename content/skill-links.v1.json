@@ -1,0 +1,92 @@
+{
+  "version": "1.0.0",
+  "status": "reconciled",
+  "approvalScope": "schema-and-taxonomy-linkage-only",
+  "educatorApprovalRequired": true,
+  "linkageRule": {
+    "appliesTo": ["packs", "entries"],
+    "taxonomyLinkedDoesNotGrant": ["runtime-approval", "child-approval"]
+  },
+  "taxonomyVersion": "2.0",
+  "packs": [
+    { "source": "concept-morph-v1.8.json", "status": "reference", "runtime": "non-runtime" },
+    { "source": "content-manifest.json", "status": "reference", "runtime": "non-runtime" },
+    { "source": "curriculum-map-v1.4.json", "status": "reference", "runtime": "non-runtime" },
+    { "source": "french-core-v1.json", "status": "reference", "runtime": "non-runtime" },
+    { "source": "german-core-v1.json", "status": "reference", "runtime": "non-runtime" },
+    { "source": "italian-core-v1.json", "status": "reference", "runtime": "non-runtime" },
+    { "source": "japanese-core-v1.json", "status": "reference", "runtime": "non-runtime" },
+    { "source": "language-depth-v1.8.json", "status": "reference", "runtime": "non-runtime" },
+    { "source": "language-question-bank-v1.7.json", "status": "answer-bearing", "runtime": "not-approved-by-linkage" },
+    { "source": "language-question-bank-v1.9.json", "status": "answer-bearing", "runtime": "not-approved-by-linkage" },
+    { "source": "math-35-v1.json", "status": "reference", "runtime": "non-runtime" },
+    { "source": "math-6-v1.json", "status": "reference", "runtime": "non-runtime" },
+    { "source": "math-core-v1.json", "status": "reference", "runtime": "non-runtime" },
+    { "source": "math-curated-v3.json", "status": "answer-bearing", "runtime": "not-approved-by-linkage" },
+    { "source": "math-expanded-v2.json", "status": "answer-bearing", "runtime": "not-approved-by-linkage" },
+    { "source": "math-k2-v1.json", "status": "reference", "runtime": "non-runtime" },
+    { "source": "math-question-bank-v1.7.json", "status": "answer-bearing", "runtime": "not-approved-by-linkage" },
+    { "source": "math-question-bank-v1.9.json", "status": "answer-bearing", "runtime": "not-approved-by-linkage" },
+    { "source": "spanish-core-v1.json", "status": "reference", "runtime": "non-runtime" },
+    { "source": "spanish-curated-v3.json", "status": "reference", "runtime": "non-runtime" },
+    { "source": "spanish-expanded-v2.json", "status": "reference", "runtime": "non-runtime" },
+    { "source": "words-35-v1.json", "status": "reference", "runtime": "non-runtime" },
+    { "source": "words-6-v1.json", "status": "reference", "runtime": "non-runtime" },
+    { "source": "words-core-v1.json", "status": "reference", "runtime": "non-runtime" },
+    { "source": "words-curated-v3.json", "status": "answer-bearing", "runtime": "not-approved-by-linkage" },
+    { "source": "words-expanded-v2.json", "status": "answer-bearing", "runtime": "not-approved-by-linkage" },
+    { "source": "words-k2-v1.json", "status": "reference", "runtime": "non-runtime" },
+    { "source": "words-question-bank-v1.7.json", "status": "answer-bearing", "runtime": "not-approved-by-linkage" },
+    { "source": "words-question-bank-v1.9.json", "status": "answer-bearing", "runtime": "not-approved-by-linkage" }
+  ],
+  "entries": [
+    { "source": "language-question-bank-v1.7.json", "path": "$.sets[0]", "locale": "es", "status": "quarantined", "unlinkedReason": "no-canonical-language-skill" },
+    { "source": "language-question-bank-v1.7.json", "path": "$.sets[1]", "locale": "fr", "status": "quarantined", "unlinkedReason": "no-canonical-language-skill" },
+    { "source": "language-question-bank-v1.7.json", "path": "$.sets[2]", "locale": "de", "status": "quarantined", "unlinkedReason": "no-canonical-language-skill" },
+    { "source": "language-question-bank-v1.7.json", "path": "$.sets[3]", "locale": "it", "status": "quarantined", "unlinkedReason": "no-canonical-language-skill" },
+    { "source": "language-question-bank-v1.7.json", "path": "$.sets[4]", "locale": "ja", "status": "quarantined", "unlinkedReason": "no-canonical-language-skill" },
+    { "source": "language-question-bank-v1.9.json", "path": "$.sets[0]", "locale": "es", "status": "quarantined", "unlinkedReason": "no-canonical-language-skill" },
+    { "source": "language-question-bank-v1.9.json", "path": "$.sets[1]", "locale": "fr", "status": "quarantined", "unlinkedReason": "no-canonical-language-skill" },
+    { "source": "language-question-bank-v1.9.json", "path": "$.sets[2]", "locale": "de", "status": "quarantined", "unlinkedReason": "no-canonical-language-skill" },
+    { "source": "language-question-bank-v1.9.json", "path": "$.sets[3]", "locale": "it", "status": "quarantined", "unlinkedReason": "no-canonical-language-skill" },
+    { "source": "language-question-bank-v1.9.json", "path": "$.sets[4]", "locale": "ja", "status": "quarantined", "unlinkedReason": "no-canonical-language-skill" },
+
+    { "source": "math-curated-v3.json", "path": "$.skills.fractions_half[0]", "sourceSkillId": "fractions_half", "subject": "math", "status": "linked", "canonicalSkillId": "math-4-fractions" },
+    { "source": "math-curated-v3.json", "path": "$.skills.fractions_half[1]", "sourceSkillId": "fractions_half", "subject": "math", "status": "linked", "canonicalSkillId": "math-4-fractions" },
+    { "source": "math-curated-v3.json", "path": "$.skills.addition_20[0]", "sourceSkillId": "addition_20", "subject": "math", "status": "linked", "canonicalSkillId": "math-1-addition" },
+
+    { "source": "math-expanded-v2.json", "path": "$.questionSets.addition_20[0]", "sourceSkillId": "addition_20", "subject": "math", "status": "linked", "canonicalSkillId": "math-1-addition" },
+    { "source": "math-expanded-v2.json", "path": "$.questionSets.addition_20[1]", "sourceSkillId": "addition_20", "subject": "math", "status": "linked", "canonicalSkillId": "math-1-addition" },
+    { "source": "math-expanded-v2.json", "path": "$.questionSets.fractions_half[0]", "sourceSkillId": "fractions_half", "subject": "math", "status": "linked", "canonicalSkillId": "math-4-fractions" },
+
+    { "source": "math-question-bank-v1.7.json", "path": "$.sets[0]", "sourceSkillId": "addition_20", "subject": "math", "status": "linked", "canonicalSkillId": "math-1-addition" },
+    { "source": "math-question-bank-v1.7.json", "path": "$.sets[1]", "sourceSkillId": "multiplication", "subject": "math", "status": "linked", "canonicalSkillId": "math-3-multiplication" },
+    { "source": "math-question-bank-v1.7.json", "path": "$.sets[2]", "sourceSkillId": "division", "subject": "math", "status": "quarantined", "unlinkedReason": "no-canonical-division-skill" },
+    { "source": "math-question-bank-v1.7.json", "path": "$.sets[3]", "sourceSkillId": "fractions_half", "subject": "math", "status": "linked", "canonicalSkillId": "math-4-fractions" },
+    { "source": "math-question-bank-v1.7.json", "path": "$.sets[4]", "sourceSkillId": "decimals", "subject": "math", "status": "linked", "canonicalSkillId": "math-5-decimals" },
+    { "source": "math-question-bank-v1.7.json", "path": "$.sets[5]", "sourceSkillId": "ratios", "subject": "math", "status": "linked", "canonicalSkillId": "math-6-ratios" },
+
+    { "source": "math-question-bank-v1.9.json", "path": "$.sets[0]", "sourceSkillId": "multiplication", "subject": "math", "status": "linked", "canonicalSkillId": "math-3-multiplication" },
+    { "source": "math-question-bank-v1.9.json", "path": "$.sets[1]", "sourceSkillId": "division", "subject": "math", "status": "quarantined", "unlinkedReason": "no-canonical-division-skill" },
+    { "source": "math-question-bank-v1.9.json", "path": "$.sets[2]", "sourceSkillId": "fractions", "subject": "math", "status": "linked", "canonicalSkillId": "math-4-fractions" },
+    { "source": "math-question-bank-v1.9.json", "path": "$.sets[3]", "sourceSkillId": "decimals", "subject": "math", "status": "linked", "canonicalSkillId": "math-5-decimals" },
+    { "source": "math-question-bank-v1.9.json", "path": "$.sets[4]", "sourceSkillId": "integers", "subject": "math", "status": "quarantined", "unlinkedReason": "no-canonical-integer-skill" },
+
+    { "source": "words-curated-v3.json", "path": "$.skills.context_clues[0]", "sourceSkillId": "context_clues", "subject": "vocabulary", "status": "quarantined", "unlinkedReason": "source-skill-content-mismatch-needs-review" },
+    { "source": "words-curated-v3.json", "path": "$.skills.context_clues[1]", "sourceSkillId": "context_clues", "subject": "vocabulary", "status": "quarantined", "unlinkedReason": "source-skill-content-mismatch-needs-review" },
+    { "source": "words-curated-v3.json", "path": "$.skills.homophones[0]", "sourceSkillId": "homophones", "subject": "vocabulary", "status": "quarantined", "unlinkedReason": "no-canonical-homophone-skill" },
+
+    { "source": "words-expanded-v2.json", "path": "$.questionSets.context_clues[0]", "sourceSkillId": "context_clues", "subject": "vocabulary", "status": "quarantined", "unlinkedReason": "source-skill-content-mismatch-needs-review" },
+    { "source": "words-expanded-v2.json", "path": "$.questionSets.homophones[0]", "sourceSkillId": "homophones", "subject": "vocabulary", "status": "quarantined", "unlinkedReason": "no-canonical-homophone-skill" },
+
+    { "source": "words-question-bank-v1.7.json", "path": "$.sets[0]", "sourceSkillId": "synonyms", "subject": "vocabulary", "status": "linked", "canonicalSkillId": "vocabulary-2-synonyms" },
+    { "source": "words-question-bank-v1.7.json", "path": "$.sets[1]", "sourceSkillId": "antonyms", "subject": "vocabulary", "status": "quarantined", "unlinkedReason": "no-canonical-antonym-skill" },
+    { "source": "words-question-bank-v1.7.json", "path": "$.sets[2]", "sourceSkillId": "context_clues", "subject": "vocabulary", "status": "quarantined", "unlinkedReason": "source-skill-content-mismatch-needs-review" },
+    { "source": "words-question-bank-v1.7.json", "path": "$.sets[3]", "sourceSkillId": "homophones", "subject": "vocabulary", "status": "quarantined", "unlinkedReason": "no-canonical-homophone-skill" },
+    { "source": "words-question-bank-v1.7.json", "path": "$.sets[4]", "sourceSkillId": "roots", "subject": "vocabulary", "status": "linked", "canonicalSkillId": "vocabulary-5-roots" },
+
+    { "source": "words-question-bank-v1.9.json", "path": "$.sets[0]", "sourceSkillId": "roots", "subject": "vocabulary", "status": "linked", "canonicalSkillId": "vocabulary-5-roots" },
+    { "source": "words-question-bank-v1.9.json", "path": "$.sets[1]", "sourceSkillId": "figurative_language", "subject": "vocabulary", "status": "quarantined", "unlinkedReason": "no-canonical-figurative-language-skill" },
+    { "source": "words-question-bank-v1.9.json", "path": "$.sets[2]", "sourceSkillId": "context", "subject": "vocabulary", "status": "quarantined", "unlinkedReason": "source-skill-content-mismatch-needs-review" }
+  ]
+}

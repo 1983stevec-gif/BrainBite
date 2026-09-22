@@ -1,0 +1,507 @@
+{
+  "viewport": "desktop",
+  "errors": [],
+  "assets": [
+    "mascot",
+    "portal",
+    "jungle",
+    "mascot",
+    "kraken",
+    "pillars"
+  ],
+  "performance": {
+    "home": {
+      "metrics": {
+        "frame": {
+          "count": 4,
+          "average": 293.20000000018626,
+          "p95": 703.7999999988824,
+          "p99": 703.7999999988824,
+          "max": 703.7999999988824
+        },
+        "startup": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "sceneLoad": {
+          "count": 1,
+          "average": 313.90000000037253,
+          "p95": 313.90000000037253,
+          "p99": 313.90000000037253,
+          "max": 313.90000000037253
+        },
+        "save": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "memory": {
+          "count": 1,
+          "average": 10000000,
+          "p95": 10000000,
+          "p99": 10000000,
+          "max": 10000000
+        },
+        "rendererGeometries": {
+          "count": 1,
+          "average": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "rendererTextures": {
+          "count": 1,
+          "average": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "rendererPrograms": {
+          "count": 1,
+          "average": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "renderCalls": {
+          "count": 1,
+          "average": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "renderTriangles": {
+          "count": 1,
+          "average": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "assetLoad": {
+          "count": 3,
+          "average": 1172.7333333343267,
+          "p95": 1175.4000000003725,
+          "p99": 1175.4000000003725,
+          "max": 1175.4000000003725,
+          "totalDuration": 3518.2000000029802,
+          "transferSize": 0,
+          "encodedBodySize": 0,
+          "decodedBodySize": 0,
+          "slowest": {
+            "name": "jungle",
+            "duration": 1175.4000000003725
+          }
+        }
+      },
+      "assetTiming": {
+        "count": 3,
+        "average": 1172.7333333343267,
+        "p95": 1175.4000000003725,
+        "p99": 1175.4000000003725,
+        "max": 1175.4000000003725,
+        "totalDuration": 3518.2000000029802,
+        "transferSize": 0,
+        "encodedBodySize": 0,
+        "decodedBodySize": 0,
+        "slowest": {
+          "name": "jungle",
+          "duration": 1175.4000000003725
+        }
+      },
+      "budgets": {
+        "frame": {
+          "p95": 33.4,
+          "p99": 50,
+          "max": 100
+        },
+        "startup": {
+          "max": 3000
+        },
+        "sceneLoad": {
+          "p95": 1500,
+          "max": 3000
+        },
+        "save": {
+          "p95": 250,
+          "max": 1000
+        },
+        "memory": {
+          "max": 536870912
+        },
+        "rendererGeometries": {
+          "max": 500
+        },
+        "rendererTextures": {
+          "max": 256
+        },
+        "rendererPrograms": {
+          "max": 64
+        },
+        "renderCalls": {
+          "max": 200
+        },
+        "renderTriangles": {
+          "max": 250000
+        },
+        "assetLoad": {
+          "p95": 1500,
+          "max": 3000
+        }
+      },
+      "violations": [
+        {
+          "metric": "frame",
+          "statistic": "p95",
+          "actual": 703.7999999988824,
+          "budget": 33.4,
+          "overBy": 670.3999999988824
+        },
+        {
+          "metric": "frame",
+          "statistic": "p99",
+          "actual": 703.7999999988824,
+          "budget": 50,
+          "overBy": 653.7999999988824
+        },
+        {
+          "metric": "frame",
+          "statistic": "max",
+          "actual": 703.7999999988824,
+          "budget": 100,
+          "overBy": 603.7999999988824
+        }
+      ],
+      "recommendation": {
+        "tier": "mobile",
+        "reasons": [
+          "Frame p95 703.7999999988824ms and p99 703.7999999988824ms fit the mobile thresholds.",
+          "Peak sampled heap was 10000000 bytes."
+        ]
+      }
+    },
+    "battle": {
+      "metrics": {
+        "frame": {
+          "count": 19,
+          "average": 144.5894736841713,
+          "p95": 635.5,
+          "p99": 635.5,
+          "max": 635.5
+        },
+        "startup": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "sceneLoad": {
+          "count": 1,
+          "average": 390.5,
+          "p95": 390.5,
+          "p99": 390.5,
+          "max": 390.5
+        },
+        "save": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "memory": {
+          "count": 1,
+          "average": 10000000,
+          "p95": 10000000,
+          "p99": 10000000,
+          "max": 10000000
+        },
+        "rendererGeometries": {
+          "count": 1,
+          "average": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "rendererTextures": {
+          "count": 1,
+          "average": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "rendererPrograms": {
+          "count": 1,
+          "average": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "renderCalls": {
+          "count": 1,
+          "average": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "renderTriangles": {
+          "count": 1,
+          "average": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "assetLoad": {
+          "count": 3,
+          "average": 959.8666666671634,
+          "p95": 965.8000000007451,
+          "p99": 965.8000000007451,
+          "max": 965.8000000007451,
+          "totalDuration": 2879.60000000149,
+          "transferSize": 0,
+          "encodedBodySize": 0,
+          "decodedBodySize": 0,
+          "slowest": {
+            "name": "pillars",
+            "duration": 965.8000000007451
+          }
+        }
+      },
+      "assetTiming": {
+        "count": 3,
+        "average": 959.8666666671634,
+        "p95": 965.8000000007451,
+        "p99": 965.8000000007451,
+        "max": 965.8000000007451,
+        "totalDuration": 2879.60000000149,
+        "transferSize": 0,
+        "encodedBodySize": 0,
+        "decodedBodySize": 0,
+        "slowest": {
+          "name": "pillars",
+          "duration": 965.8000000007451
+        }
+      },
+      "budgets": {
+        "frame": {
+          "p95": 33.4,
+          "p99": 50,
+          "max": 100
+        },
+        "startup": {
+          "max": 3000
+        },
+        "sceneLoad": {
+          "p95": 1500,
+          "max": 3000
+        },
+        "save": {
+          "p95": 250,
+          "max": 1000
+        },
+        "memory": {
+          "max": 536870912
+        },
+        "rendererGeometries": {
+          "max": 500
+        },
+        "rendererTextures": {
+          "max": 256
+        },
+        "rendererPrograms": {
+          "max": 64
+        },
+        "renderCalls": {
+          "max": 200
+        },
+        "renderTriangles": {
+          "max": 250000
+        },
+        "assetLoad": {
+          "p95": 1500,
+          "max": 3000
+        }
+      },
+      "violations": [
+        {
+          "metric": "frame",
+          "statistic": "p95",
+          "actual": 635.5,
+          "budget": 33.4,
+          "overBy": 602.1
+        },
+        {
+          "metric": "frame",
+          "statistic": "p99",
+          "actual": 635.5,
+          "budget": 50,
+          "overBy": 585.5
+        },
+        {
+          "metric": "frame",
+          "statistic": "max",
+          "actual": 635.5,
+          "budget": 100,
+          "overBy": 535.5
+        }
+      ],
+      "recommendation": {
+        "tier": "mobile",
+        "reasons": [
+          "Frame p95 635.5ms and p99 635.5ms fit the mobile thresholds.",
+          "Peak sampled heap was 10000000 bytes."
+        ]
+      }
+    },
+    "runtime": {
+      "metrics": {
+        "frame": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "startup": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "sceneLoad": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "save": {
+          "count": 1,
+          "average": 2.799999998882413,
+          "p95": 2.799999998882413,
+          "p99": 2.799999998882413,
+          "max": 2.799999998882413
+        },
+        "memory": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "rendererGeometries": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "rendererTextures": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "rendererPrograms": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "renderCalls": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "renderTriangles": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "assetLoad": {
+          "count": 0,
+          "average": null,
+          "p95": null,
+          "p99": null,
+          "max": null,
+          "totalDuration": 0,
+          "transferSize": 0,
+          "encodedBodySize": 0,
+          "decodedBodySize": 0,
+          "slowest": null
+        }
+      },
+      "assetTiming": {
+        "count": 0,
+        "average": null,
+        "p95": null,
+        "p99": null,
+        "max": null,
+        "totalDuration": 0,
+        "transferSize": 0,
+        "encodedBodySize": 0,
+        "decodedBodySize": 0,
+        "slowest": null
+      },
+      "budgets": {
+        "frame": {
+          "p95": 33.4,
+          "p99": 50,
+          "max": 100
+        },
+        "startup": {
+          "max": 3000
+        },
+        "sceneLoad": {
+          "p95": 1500,
+          "max": 3000
+        },
+        "save": {
+          "p95": 250,
+          "max": 1000
+        },
+        "memory": {
+          "max": 536870912
+        },
+        "rendererGeometries": {
+          "max": 500
+        },
+        "rendererTextures": {
+          "max": 256
+        },
+        "rendererPrograms": {
+          "max": 64
+        },
+        "renderCalls": {
+          "max": 200
+        },
+        "renderTriangles": {
+          "max": 250000
+        },
+        "assetLoad": {
+          "p95": 1500,
+          "max": 3000
+        }
+      },
+      "violations": [],
+      "recommendation": {
+        "tier": "balanced",
+        "reasons": [
+          "No frame samples; using the conservative default."
+        ]
+      }
+    }
+  }
+}

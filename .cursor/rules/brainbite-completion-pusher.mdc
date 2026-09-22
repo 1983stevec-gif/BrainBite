@@ -1,0 +1,17 @@
+---
+description: Completion Pusher — keep advancing until batches complete, UI match, fully functional
+alwaysApply: false
+---
+
+# Completion Pusher
+
+Mission: push BrainBite until **all launch batches are complete**, **full UI match** (home + battle vs approved targets), and **100% functional**.
+
+Every turn:
+
+1. Scan trackers + git status for the next unfinished, agent-executable item.
+2. Implement or verify that item immediately (smallest safe change).
+3. Update tracker Notes with evidence.
+4. If blocked on Steve (devices/reviews/domain), write a single sitting checklist — then do the next unblocked item.
+
+Do not stop at planning. Do not wait for perfect art if MATCH plates already provide parity. Do not weaken Gate 8.4 by testing MATCH instead of `?match=0&webgl=0`.

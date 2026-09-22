@@ -1,15 +1,16 @@
 {
   "product": "BrainBite",
-  "version": "2.0.0-functional-core.14",
-  "date": "2026-09-02",
-  "stage": "batch-8-gates-8-1-through-8-3-complete",
-  "localSourceState": "real-git-checkout-on-main",
+  "version": "2.0.0-batch-9-certification.1",
+  "date": "2026-09-13",
+  "stage": "batch-6-local-certification-complete-external-gates-open",
+  "localSourceState": "real-git-working-tree",
   "sourceRepo": "https://github.com/1983stevec-gif/BrainBite",
   "git": {
-    "branch": "main",
-    "commit": "1f47d66",
+    "branch": "batch-9-webgl-spike",
+    "commit": "96d3bb75069e7baa61a3ecf657d0df572e16f2bf",
     "remote": "origin",
-    "pushState": "pushed"
+    "pushState": "not-pushed",
+    "workingTreeClean": false
   },
   "batch8": {
     "gate81RealGitCheckout": "PASS",
@@ -25,8 +26,8 @@
     "result": "PASS",
     "contentPacksValidated": 29,
     "questionSetsValidated": 40,
-    "unitTests": 16,
-    "playwrightTests": 22
+    "unitTests": 123,
+    "playwrightTests": 118
   },
   "verifiedSurface": [
     "profile isolation",
@@ -52,6 +53,6 @@
     "legal/privacy review",
     "production domain and support contact verification"
   ],
-  "nextPhase": "Batch 8 - external launch validation and real-device certification",
-  "nextPhaseDoc": "docs/BATCH_8_EXTERNAL_LAUNCH_PLAN.md"
+  "nextPhase": "Batch 6 - external device, review, and production certification",
+  "nextPhaseDoc": "docs/GATE_8_4_OPERATOR_CHECKLIST.md"
 }

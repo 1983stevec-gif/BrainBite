@@ -86,7 +86,7 @@ npm run serve
 ```
 
 4. Open the local URL shown by the server
-- usually `http://127.0.0.1:8080`
+- usually `http://127.0.0.1:4317`
 
 ## Exact Verification Steps
 

@@ -5,35 +5,214 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == familyId;
     }
 
+    function validIdentifier(value) {
+      return value.matches('^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$');
+    }
+
+    function validFamilyDocument(data, familyId) {
+      return data.keys().hasOnly(['ownerId', 'updatedAt'])
+        && data.ownerId is string
+        && data.ownerId == familyId
+        && data.updatedAt is timestamp;
+    }
+
+    function validProgression(data) {
+      return data is map
+        && data.keys().hasOnly(['version', 'completedMissionIds', 'unlockedMissionIds', 'lastMissionId'])
+        && data.version is int && data.version >= 1 && data.version <= 100
+        && data.completedMissionIds is list && data.completedMissionIds.size() <= 30
+        && data.unlockedMissionIds is list && data.unlockedMissionIds.size() <= 30
+        && data.lastMissionId is int && data.lastMissionId >= 1 && data.lastMissionId <= 30;
+    }
+
+    function validMastery(data) {
+      return data is map
+        && data.keys().hasOnly(['math', 'words', 'spanish'])
+        && data.math is number && data.math >= 0 && data.math <= 100
+        && data.words is number && data.words >= 0 && data.words <= 100
+        && data.spanish is number && data.spanish >= 0 && data.spanish <= 100;
+    }
+
+    function validSettings(data) {
+      return data is map
+        && data.keys().hasOnly([
+          'reducedMotion', 'cameraMotionReduction', 'largeTargets', 'highContrast',
+          'captions', 'dyslexicFont', 'textScale', 'qualityTier', 'soundOn',
+          'musicOn', 'enemySpeed'
+        ])
+        && data.reducedMotion is bool
+        && data.cameraMotionReduction is bool
+        && data.largeTargets is bool
+        && data.highContrast is bool
+        && data.captions is bool
+        && data.dyslexicFont is bool
+        && data.textScale is string && data.textScale.size() <= 8
+        && data.qualityTier is string && data.qualityTier.size() <= 24
+        && data.soundOn is bool
+        && data.musicOn is bool
+        && data.enemySpeed is string && data.enemySpeed.size() <= 24;
+    }
+
+    function validControls(data) {
+      return data is map
+        && data.keys().hasOnly([
+          'dailyMinutes', 'maxSessionMinutes', 'requireParentForSnap',
+          'requireParentForPractice'
+        ])
+        && data.dailyMinutes is int && data.dailyMinutes >= 1 && data.dailyMinutes <= 240
+        && data.maxSessionMinutes is int
+        && data.maxSessionMinutes >= 1 && data.maxSessionMinutes <= 120
+        && data.maxSessionMinutes <= data.dailyMinutes
+        && data.requireParentForSnap is bool
+        && data.requireParentForPractice is bool;
+    }
+
+    function validLearningCoreHub(data) {
+      return data is map
+        && data.keys().hasOnly([
+          'variant', 'expansionUnlocked', 'visibleChangeCount', 'upgrades'
+        ])
+        && data.variant is string && data.variant.size() <= 32
+        && data.expansionUnlocked is bool
+        && data.visibleChangeCount is number
+        && data.visibleChangeCount >= 0 && data.visibleChangeCount <= 1000000
+        && data.upgrades is list && data.upgrades.size() <= 64;
+    }
+
+    function validLearningCore(data) {
+      return data is map
+        && data.keys().hasOnly([
+          'version', 'stage', 'completedStages', 'skills', 'mastery', 'rewards',
+          'rewardLedger', 'hub'
+        ])
+        && data.version is int && data.version >= 1 && data.version <= 100
+        && data.stage is string && data.stage.size() <= 32
+        && data.completedStages is list && data.completedStages.size() <= 32
+        && data.skills is map && data.skills.size() <= 200
+        && data.mastery is map && data.mastery.size() <= 200
+        && data.rewards is list && data.rewards.size() <= 200
+        && data.rewardLedger is map && data.rewardLedger.size() <= 200
+        && validLearningCoreHub(data.hub);
+    }
+
+    function validOptionalProfileCollections(data) {
+      return data.programmableBits is map && data.programmableBits.size() <= 64
+        && data.codeLabProjects is map && data.codeLabProjects.size() <= 50
+        && data.codeBridgeLessons is map && data.codeBridgeLessons.size() <= 100
+        && data.programmableBitLessons is map && data.programmableBitLessons.size() <= 100
+        && data.bubbleReefRewards is map && data.bubbleReefRewards.size() <= 8;
+    }
+
+    function validOptionalProfileScalars(data) {
+      return data.equippedCosmetic is string && data.equippedCosmetic.size() <= 64
+        && data.activeProgrammableBitId is string
+        && data.activeProgrammableBitId.size() <= 32
+        && data.updatedAt is number && data.updatedAt >= 0;
+    }
+
+    function validLiveProgress(data, profileId, displayName) {
+      let keys = data.keys();
+      return data is map
+        && keys.hasOnly([
+          'id', 'name', 'score', 'stars', 'spark', 'progression', 'learningCore',
+          'bestCombo', 'bite', 'unlockedBites', 'cosmetics', 'equippedCosmetic',
+          'programmableBits', 'activeProgrammableBitId', 'mastery', 'skills',
+          'mistakes', 'practice', 'snap', 'sessions', 'settings', 'controls',
+          'updatedAt', 'codeLabProjects', 'codeBridgeLessons',
+          'programmableBitLessons', 'bubbleReefRewards'
+        ])
+        && !keys.hasAny([
+          'parentPin', 'parentAuth', 'pinHash', 'pinSalt', 'password',
+          'idToken', 'refreshToken'
+        ])
+        && data.id == profileId
+        && data.name == displayName
+        && data.score is number && data.score >= 0 && data.score <= 1000000000
+        && data.stars is number && data.stars >= 0 && data.stars <= 1000000000
+        && data.spark is number && data.spark >= 0 && data.spark <= 1000000000
+        && data.bestCombo is number && data.bestCombo >= 0 && data.bestCombo <= 1000000
+        && data.bite is string && data.bite.size() >= 1 && data.bite.size() <= 40
+        && data.unlockedBites is list && data.unlockedBites.size() <= 32
+        && data.cosmetics is list && data.cosmetics.size() <= 128
+        && data.skills is map && data.skills.size() <= 200
+        && data.mistakes is list && data.mistakes.size() <= 100
+        && data.practice is list && data.practice.size() <= 100
+        && data.snap is list && data.snap.size() == 0
+        && data.sessions is list && data.sessions.size() <= 100
+        && validProgression(data.progression)
+        && validMastery(data.mastery)
+        && validSettings(data.settings)
+        && validControls(data.controls)
+        && validLearningCore(data.learningCore)
+        && validOptionalProfileCollections(data)
+        && validOptionalProfileScalars(data);
+    }
+
+    function validTombstone(data, profileId) {
+      return data is map
+        && data.keys().hasOnly(['id', 'deleted', 'deletedAt'])
+        && data.id == profileId
+        && data.deleted is bool && data.deleted == true
+        && data.deletedAt is int && data.deletedAt >= 0;
+    }
+
+    function validProfileDocument(data, profileId, familyId) {
+      return data.keys().hasOnly([
+          'ownerId', 'displayName', 'clientProfileId', 'progress', 'clientUpdatedAt'
+        ])
+        && data.ownerId is string && data.ownerId == familyId
+        && validIdentifier(data.clientProfileId)
+        && data.clientProfileId == profileId
+        && data.progress is map
+        && data.progress.id == data.clientProfileId
+        && data.displayName is string && data.displayName.size() <= 40
+        && data.clientUpdatedAt is timestamp
+        && ((data.displayName.size() >= 1
+            && validLiveProgress(data.progress, profileId, data.displayName))
+          || (data.displayName == ''
+            && validTombstone(data.progress, profileId)
+            && data.clientUpdatedAt.toMillis() == data.progress.deletedAt));
+    }
+
+    function isStoredTombstone(data) {
+      return data.progress is map
+        && data.progress.get('deleted', false) == true;
+    }
+
     match /families/{familyId} {
-      allow read, delete: if signedInAs(familyId);
-      allow create, update: if signedInAs(familyId)
-        && request.resource.data.ownerId == request.auth.uid
-        && request.resource.data.keys().hasOnly(['ownerId', 'updatedAt']);
+      allow read: if signedInAs(familyId)
+        && resource.data.ownerId == request.auth.uid;
+
+      allow create: if signedInAs(familyId)
+        && validFamilyDocument(request.resource.data, familyId);
+
+      allow update: if signedInAs(familyId)
+        && resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerId == resource.data.ownerId
+        && validFamilyDocument(request.resource.data, familyId);
+
+      // Removing this parent document does not cascade its profile subcollection.
+      allow delete: if false;
 
       match /profiles/{profileId} {
         allow read: if signedInAs(familyId)
-          && resource.data.ownerId == request.auth.uid;
+          && resource.data.ownerId == request.auth.uid
+          && resource.data.clientProfileId == profileId;
 
         allow create: if signedInAs(familyId)
-          && request.resource.data.ownerId == request.auth.uid
-          && request.resource.data.clientProfileId == profileId
-          && request.resource.data.displayName is string
-          && request.resource.data.displayName.size() <= 40
-          && request.resource.data.progress is map
-          && request.resource.data.keys().hasOnly(['ownerId', 'displayName', 'clientProfileId', 'progress', 'clientUpdatedAt']);
+          && validProfileDocument(request.resource.data, profileId, familyId);
 
         allow update: if signedInAs(familyId)
-          && resource.data.ownerId == request.auth.uid
-          && request.resource.data.ownerId == request.auth.uid
-          && request.resource.data.clientProfileId == profileId
-          && request.resource.data.displayName is string
-          && request.resource.data.displayName.size() <= 40
-          && request.resource.data.progress is map
-          && request.resource.data.keys().hasOnly(['ownerId', 'displayName', 'clientProfileId', 'progress', 'clientUpdatedAt']);
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'displayName', 'progress', 'clientUpdatedAt'
+          ])
+          && validProfileDocument(request.resource.data, profileId, familyId)
+          && ((!isStoredTombstone(resource.data))
+            || request.resource.data == resource.data);
 
-        allow delete: if signedInAs(familyId)
-          && resource.data.ownerId == request.auth.uid;
+        // A profile is deleted by replacing it with a permanent tombstone. A
+        // privileged backend is required for full account-erasure cleanup.
+        allow delete: if false;
       }
     }
 

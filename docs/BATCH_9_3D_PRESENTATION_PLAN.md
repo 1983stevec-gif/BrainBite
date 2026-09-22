@@ -1,7 +1,7 @@
 # BrainBite Batch 9 — 3D Presentation Layer
 
 Date: 2026-09-02  
-Status: Planned (not started)  
+Status: Functional live-3D alpha on `batch-9-webgl-spike`; Blender-authored GLBs load by default with DOM and procedural fallbacks. Visual production and real-device certification remain open.
 Depends on: Batch 8 launch path can continue in parallel on the current 2D PWA shell
 
 ## Purpose
@@ -181,3 +181,40 @@ Total: roughly **5–8 weeks** to “looks like the references in-browser,” no
 | Date | Decision |
 | --- | --- |
 | 2026-09-02 | User chose Option 3: separate 3D fidelity batch. Engine preference: **WebGL presentation in PWA (Three.js preferred for ecosystem/size); Unity rejected as primary path.** |
+| 2026-09-02 | 9.0 spike scaffold started on branch batch-9-webgl-spike: Three r170 via node_modules, home+battle procedural scenes, ?webgl=1 flag, DOM fallback default. |
+| 2026-09-02 | Visual **MATCH mode** added as spike default: approved JPG plates (`home-dashboard-target.jpg`, `battle-hud-target.jpg`) full-bleed with hotspots wired to LearningCore / mission start. Procedural WebGL via `?webgl=1`. 2D DOM via `?match=0`. |
+| 2026-09-02 | MATCH pillar answers now resolve through `BrainBiteGame.tryAnswer` using LearningCore correct/wrong sets (presentation path), so plate picks no longer depend on a random 5×5 cell. Smoke: `scripts/smoke-completion-pusher.mjs` PASS. |
+| 2026-09-09 | Blender 5.2.1 LTS portable installed and SHA-256 verified. Deterministic source pipeline now produces mascot, jungle, portal, pillar, and Kraken GLBs plus an editable `.blend` and provenance manifest. |
+| 2026-09-09 | Live 3D is the default presentation with an explicit Live 3D / Classic / Reference preview selector. WebGL context loss falls back without losing the active mission. |
+| 2026-09-09 | WebGL answer targets are consumed uniquely, fraction choices rotate through all correct evidence, and non-boss missions no longer expose false boss state. |
+| 2026-09-09 | Full Playwright gate: 48/48 PASS, including classic release, MATCH, live 3D, accessibility, GLB loading/failure fallback, profile isolation, recovery, offline/PWA, and all 30 missions. |
+
+## 2026-09-09 Verified Evidence
+
+Newest graphics follow-up: [Bite and Jungle refinement](BATCH_9_GRAPHICS_REFINEMENT_REPORT.md).
+Pipeline v1.1.0 exports the crested six-bone Bite with an idle/blink clip; runtime
+animation, layered house/trees, and real shadow/pixel-ratio quality controls are
+integrated. Release check: 22 unit tests and 52 browser tests PASS (2.6m), all five
+GLBs re-imported. Batch 9.4 remains in progress, not AAA-certified.
+
+Latest follow-up: [Jungle composition and responsive hardening](BATCH_9_JUNGLE_COMPOSITION_REPORT.md).
+The integrated release check now passes 19 unit tests and 51 browser tests (1.8m),
+including offline 3D reload, responsive portal bounds, and shared GPU-resource cleanup.
+Shared instanced scenery, camera fitting, readable answer slots, and mobile overflow
+fixes are implemented. This does not close production-art or real-device gates.
+
+- Blender: `D:\Codex\tools\blender-5.2.1-windows-x64\blender.exe --version` reports 5.2.1 LTS.
+- Blender archive SHA-256: `0e631dad7d0cad6d5d18abdd2e2550f6c0213215334eda00ddbd3d22b96ecb2c`.
+- Asset verification: five GLBs re-import successfully in headless Blender; see `assets/generated/blender/manifest.json`.
+- Unit tests: 16/16 PASS.
+- Content validation: 29 packs and 40 question sets PASS.
+- Browser tests: 48/48 PASS in 2.4 minutes.
+- Release structure, Firebase ownership/default-deny, launch, final-hardening, and evidence validators PASS.
+
+Remaining production gates:
+
+- Approved-reference visual fidelity is not complete. Current GLBs improve silhouette and hierarchy, but materials, environment density, lighting, animation, and camera composition still need production art direction.
+- Android, iOS, tablet, Chromebook, controller, and low-end WebGL performance remain UNVERIFIED on physical hardware.
+- External educator, Spanish, legal/privacy, and screen-reader reviews remain human gates.
+- Production domain, HTTPS, support contact, deletion, and export require production-environment certification.
+- Blender MCP add-on is installed in safe-mode-capable portable Blender, but persistent Codex MCP registration is intentionally not enabled without explicit informed approval because it can execute Blender-side Python.

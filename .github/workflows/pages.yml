@@ -1,0 +1,57 @@
+# Deploy BrainBite PWA to GitHub Pages (HTTPS)
+name: pages
+
+on:
+  workflow_run:
+    workflows: ["BrainBite CI"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Validate reviewed content
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run check:content
+          npm run check:content-review
+      - name: Validate the runtime package
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Same allowlist, completeness, and integrity checks the local gate uses, so a
+          # deploy cannot ship a package that is missing a referenced or precached asset.
+          npm run check:static
+      - name: Stage static site
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/stage-site.mjs _site
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,85 @@
+{
+  "at": "2026-09-22T15:07:57.148Z",
+  "rows": [
+    {
+      "name": "phone-360",
+      "width": 360,
+      "height": 740,
+      "boot": {
+        "title": "BrainBite",
+        "overflow": false,
+        "home": true,
+        "match": false
+      },
+      "prompt": "Bite all even numbers.",
+      "persist": true,
+      "errors": [],
+      "shot": "docs\\references\\spike\\gate84-phone-360.png",
+      "pass": true
+    },
+    {
+      "name": "phone-390",
+      "width": 390,
+      "height": 844,
+      "boot": {
+        "title": "BrainBite",
+        "overflow": false,
+        "home": true,
+        "match": false
+      },
+      "prompt": "Bite all even numbers.",
+      "persist": true,
+      "errors": [],
+      "shot": "docs\\references\\spike\\gate84-phone-390.png",
+      "pass": true
+    },
+    {
+      "name": "tablet-768",
+      "width": 768,
+      "height": 1024,
+      "boot": {
+        "title": "BrainBite",
+        "overflow": false,
+        "home": true,
+        "match": false
+      },
+      "prompt": "Bite all even numbers.",
+      "persist": true,
+      "errors": [],
+      "shot": "docs\\references\\spike\\gate84-tablet-768.png",
+      "pass": true
+    },
+    {
+      "name": "tablet-1024",
+      "width": 1024,
+      "height": 1366,
+      "boot": {
+        "title": "BrainBite",
+        "overflow": false,
+        "home": true,
+        "match": false
+      },
+      "prompt": "Bite all even numbers.",
+      "persist": true,
+      "errors": [],
+      "shot": "docs\\references\\spike\\gate84-tablet-1024.png",
+      "pass": true
+    },
+    {
+      "name": "desktop-1280",
+      "width": 1280,
+      "height": 800,
+      "boot": {
+        "title": "BrainBite",
+        "overflow": false,
+        "home": true,
+        "match": false
+      },
+      "prompt": "Bite all even numbers.",
+      "persist": true,
+      "errors": [],
+      "shot": "docs\\references\\spike\\gate84-desktop-1280.png",
+      "pass": true
+    }
+  ]
+}

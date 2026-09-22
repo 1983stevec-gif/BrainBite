@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 
 const requiredFiles = [
   'release/v14-evidence.json',
@@ -10,6 +11,7 @@ const requiredFiles = [
 ];
 
 let failed = false;
+const allowForeignCheckout = process.argv.includes('--allow-foreign-checkout');
 for (const file of requiredFiles) {
   if (!fs.existsSync(file)) {
     console.error(`Missing ${file}`);
@@ -24,8 +26,8 @@ if (!failed) {
     result: 'PASS',
     contentPacksValidated: 29,
     questionSetsValidated: 40,
-    unitTests: 16,
-    playwrightTests: 22
+    unitTests: 123,
+    playwrightTests: 118
   };
 
   for (const [key, value] of Object.entries(expected)) {
@@ -45,8 +47,32 @@ if (!failed) {
     failed = true;
   }
 
-  if (evidence.nextPhaseDoc !== 'docs/BATCH_8_EXTERNAL_LAUNCH_PLAN.md') {
+  if (evidence.nextPhaseDoc !== 'docs/GATE_8_4_OPERATOR_CHECKLIST.md') {
     console.error('Evidence nextPhaseDoc is incorrect');
+    failed = true;
+  }
+
+  try {
+    if (allowForeignCheckout) {
+      console.log('Evidence checkout provenance comparison skipped explicitly for CI.');
+    } else {
+    const branch = execFileSync('git', ['branch', '--show-current'], { encoding: 'utf8' }).trim();
+    const commit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+    if (evidence.git?.branch !== branch) {
+      console.error(`Evidence branch mismatch: recorded ${evidence.git?.branch}, current ${branch}`);
+      failed = true;
+    }
+    if (evidence.git?.commit !== commit) {
+      console.error(`Evidence commit mismatch: recorded ${evidence.git?.commit}, current ${commit}`);
+      failed = true;
+    }
+    if (evidence.git?.workingTreeClean === true && execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim()) {
+      console.error('Evidence claims a clean working tree, but current working tree is dirty');
+      failed = true;
+    }
+    }
+  } catch (error) {
+    console.error(`Unable to verify git provenance: ${error.message}`);
     failed = true;
   }
 

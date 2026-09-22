@@ -1,0 +1,200 @@
+/**
+ * Reproducible local certification for the BrainBite shipping and MATCH paths.
+ * External device, human-review, and production-host gates remain unverified.
+ */
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { createConnection } from 'node:net';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
+
+const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
+const output = resolve(process.env.BB_CERT_OUTPUT || 'release-evidence/local-certification.json');
+const tempOutput = resolve(process.env.BB_CERT_TEMP || '.certification-tmp');
+const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const nodeCommand = process.execPath;
+const results = [];
+
+function run(command, args, extraEnv = {}) {
+  return new Promise((resolveRun) => {
+    const child = spawn(command, args, {
+      cwd: root,
+      env: { ...process.env, ...extraEnv },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: process.platform === 'win32' && command.toLowerCase().endsWith('.cmd'),
+      windowsHide: true,
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', chunk => { stdout += chunk; });
+    child.stderr.on('data', chunk => { stderr += chunk; });
+    child.on('close', code => resolveRun({ code: code ?? 1, stdout, stderr }));
+    child.on('error', error => resolveRun({ code: 1, stdout, stderr: `${stderr}${error.message}` }));
+  });
+}
+
+async function record(label, command, args, extraEnv = {}) {
+  const startedAt = Date.now();
+  const result = await run(command, args, extraEnv);
+  const entry = {
+    label,
+    command: [command, ...args].join(' '),
+    passed: result.code === 0,
+    exitCode: result.code,
+    durationMs: Date.now() - startedAt,
+    output: `${result.stdout}${result.stderr}`.slice(-6000),
+  };
+  results.push(entry);
+  console.log(`${entry.passed ? 'PASS' : 'FAIL'} ${label}`);
+  return entry;
+}
+
+async function waitForServer(port) {
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline) {
+    const ready = await new Promise(resolveReady => {
+      const socket = createConnection({ port, host: '127.0.0.1' });
+      socket.once('connect', () => {
+        socket.destroy();
+        resolveReady(true);
+      });
+      socket.once('error', () => resolveReady(false));
+    });
+    if (ready) return;
+    await new Promise(resolveSleep => setTimeout(resolveSleep, 150));
+  }
+  throw new Error(`Timed out waiting for local server on port ${port}`);
+}
+
+async function serverIsReady(port) {
+  return new Promise(resolveReady => {
+    const socket = createConnection({ port, host: '127.0.0.1' });
+    socket.once('connect', () => { socket.destroy(); resolveReady(true); });
+    socket.once('error', () => resolveReady(false));
+  });
+}
+
+async function gitSnapshot() {
+  const [branch, commit, status] = await Promise.all([
+    run('git', ['branch', '--show-current']),
+    run('git', ['rev-parse', 'HEAD']),
+    run('git', ['status', '--porcelain']),
+  ]);
+  return {
+    branch: branch.stdout.trim(),
+    commit: commit.stdout.trim(),
+    workingTreeClean: !status.stdout.trim(),
+  };
+}
+
+await mkdir(resolve(output, '..'), { recursive: true });
+await mkdir(tempOutput, { recursive: true });
+const existingServer = await serverIsReady(4317);
+const server = existingServer ? null : spawn(nodeCommand, ['scripts/serve.mjs'], {
+  cwd: root,
+  env: { ...process.env, PORT: '4317' },
+  stdio: 'ignore',
+  windowsHide: true,
+});
+server?.unref();
+
+try {
+  await waitForServer(4317);
+  const validators = [
+    ['content', 'check:content'],
+    ['content-review', 'check:content-review'],
+    ['runtime', 'check:runtime'],
+    ['release-structure', 'check:release'],
+    ['firebase-structure', 'check:firebase'],
+    ['launch-structure', 'check:launch'],
+    ['final-hardening', 'check:final'],
+    ['firebase-security', 'check:firebase:security'],
+    ['release-evidence', 'check:evidence'],
+    ['unit-tests', 'test:unit'],
+  ];
+  for (const [label, script] of validators) await record(label, npmCommand, ['run', script]);
+
+  const browserGroups = [
+    ['release-browser', 'tests/release.spec.js'],
+    ['activity-browser', 'tests/activity-families.spec.js'],
+    ['webgl-browser', 'tests/webgl.spec.js', 'tests/webgl-accessibility.spec.js', 'tests/webgl-assets.spec.js'],
+    ['brainbase-match-browser', 'tests/brainbase.spec.js', 'tests/match.spec.js'],
+  ];
+  for (const [label, ...specs] of browserGroups) {
+    await record(label, npmCommand, ['exec', '--', 'playwright', 'test', ...specs, '--reporter=json'], {
+      PLAYWRIGHT_OUTPUT_DIR: resolve(tempOutput, label),
+    });
+  }
+
+  // One reported smoke runner owns the smoke inventory; the performance probe stays
+  // separate because it produces its own evidence pack.
+  await record('smoke-runner', nodeCommand, ['scripts/smoke-runner.mjs']);
+  {
+    const entry = results.at(-1);
+    try {
+      const smoke = JSON.parse(await readFile(resolve(root, 'release-evidence', 'smoke-report.json'), 'utf8'));
+      entry.quality = 'headless';
+      entry.smokesPassed = smoke.totals?.passed ?? 0;
+      entry.smokesTotal = smoke.totals?.scripts ?? 0;
+      entry.note = `${entry.smokesPassed}/${entry.smokesTotal} smoke checks passed.`;
+    } catch (error) {
+      entry.note = `Smoke report unavailable: ${error.message}`;
+    }
+  }
+
+  {
+    const label = 'performance-probe';
+    const env = { BB_PERF_OUTPUT_DIR: resolve(tempOutput, 'performance-evidence') };
+    await record(label, nodeCommand, ['scripts/probe-performance.mjs'], env);
+    {
+      try {
+        const performance = JSON.parse(await readFile(resolve(tempOutput, 'performance-evidence', 'summary.json'), 'utf8'));
+        const entry = results.at(-1);
+        const gate = performance.reports?.[0]?.budgetGate || null;
+        const headlessViolations = performance.reports.flatMap(report => report.budgetGate?.headless || []);
+        const deviceOnly = performance.reports.flatMap(report => report.budgetGate?.device || []);
+        const payloadBytes = Math.max(0, ...performance.reports.map(report => report.payload?.bytes || 0));
+        entry.quality = 'headless-judged';
+        entry.headlessBudgetViolations = headlessViolations.length;
+        entry.deviceOnlyBudgetViolations = deviceOnly.length;
+        entry.payloadBytes = payloadBytes;
+        entry.note = headlessViolations.length
+          ? `Headless budgets failed: ${headlessViolations.map(item => `${item.metric}.${item.statistic}`).join(', ')}`
+          : `${deviceOnly.length} device-only budget(s) recorded as unverified; payload ${Math.round(payloadBytes / 1024)} KB.`;
+        if (!gate?.pass && !headlessViolations.length) entry.note = 'Budget gate did not report a pass.';
+      } catch (error) {
+        const entry = results.at(-1);
+        entry.quality = 'diagnostic-unavailable';
+        entry.note = `Performance summary could not be read: ${error.message}`;
+      }
+    }
+  }
+} finally {
+  // The server is deliberately unref'd so the certification process can exit
+  // with its report status on Windows without terminating its process tree.
+}
+
+const git = await gitSnapshot();
+const report = {
+  schema: 'brainbite.local-certification.v1',
+  generatedAt: new Date().toISOString(),
+  branch: git.branch || 'unknown',
+  commit: git.commit || 'unknown',
+  workingTreeClean: git.workingTreeClean,
+  scope: 'local automated release certification',
+  results,
+  summary: {
+    total: results.length,
+    passed: results.filter(item => item.passed).length,
+    failed: results.filter(item => !item.passed).length,
+  },
+  externalGates: [
+    { id: 'gate-8.4-mobile', status: 'UNVERIFIED', reason: 'Requires real phone/tablet/Chromebook devices.' },
+    { id: 'gate-8.5-review', status: 'UNVERIFIED', reason: 'Requires educator, Spanish, legal/privacy, and screen-reader sign-off.' },
+    { id: 'gate-8.6-production', status: 'UNVERIFIED', reason: 'Requires production domain, HTTPS, support contact, and live account deletion/export.' },
+  ],
+};
+await writeFile(output, `${JSON.stringify(report, null, 2)}\n`);
+await rm(tempOutput, { recursive: true, force: true });
+console.log(`CERTIFICATION REPORT ${output}`);
+process.exitCode = report.summary.failed ? 1 : 0;
