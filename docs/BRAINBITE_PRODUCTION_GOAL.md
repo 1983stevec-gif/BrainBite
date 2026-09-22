@@ -360,7 +360,26 @@ Repository work may prepare evidence for these gates but may not mark them compl
 
 Updated: 2026-09-22
 
-- 2026-09-22 Phase 0.2-0.3 advanced:
+- 2026-09-22 repository synced, pushed, and CI green:
+  - Committed the verified working tree (`1b538e5`, 299 files) and pushed
+    `batch-9-webgl-spike`; opened PR #1 to `main`. `check:evidence` passes for the first
+    time because the tree is clean.
+  - The evidence declaration was refreshed from stale 2026-09-13 numbers (123 unit / 118
+    browser) to the real gate (198 unit, 161 browser, 11 smokes, 0 headless budget
+    violations, 96 packaged files), and the validator now cross-checks counts against the
+    evidence the gate produces instead of hardcoded constants.
+  - The commit provenance rule required `evidence.commit === HEAD`, which no commit can
+    satisfy because committing the evidence moves HEAD; it now requires an ancestor on the
+    same branch with a clean tree.
+  - CI found two cross-platform bugs invisible on Windows: platform-dependent package
+    manifest hashes from mixed CRLF/LF endings (fixed with `.gitattributes` plus
+    line-ending-independent text hashing) and a hardcoded `D:/Codex/Brainbite` path in the
+    PWA installability smoke (fixed, with `check:host-paths` added to `check:static`).
+    Both CI runs are now green (`9m11s`).
+  - Measured the 3D payload: 3,183 KB of which **53% (34,273 of 64,069 vertices) is
+    duplicated geometry**. The kraken, pillars, portal, and jungle assets are unskinned and
+    can share meshes; the mascot is skinned and needs a merged skinned mesh. Recorded in
+    `docs/CLOSED_BETA_READINESS.md` section 5.
   - `CHECKSUMS.json` retired: 45 of its 176 entries pointed at files that no longer exist
     (old `.wav` audio, removed tests and scripts) and 20 digests were stale. Replaced by a
     generated `release-evidence/package-manifest.json` derived from the same allowlist that

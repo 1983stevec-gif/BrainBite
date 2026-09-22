@@ -103,23 +103,57 @@ The installer is unsigned and is an internal closed-beta artifact.
   resulting connection refusal as a measurement, which is why its earlier evidence was
   empty and `certify:local`'s performance stage could not have measured anything.
 
+### CI found two cross-platform bugs the Windows workstation could not see
+
+The first pull request ran the real workflow for the first time. Both failures were
+Windows-only blind spots:
+
+| Failure | Cause | Fix |
+|---|---|---|
+| `check:static` failed on six package manifest digests (app.js, index.html, boot.mjs, capability.mjs, service-worker.js, three.module.js) | The manifest hashed raw working-copy bytes; the Windows copy had mixed CRLF/LF endings while CI checked out LF | `.gitattributes` normalizes text to LF in the repository and every checkout; text hashing is line-ending independent and binaries are still hashed byte for byte |
+| `smoke-pwa-installability` failed 10/11 | It hardcoded `D:/Codex/Brainbite` as the repository root, so every manifest icon lookup failed on Linux | The root is derived from the module location; `check:host-paths` joined `check:static` to prevent a recurrence |
+
+CI is green on the branch (`9m11s` for the pull request run).
+
 ### Open, non-blocking
 
 | Item | Severity | Note |
 |---|---|---|
-| 3D payload 3.2 MB; mascot GLB 1.28 MB of raw float32 geometry | P2 | Within the documented 8–12 MB Batch 9 target. Draco is the next reduction; encoder and decoder are both available locally |
+| 3D payload 3.2 MB, of which **53% is duplicated geometry** | P2 | See the payload section below. Within the documented 8–12 MB Batch 9 target |
 | Device-only budgets unverified: frame pacing, long-task tails, scene load, asset load | P2 (external) | Recorded in every probe run; requires real hardware |
 | `app.js` remains a large classic script with a full re-render on save | P3 | Measured `render()` at 5–6 ms, so it is not a current bottleneck |
-| Full re-render touches hidden screens | P3 | Same as above |
 
-### Known environmental flakiness
+## 5. 3D payload: measured duplication
 
-The browser suite is sensitive to machine load. WebGL mount and `page.reload` timeouts
-appear when the host is busy; every instance observed passed in isolation, and complete
-runs have passed at `161/161` repeatedly. Treat a WebGL mount timeout as inconclusive
-rather than a product defect, and re-run it.
+The runtime package ships 3,183 KB of 3D assets. Analysing the GLB accessors shows that
+over half of it is the same geometry copied instead of referenced, because every part is
+created with its own mesh datablock in the Blender pipeline.
 
-## 5. External gates — not part of this package
+| Asset | KB | primitives | distinct geometries | redundant vertices | largest duplicate group |
+|---|---:|---:|---:|---:|---:|
+| mascot | 1,284 | 56 | 11 | 17,379 of 21,204 (82%) | 18× |
+| kraken | 898 | 64 | 13 | 11,760 of 21,463 (55%) | 16× |
+| answer pillars | 338 | 28 | 9 | 3,540 of 8,294 (43%) | 8× |
+| portal | 313 | 16 | 7 | 1,020 of 7,505 (14%) | 8× |
+| jungle props | 254 | 28 | 14 | 574 of 5,603 (10%) | 5× |
+| **total** | **3,183** | 192 | 54 | **34,273 of 64,069 (53%)** | |
+
+Two different fixes, because the assets differ:
+
+1. **Kraken, pillars, portal, jungle (1,803 KB)** carry no `JOINTS_0`/`WEIGHTS_0`, so they
+   are not skinned. Their repeated spheres can share one mesh datablock referenced by many
+   nodes (Blender linked duplicates), which removes roughly 55/43/14/10% of their vertex
+   data with no visual change.
+2. **The mascot (1,284 KB)** is skinned: each of its 56 parts is a separate mesh bound
+   100% to one bone, and Blender stores weights per mesh vertex, so parts on different
+   bones cannot share geometry as they stand. The correct fix is a single merged skinned
+   mesh with one vertex group per bone, which is the normal shape for a game character.
+
+Either change requires a Blender re-export plus visual verification against the current
+render, so it belongs in a session that can capture before/after screenshots. The payload
+budget (4,096 KB) and `npm run probe:performance` will measure the result.
+
+## 6. External gates — not part of this package
 
 | Gate | Owner | Requirement |
 |---|---|---|
@@ -132,7 +166,7 @@ rather than a product defect, and re-run it.
 | Production Firebase delete/export verification | Steve | Requires a signed-in production session |
 | Store packaging and signing | Steve | The current installer is unsigned |
 
-## 6. Rollback
+## 7. Rollback
 
 The runtime is a static package plus local storage, so rollback is bounded and offline.
 
@@ -153,7 +187,7 @@ The runtime is a static package plus local storage, so rollback is bounded and o
 5. **Native shell**: uninstall the app; local storage is removed with the profile directory,
    so export progress first from Parent → Recovery → Export Versioned Progress.
 
-## 7. What is deliberately not claimed
+## 8. What is deliberately not claimed
 
 - No device, educator, legal, language, or store certification.
 - No production-cloud verification.
