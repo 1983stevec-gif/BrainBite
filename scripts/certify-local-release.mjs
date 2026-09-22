@@ -92,7 +92,11 @@ try {
 
   const browserGroups = [
     ['release-browser', 'tests/release.spec.js'],
-    ['activity-browser', 'tests/activity-families.spec.js'],
+    // bubble-reef-preview is a world/activity preview, so it belongs with the activity
+    // family. It used to be in no group at all: the certification ran 159 of the 161
+    // browser tests and still reported a clean sweep. check:certification-coverage now
+    // fails if a spec in the Playwright testMatch is missing from this list.
+    ['activity-browser', 'tests/activity-families.spec.js', 'tests/bubble-reef-preview.spec.js'],
     ['webgl-browser', 'tests/webgl.spec.js', 'tests/webgl-accessibility.spec.js', 'tests/webgl-assets.spec.js'],
     ['brainbase-match-browser', 'tests/brainbase.spec.js', 'tests/match.spec.js'],
   ];
