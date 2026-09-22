@@ -392,6 +392,15 @@ Updated: 2026-09-22
     and script (three of five GLBs match; the kraken differs by one accessor and 4,456
     bytes, the mascot by 4 bytes), so assets are verified against the committed manifest
     rather than by rebuilding.
+  - Merged to `main` (PR #1, merge commit `6b43a59`) after all gates were green at
+    `39db2bc`. Local `main` is byte-identical to the verified branch. **CI is green on
+    `main` for the first time** — every earlier run on `main` (2026-09-02) had failed.
+  - The release declaration now records `main` as its branch, because `check:evidence`
+    requires the recorded branch to match and the strict gate therefore could not pass on
+    the shipping branch. `unitTests` was also stale at 198 and is now 201.
+  - The `pages` workflow fails on `main` with `Get Pages site failed`: GitHub Pages is not
+    enabled. That is the repository owner's decision and the only remaining step that
+    cannot be taken from code; it is recorded in the external-gates table.
   - Refreshed the local certification, which was stale since 2026-09-13. The first run in
     this cycle exposed three defects in the harness itself:
     - it started a server on port 4317 that nothing ever connected to (Playwright's global

@@ -201,6 +201,7 @@ change the arithmetic.
 | Production domain, HTTPS, support contact | Steve | `docs/GATE_8_6_OPERATOR_CHECKLIST.md` |
 | Production Firebase delete/export verification | Steve | Requires a signed-in production session |
 | Store packaging and signing | Steve | The current installer is unsigned |
+| Enable GitHub Pages so the deploy can run | Steve | Settings, Pages, Source: GitHub Actions. Until then the `pages` workflow fails on `main` with `Get Pages site failed`. The closed-beta code itself is merged and CI is green on `main` |
 
 ## 7. Rollback
 

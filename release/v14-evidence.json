@@ -1,16 +1,16 @@
 {
   "product": "BrainBite",
-  "version": "2.0.0-batch-9-certification.2",
+  "version": "2.0.0-batch-9-certification.3",
   "date": "2026-09-22",
   "stage": "closed-beta-candidate-local-verification-complete-external-gates-open",
   "localSourceState": "real-git-working-tree",
   "sourceRepo": "https://github.com/1983stevec-gif/BrainBite",
   "git": {
-    "branch": "batch-9-webgl-spike",
-    "commit": "cdd04c622af3aa0d4913f6f9234456cdd3dced69",
+    "branch": "main",
+    "commit": "6b43a5916ec35cba72c29ace2b4743d65d298249",
     "remote": "origin",
     "pushState": "pushed",
-    "pushedRef": "origin/batch-9-webgl-spike",
+    "pushedRef": "origin/main",
     "workingTreeClean": true
   },
   "batch8": {
@@ -27,7 +27,7 @@
     "result": "PASS",
     "contentPacksValidated": 29,
     "questionSetsValidated": 40,
-    "unitTests": 198,
+    "unitTests": 201,
     "playwrightTests": 161,
     "smokeChecks": 11,
     "headlessBudgetViolations": 0,
@@ -64,6 +64,7 @@
   "nextPhaseDoc": "docs/GATE_8_4_OPERATOR_CHECKLIST.md",
   "notes": [
     "Evidence describes this line of work; see docs/CLOSED_BETA_READINESS.md for the defect ledger, external gates, and rollback procedure.",
-    "Headless-judgeable performance budgets pass; frame pacing, long-task tails, scene load, and asset load remain device-only and unverified."
+    "Headless-judgeable performance budgets pass; frame pacing, long-task tails, scene load, and asset load remain device-only and unverified.",
+    "This line of work is now merged to main (PR #1, merge commit 6b43a59). CI is green on main for the first time; every earlier run on main had failed. The pages workflow fails until GitHub Pages is enabled in repository settings, which is the repository owner's decision and the only remaining step that cannot be taken from code."
   ]
 }
