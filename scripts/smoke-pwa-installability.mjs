@@ -1,10 +1,13 @@
-/** Gate 8.4 PWA installability evidence (Windows): manifest + icons + SW + install UI hook */
+/** Gate 8.4 PWA installability evidence: manifest + icons + SW + install UI hook */
 import { chromium } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const base = process.env.BB_BASE || process.env.PLAYWRIGHT_BASE_URL || `http://127.0.0.1:` + String(process.env.BRAINBITE_TEST_PORT || 4318);
-const root = path.resolve('D:/Codex/Brainbite');
+// Derived from this module so the check works on any checkout. It used to hardcode
+// `D:/Codex/Brainbite`, which made every icon lookup fail on the Linux CI runner.
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 async function run(channel) {
   const browser = await chromium.launch({ headless: true, ...(channel ? { channel } : {}) });
@@ -69,4 +72,4 @@ if (!ok(chrome)) {
   console.error('PWA INSTALLABILITY CHROME FAIL');
   process.exit(1);
 }
-console.log(ok(edge) ? 'PWA INSTALLABILITY CHROME+EDGE PASS' : 'PWA INSTALLABILITY CHROME PASS (Edge partial)');
+console.log(ok(edge) ? 'PWA INSTALLABILITY CHROME+EDGE PASS' : 'PWA INSTALLABILITY CHROME PASS (Edge not available on this host)');
