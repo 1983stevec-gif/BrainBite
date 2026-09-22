@@ -392,6 +392,20 @@ Updated: 2026-09-22
     and script (three of five GLBs match; the kraken differs by one accessor and 4,456
     bytes, the mascot by 4 bytes), so assets are verified against the committed manifest
     rather than by rebuilding.
+  - Refreshed the local certification, which was stale since 2026-09-13. The first run in
+    this cycle exposed three defects in the harness itself:
+    - it started a server on port 4317 that nothing ever connected to (Playwright's global
+      setup and the smoke runner each serve 4318), while `check:test-ports` exempted the
+      file that hid it; the runner now starts no server and is scanned again;
+    - `tests/bubble-reef-preview.spec.js` was in no certification group, so the run covered
+      159 of the 161 browser tests and still reported a clean sweep; it joins the activity
+      group and `check:certification-coverage` (in `check:static`) fails when a configured
+      spec is in no group;
+    - the git snapshot was taken after the run, so `workingTreeClean` was always false.
+    The browser groups now retry once, matching CI, and record passed/flaky/failed counts
+    so a retry is visible rather than hidden. Result: **16/16 stages, 161 browser tests,
+    11/11 smokes, probe exit 0, zero headless budget violations**, from a clean tree at
+    `57864b4`.
   - `CHECKSUMS.json` retired: 45 of its 176 entries pointed at files that no longer exist
     (old `.wav` audio, removed tests and scripts) and 20 digests were stale. Replaced by a
     generated `release-evidence/package-manifest.json` derived from the same allowlist that

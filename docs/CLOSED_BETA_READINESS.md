@@ -72,7 +72,7 @@ The installer is unsigned and is an internal closed-beta artifact.
 | `release-evidence/package-manifest.json` | `npm run package:manifest` | Current: 96 files, verified by `check:stage` |
 | `release-evidence/content-review-packet.{json,html}` | `npm run review:packet` | Current: 75 pending records, 0 digest mismatches |
 | `test-results/performance-evidence/{desktop,mobile}.json` | `npm run probe:performance` | Current: zero headless budget violations |
-| `release-evidence/local-certification.json` | `npm run certify:local` | **Stale (2026-09-13).** It predates this cycle and cannot pass today because `check:evidence` requires a clean tree. Regenerate after the next commit |
+| `release-evidence/local-certification.json` | `npm run certify:local` | Current: **16/16 stages**, 161 browser tests (92 + 23 + 32 + 14), 11/11 smokes, probe exit 0 with zero headless budget violations |
 
 ## 4. Defect ledger
 
@@ -102,6 +102,22 @@ The installer is unsigned and is an internal closed-beta artifact.
   again. Before this it required a server to already be listening and reported the
   resulting connection refusal as a measurement, which is why its earlier evidence was
   empty and `certify:local`'s performance stage could not have measured anything.
+
+### The certification harness certified less than it claimed
+
+Running `npm run certify:local` for the first time in this cycle exposed three defects in
+the harness itself, all of which made the artifact look better than the run behind it:
+
+| Defect | Effect | Fix |
+|---|---|---|
+| It started a server on port **4317** and waited for it | Nothing ever connected: Playwright's global setup and the smoke runner each serve 4318, so the readiness gate proved nothing. `check:test-ports` was exempting this exact file, which is why the drift was never flagged | The runner starts no server; every stage serves itself, and the file is scanned again |
+| `tests/bubble-reef-preview.spec.js` was in no group | The run covered 159 of the 161 browser tests and still reported a clean sweep | It joins the activity group, and `check:certification-coverage` fails when a configured spec is in no group |
+| The git snapshot was taken at the end | `workingTreeClean` was always false, because the run regenerates tracked evidence by design, so the field carried no information | Snapshot taken before anything is written |
+
+The browser groups also ran with zero retries while CI uses one, so a single load-induced
+WebGL mount or reload timeout failed a twenty-minute run. They now match CI, and each entry
+records passed/flaky/failed counts parsed from the Playwright JSON report, so a test that
+only passes on retry is visible as flaky rather than hidden.
 
 ### CI found two cross-platform bugs the Windows workstation could not see
 
