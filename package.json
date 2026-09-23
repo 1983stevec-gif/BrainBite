@@ -37,7 +37,7 @@
     "check:content-review": "node scripts/validate-code-bridge-content.mjs && node scripts/validate-programmable-bit-content.mjs && node scripts/validate-content-review.mjs",
     "beta:check": "npm run check:content && npm run check:content-review && npm run test:unit && npm run test:e2e && npm run smoke",
     "rc:check": "npm run check:content && npm run check:content-review && npm run test:unit && npm run test:e2e && npm run smoke",
-    "release:check": "npm run check:content && npm run check:content-review && npm run check:static && npm run check:runtime && npm run check:release && npm run check:firebase && npm run check:launch && npm run check:final && npm run check:firebase:security && npm run check:evidence && npm run test:unit && npm run test:e2e && npm run smoke",
+    "release:check": "npm run check:content && npm run check:content-review && npm run check:static && npm run check:runtime && npm run check:release && npm run check:firebase && npm run check:launch && npm run check:final && npm run check:firebase:security && npm run native:verify && npm run check:evidence && npm run test:unit && npm run test:e2e && npm run smoke",
     "check:runtime": "node scripts/validate-runtime.mjs",
     "check:release": "node scripts/validate-release.mjs",
     "check:firebase": "node scripts/validate-firebase.mjs",

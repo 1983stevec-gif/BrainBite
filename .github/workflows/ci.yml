@@ -25,6 +25,7 @@ jobs:
       - run: npm run check:launch
       - run: npm run check:final
       - run: npm run check:firebase:security
+      - run: npm run native:verify
       # Full release gate used locally; CI keeps content + e2e (DOM + MATCH).
       - run: npm run test:unit
       - run: npm run test:e2e
