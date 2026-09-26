@@ -11,7 +11,26 @@ export function requestedPresentation() {
     const stored = localStorage.getItem('bb-presentation');
     if (['dom', 'webgl', 'match'].includes(stored)) return stored;
   } catch {}
+  // No explicit or remembered choice: constrained devices start on the DOM path.
+  // The 3D hub stays one tap away in Settings, and any explicit query or stored
+  // choice above still wins, so tests and parents can force WebGL.
+  if (constrainedDevice()) return 'dom';
   return 'webgl';
+}
+/**
+ * True when the device asked for less data or reports very little memory/CPU.
+ * Thresholds are deliberately conservative (2 GB / 2 cores) so ordinary phones
+ * keep the 3D default; app.js's broader low-end heuristic (4 GB / 4 cores) only
+ * trims effects, it does not change the presentation path.
+ */
+export function constrainedDevice(nav = globalThis.navigator) {
+  try {
+    if (!nav) return false;
+    if (nav.connection?.saveData === true) return true;
+    const memory = Number(nav.deviceMemory || 0);
+    const cores = Number(nav.hardwareConcurrency || 0);
+    return (memory > 0 && memory <= 2) || (cores > 0 && cores <= 2);
+  } catch { return false; }
 }
 export function wantsMatch() { return requestedPresentation() === 'match'; }
 export function wantsWebgl() { return requestedPresentation() === 'webgl'; }

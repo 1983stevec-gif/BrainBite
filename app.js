@@ -213,7 +213,11 @@ let audioCtx=null,musicOsc=null,musicGain=null;
 const BOSS_PHASES=3;
 
 const AUDIO_FILES={correct:'audio/bite-correct.wav',wrong:'audio/bite-wrong.wav',hit:'audio/enemy-hit.wav',boss:'audio/boss-hit.wav',clear:'audio/mission-clear.wav',super:'audio/super-bite.wav'};
-async function fileCue(name){if(!P().settings.soundOn)return;const src=AUDIO_FILES[name];if(!src)return cue(name);try{const a=new Audio(src);a.volume=.35*volumeLevel();await a.play()}catch{cue(name)}}
+// Recorded cues are optional production media. Once a file has failed to load
+// (today none of the WAVs ship, so every answer would otherwise 404), remember it and
+// go straight to the synthesized cue instead of re-requesting on every bite.
+const MISSING_AUDIO=new Set(),PROBING_AUDIO=new Set();
+async function fileCue(name){if(!P().settings.soundOn)return;const src=AUDIO_FILES[name];if(!src||MISSING_AUDIO.has(src)||PROBING_AUDIO.has(src))return cue(name);PROBING_AUDIO.add(src);try{const a=new Audio(src);a.volume=.35*volumeLevel();await a.play()}catch{MISSING_AUDIO.add(src);cue(name)}finally{PROBING_AUDIO.delete(src)}}
 
 function audioContext(){if(!audioCtx)try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch{}return audioCtx}
 function cue(name){

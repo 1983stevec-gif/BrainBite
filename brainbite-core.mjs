@@ -1509,13 +1509,17 @@ function scoreAttempt(attempt = {}, skillState = createSkillState('skill')) {
   const hasExplicitOrigin = attempt.originId != null && attempt.originSequence != null;
   const sourceId = attempt.originId != null ? String(attempt.originId) : LOCAL_UNSCOPED_EVIDENCE_SOURCE;
   const existingSource = provenanceSources.find(source => source.id === sourceId);
+  // A replayed attempt (same id, no or same origin) must not count twice. The
+  // recent-performance ring is the cheapest durable record of what was scored.
+  const attemptId = attempt.id || attempt.attemptId;
+  if (attemptId != null && next.recentPerformance.some(record => record?.id === String(attemptId))) return next;
   const explicitSequence = Number(attempt.originSequence);
   const sourceSequence = hasExplicitOrigin && Number.isSafeInteger(explicitSequence) && explicitSequence > 0
     ? explicitSequence
     : (existingSource?.sequence || 0) + 1;
   if (existingSource && sourceSequence <= existingSource.sequence) return next;
   const performance = {
-    id: attempt.id || attempt.attemptId || uuid(),
+    id: String(attemptId || uuid()),
     correct,
     assisted,
     hintsUsed,
@@ -1624,7 +1628,15 @@ function mergeSkillStates(leftValue, rightValue, { preferRight = false } = {}) {
     missing: [...new Set([...(left.prerequisiteState?.missing || []), ...(right.prerequisiteState?.missing || [])])],
   };
   const importedMasteryFloor = Math.max(left.legacyImported ? left.masteryScore : 0, right.legacyImported ? right.masteryScore : 0);
-  merged.masteryScore = merged.evidence.attempts > 0 ? Math.round(computeMasteryScore(merged)) : importedMasteryFloor;
+  // The incremental scorer (scoreAttempt) and the evidence formula
+  // (computeMasteryScore) are tuned differently on purpose, so recomputing on
+  // every merge would nudge a score even when the merge added no evidence.
+  // When one side already holds exactly the merged evidence, its score stands;
+  // only a merge that genuinely combines new evidence recomputes.
+  const sameEvidence = (a, b) => EVIDENCE_KEYS.every(key => Number(a?.evidence?.[key]) === Number(b?.evidence?.[key]));
+  if (merged.evidence.attempts > 0 && sameEvidence(merged, right) && !right.legacyImported) merged.masteryScore = right.masteryScore;
+  else if (merged.evidence.attempts > 0 && sameEvidence(merged, left) && !left.legacyImported) merged.masteryScore = left.masteryScore;
+  else merged.masteryScore = merged.evidence.attempts > 0 ? Math.round(computeMasteryScore(merged)) : importedMasteryFloor;
   merged.confidence = computeConfidence(merged.evidence);
   merged.masteryState = masteryStateFor(merged.masteryScore, merged.confidence, merged.evidence);
   return normalizeSkillState(merged);
@@ -2237,10 +2249,21 @@ function normalizeLearner(learner, profileId) {
   out.rewardLedger = out.rewardLedger && typeof out.rewardLedger === 'object' ? { ...out.rewardLedger } : {};
   out.practice = Array.isArray(out.practice) ? clone(out.practice) : [];
   out.sessions = Array.isArray(out.sessions) ? clone(out.sessions) : [];
-  const privateValues = [out.profileId, out.name].filter(value => String(value || '').length > 0).map(String);
+  // profileId is an opaque id, so any string containing it is private. The
+  // child's name is ordinary text: only a whole-word, case-insensitive match
+  // of a name at least three characters long counts, so a child called "Al"
+  // or "e" does not erase every telemetry field that happens to contain those
+  // letters. Structural key removal below still drops name-bearing fields.
+  const privateIds = [out.profileId].filter(value => String(value || '').length > 0).map(String);
+  const nameToken = String(out.name || '').trim();
+  const namePattern = nameToken.length >= 3
+    ? new RegExp(`(^|[^\\p{L}\\p{N}])${nameToken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[^\\p{L}\\p{N}])`, 'iu')
+    : null;
+  const containsPrivateValue = value => privateIds.some(privateValue => value.includes(privateValue)) || (namePattern ? namePattern.test(value) : false);
+  const privateValues = [...privateIds, ...(nameToken.length >= 3 ? [nameToken] : [])];
   const contentEventTypes = new Set(['LearningAttemptRecorded', 'ContentAttemptRecorded', 'ContentOutcomeObserved', 'ContentOutcomeFlagged']);
   const scrubCloudValue = value => {
-    if (typeof value === 'string' && privateValues.some(privateValue => value.includes(privateValue))) return undefined;
+    if (typeof value === 'string' && containsPrivateValue(value)) return undefined;
     if (Array.isArray(value)) return value.map(scrubCloudValue).filter(item => item !== undefined);
     if (!value || typeof value !== 'object') return value;
     return Object.fromEntries(Object.entries(value).flatMap(([key, child]) => {
