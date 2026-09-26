@@ -441,11 +441,22 @@ test('running out of hearts refills them and keeps mission progress',async({page
   await page.goto('/?presentation=webgl');
   await page.evaluate(()=>window.BrainBiteGame.startMission(1));
   await answerCorrect(page);
-  for(let i=0;i<3;i++)await answerWrong(page);
-  await expect(page.locator('#snackCard')).toBeVisible();
-  await expect(page.locator('#snackTitle')).toHaveText('Bite needs a snack!');
-  await expect(page.locator('#snackActions')).toBeHidden();
-  expect(await page.evaluate(()=>window.BrainBiteGame.tryAnswer(window.BrainBiteGame.getState().webglRemaining[0]))).toBe(false);
+  for(let i=0;i<2;i++)await answerWrong(page);
+  // The snack pause lasts two seconds, so the third miss and everything checked during the
+  // pause happen in one evaluate; separate round trips raced the refill timer under load.
+  const duringSnack=await page.evaluate(()=>{
+    const game=window.BrainBiteGame;
+    game.tryAnswer(game.getState().m.wrong[0]);
+    const card=document.getElementById('snackCard');
+    return {
+      visible:!card.hidden,
+      title:document.getElementById('snackTitle').textContent,
+      actionsHidden:document.getElementById('snackActions').hidden,
+      paused:game.getState().paused,
+      answerAccepted:game.tryAnswer(game.getState().webglRemaining[0]),
+    };
+  });
+  expect(duringSnack).toEqual({visible:true,title:'Bite needs a snack!',actionsHidden:true,paused:true,answerAccepted:false});
   await expect(page.locator('#snackCard')).toBeHidden({timeout:4000});
   const state=await page.evaluate(()=>{const g=window.BrainBiteGame.getState();return {lives:g.lives,eaten:g.eaten,refills:g.refills,paused:g.paused,prompt:document.getElementById('prompt').textContent}});
   expect(state).toMatchObject({lives:3,eaten:1,refills:1,paused:false,prompt:'Bite all even numbers.'});
