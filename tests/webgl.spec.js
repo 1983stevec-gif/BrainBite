@@ -51,7 +51,7 @@ test('3D battle consumes a correct target and resists repeated answers',async({p
   const state=await page.evaluate(()=>{
     document.documentElement.classList.add('presentation-webgl');
     window.BrainBiteGame.startMission(1);
-    const first=window.BrainBiteGame.pillarChoices()[0];
+    const first=window.BrainBiteGame.pillarChoices().find(value=>window.BrainBiteGame.getState().webglRemaining.includes(value));
     const accepted=window.BrainBiteGame.tryAnswer(first);
     const repeated=window.BrainBiteGame.tryAnswer(first);
     const game=window.BrainBiteGame.getState();
@@ -125,8 +125,9 @@ test('3D boss HUD is hidden for regular missions and preserves real boss state',
   await expect(page.locator('#bossPhase')).toContainText('Astro Muncher');
   await expect(page.locator('#bossHealth')).toHaveJSProperty('value',100);
 
-  await page.evaluate(()=>window.BrainBiteGame.tryAnswer(window.BrainBiteGame.pillarChoices()[0]));
-  await expect(page.locator('#bossHealth')).toHaveJSProperty('value',75);
+  await page.evaluate(()=>window.BrainBiteGame.tryAnswer(window.BrainBiteGame.pillarChoices().find(value=>window.BrainBiteGame.getState().webglRemaining.includes(value))));
+  // Three phases, eight hits in all (gameplay G5): one hit takes 100/8, shown rounded.
+  await expect(page.locator('#bossHealth')).toHaveJSProperty('value',88);
   expect(await page.evaluate(()=>window.BrainBiteGame.getState().m.boss)).toBe(true);
 });
 
@@ -322,7 +323,8 @@ for(const width of [360,390]){
 }
 
 // ---- M1 mobile blockers ------------------------------------------------------------
-const answerCorrect=page=>page.evaluate(()=>window.BrainBiteGame.tryAnswer(window.BrainBiteGame.getState().webglRemaining[0]));
+// Picks a right answer that is not under the Nibbler, so combo-based checks stay exact.
+const answerCorrect=page=>page.evaluate(()=>{const g=window.BrainBiteGame.getState();const choices=window.BrainBiteGame.pillarChoices();const slot=window.BrainBiteGame.nibblerState()?.slot;const pick=choices.find((v,i)=>g.webglRemaining.includes(v)&&i!==slot)||choices.find(v=>g.webglRemaining.includes(v))||g.webglRemaining[0];return window.BrainBiteGame.tryAnswer(pick)});
 const answerWrong=page=>page.evaluate(()=>window.BrainBiteGame.tryAnswer(window.BrainBiteGame.getState().m.wrong[0]));
 
 for(const [width,height] of [[360,740],[390,844],[1024,682],[1280,800]]){
@@ -590,7 +592,7 @@ test('three in a row flashes the combo panel and announces the streak',async({pa
   await page.goto('/?presentation=webgl');
   await page.evaluate(()=>window.BrainBiteGame.startMission(1));
   for(let i=0;i<3;i++)await answerCorrect(page);
-  await expect(page.locator('#game .battle-combo')).toHaveClass(/combo-flash/);
+  await expect(page.locator('#game .battle-combo')).toHaveAttribute('data-streak-label','x3 Hot streak!');
   await expect(page.locator('#comboStatus')).toHaveText(/3 in a row! Hot streak!/);
 });
 
@@ -610,7 +612,8 @@ test('finishing a mission shows the clear banner with honest stars, and stars st
   await page.evaluate(()=>window.BrainBiteGame.startMission(1));
   await page.evaluate(async()=>{
     while(window.BrainBiteGame.getState()?.webglRemaining?.length){
-      window.BrainBiteGame.tryAnswer(window.BrainBiteGame.getState().webglRemaining[0]);
+      // webglPrompt().targets also covers the twist prompt (bite an odd one).
+      window.BrainBiteGame.tryAnswer(webglPrompt().targets[0]);
       await new Promise(r=>setTimeout(r,480));
     }
   });
@@ -666,4 +669,150 @@ test('the child home copy avoids system language',async({page})=>{
   await page.goto('/?presentation=webgl');
   const text=await page.locator('#home').innerText();
   for(const word of ['Quality tier','Performance mode','trigger','profile boost'])expect(text).not.toContain(word);
+});
+
+// ---- Gameplay G4-G7 --------------------------------------------------------------------
+const eatTarget=page=>page.evaluate(()=>{const g=window.BrainBiteGame.getState();const choice=window.BrainBiteGame.pillarChoices().find(v=>g.webglRemaining.includes(v));return window.BrainBiteGame.tryAnswer(choice)});
+
+test('the twist is announced, inverts the target once, and counts a correct pick',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>window.BrainBiteGame.startMission(1));
+  for(let i=0;i<5;i++)await eatTarget(page);
+  await expect(page.locator('#prompt')).toHaveText('Twist! Now bite an ODD number!');
+  await expect(page.locator('#feedback')).toHaveAttribute('role','status');
+  await expect(page.locator('#feedback')).toContainText('Twist!');
+  const choices=await page.evaluate(()=>window.BrainBiteGame.pillarChoices());
+  const odd=choices.find(v=>Number(v)%2===1);
+  expect(choices.filter(v=>Number(v)%2===1)).toHaveLength(1);
+  const before=await page.evaluate(()=>({correct:window.BrainBiteGame.getState().correct,eaten:window.BrainBiteGame.getState().eaten}));
+  expect(await page.evaluate(v=>window.BrainBiteGame.tryAnswer(v),odd)).toBe(true);
+  const after=await page.evaluate(()=>({correct:window.BrainBiteGame.getState().correct,eaten:window.BrainBiteGame.getState().eaten}));
+  expect(after).toEqual({correct:before.correct+1,eaten:before.eaten});
+  await expect(page.locator('#prompt')).toHaveText('Bite all even numbers.');
+});
+
+test('the Nibbler shows its next pillar, and that is where it goes; its pillar costs the combo, not a heart',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>window.BrainBiteGame.startMission(1));
+  for(let i=0;i<4;i++){
+    const predicted=await page.evaluate(()=>window.BrainBiteGame.nibblerState().next);
+    await eatTarget(page);
+    expect(await page.evaluate(()=>window.BrainBiteGame.nibblerState().slot)).toBe(predicted);
+  }
+  await expect(page.locator('#game .battle-frame')).toHaveAttribute('data-nibbler-slot',/^[0-3]$/);
+  const result=await page.evaluate(()=>{
+    const g=window.BrainBiteGame.getState();
+    const slot=g.nibbler.slot;const choices=window.BrainBiteGame.pillarChoices();
+    const value=choices[slot];const correct=g.webglRemaining.includes(value);
+    g.combo=Math.max(g.combo,2);const lives=g.lives;
+    window.BrainBiteGame.tryAnswer(value);
+    return {correct,combo:g.combo,livesLost:lives-g.lives};
+  });
+  if(result.correct)expect(result.livesLost).toBe(0);
+  expect(result.combo).toBe(0);
+});
+
+test('boss phase 1 wraps a wrong pillar that cannot be picked and costs nothing',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>window.BrainBiteGame.startPracticeMission(10));
+  await expect(page.locator('#bossCutin')).toContainText('Phase 1: Tentacle Block');
+  const state=await page.evaluate(()=>{const b=window.BrainBiteGame.bossState();const g=window.BrainBiteGame.getState();const lives=g.lives,wrong=g.wrong;const accepted=window.BrainBiteGame.tryAnswer(b.blocked);return {blocked:b.blocked,accepted,lives:g.lives-lives,wrong:g.wrong-wrong,isTarget:g.webglRemaining.includes(b.blocked)}});
+  expect(state).toMatchObject({accepted:false,lives:0,wrong:0,isTarget:false});
+  await expect(page.locator(`.webgl-answer-controls button[data-value="${state.blocked}"]`)).toBeDisabled();
+});
+
+test('boss phase 2 hides the answers, and peeking makes the next answer assisted',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>window.BrainBiteGame.startPracticeMission(10));
+  for(let i=0;i<3;i++){await page.waitForTimeout(1300);await eatTarget(page)}
+  await expect.poll(()=>page.evaluate(()=>window.BrainBiteGame.bossState().phase)).toBe('ink-cloud');
+  await expect(page.locator('#bossPeek')).toBeVisible();
+  await expect.poll(()=>page.evaluate(()=>window.BrainBiteGame.bossState().inked),{timeout:6000}).toBe(true);
+  await expect(page.locator('#game .battle-frame')).toHaveAttribute('data-inked','true');
+  await page.locator('#bossPeek').click();
+  expect(await page.evaluate(()=>window.BrainBiteGame.bossState().inked)).toBe(false);
+  const skill=await page.evaluate(()=>window.BrainBiteGame.getState().m.skill);
+  const before=await page.evaluate(s=>P().learningCore.skills[s]?.evidence?.assistedSuccesses||0,skill);
+  await eatTarget(page);
+  const after=await page.evaluate(s=>P().learningCore.skills[s]?.evidence?.assistedSuccesses||0,skill);
+  expect(after).toBe(before+1);
+});
+
+test('boss phase 3 only lands a hit on two right answers in a row, and every phase is announced',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>window.BrainBiteGame.startPracticeMission(10));
+  const titles=[];
+  for(let i=0;i<6;i++){
+    await page.waitForTimeout(1300);
+    titles.push(await page.locator('#bossCutinTitle').textContent());
+    await eatTarget(page);
+  }
+  await page.waitForTimeout(1300);
+  titles.push(await page.locator('#bossCutinTitle').textContent());
+  expect(new Set(titles)).toEqual(new Set(['Phase 1: Tentacle Block','Phase 2: Ink Cloud','Phase 3: Two in a Row']));
+  const hits=()=>page.evaluate(()=>window.BrainBiteGame.bossState().hits);
+  expect(await hits()).toBe(6);
+  await eatTarget(page);
+  expect(await hits()).toBe(6);
+  await page.evaluate(()=>window.BrainBiteGame.tryAnswer(window.BrainBiteGame.getState().m.wrong.find(v=>window.BrainBiteGame.pillarChoices().includes(v))||window.BrainBiteGame.getState().m.wrong[0]));
+  await eatTarget(page);
+  expect(await hits()).toBe(6);
+  await eatTarget(page);
+  expect(await hits()).toBe(7);
+});
+
+test('a skill that is due for review shows one golden rescue disc worth a bonus',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>{window.BrainBiteGame.startMission(1);const lc=P().learningCore;lc.skills['even-numbers']={...(lc.skills['even-numbers']||{}),nextReviewAt:Date.now()-1000};draw()});
+  const rescue=await page.evaluate(()=>window.BrainBiteGame.rescueValue());
+  expect(rescue).not.toBeNull();
+  await expect(page.locator('#game .battle-frame')).toHaveAttribute('data-rescue',String(rescue));
+  const before=await page.evaluate(()=>P().score);
+  await page.evaluate(v=>window.BrainBiteGame.tryAnswer(v),rescue);
+  expect(await page.evaluate(()=>P().score)-before).toBe(150);
+  await expect(page.locator('#feedback')).toContainText('Rescue!');
+  expect(await page.evaluate(()=>window.BrainBiteGame.rescueValue())).toBeNull();
+});
+
+test('the daily streak counts real calendar days and never shames a break',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  const states=await page.evaluate(()=>{
+    const day=24*60*60*1000,now=new Date();now.setHours(12,0,0,0);const t=now.getTime();
+    const run=sessions=>{P().sessions=sessions.map(ts=>({mission:1,world:'math',ts}));return streakState(t)};
+    return {
+      none:run([]),today:run([t]),threeInARow:run([t,t-day,t-2*day]),yesterdayRun:run([t-day,t-2*day]),
+      gap:run([t-3*day]),lateNight:run([t-day+11.9*60*60*1000,t-11.9*60*60*1000]),
+    };
+  });
+  expect(states.none.label).toBe('Keep it up');
+  expect(states.today.label).toBe('You played today!');
+  expect(states.threeInARow).toMatchObject({run:3,label:'3 days in a row!'});
+  expect(states.yesterdayRun.run).toBe(2);
+  expect(states.gap.label).toBe('Welcome back!');
+  expect(states.lateNight.week.filter(d=>d.played)).toHaveLength(2);
+  for(const s of Object.values(states))expect(s.label).not.toMatch(/lost|broke|missed/i);
+});
+
+test('music is off by default, follows the volume slider, and ducks while reading aloud',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  expect(await page.evaluate(()=>P().settings.musicOn)).toBe(false);
+  expect(await page.evaluate(()=>musicGain)).toBeNull();
+  await page.evaluate(()=>{P().settings.musicOn=true;P().settings.volume=50;syncMusic()});
+  expect(await page.evaluate(()=>musicGain.gain.value)).toBeCloseTo(0.25,2);
+  await page.evaluate(()=>duckMusic(true));
+  expect(await page.evaluate(()=>musicGain.gain.value)).toBeCloseTo(0.0625,3);
+  await page.evaluate(()=>{duckMusic(false);P().settings.musicOn=false;syncMusic()});
+  expect(await page.evaluate(()=>musicGain)).toBeNull();
+  await page.evaluate(()=>show('settings'));
+  await expect(page.getByRole('slider',{name:/Volume/})).toBeVisible();
+});
+
+test('world screens show a route map and the stars each mission earned',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>{P().missionStars={1:2};P().progression=REGISTRY.completeMission(P().progression,1);show('math');render()});
+  await expect(page.locator('#mathList .world-map svg')).toHaveCount(1);
+  await expect(page.locator('#mathList .world-map .mm-stars')).toHaveText('★★☆');
+  await expect(page.locator('#mathList .mission-stars').first()).toHaveAttribute('aria-label','2 of 3 stars');
+  await page.locator('#mathList .world-map-node').nth(1).click();
+  await expect(page.locator('#game')).toHaveClass(/show/);
 });

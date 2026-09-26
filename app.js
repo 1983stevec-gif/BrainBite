@@ -91,7 +91,7 @@ function generatedChallengeGate(challenge,skill,validation){
   skill,
  })
 }
-function blank(name='Kid 1'){return {id:(crypto.randomUUID?.()||('p-'+Date.now()+'-'+Math.random())),name,score:0,stars:0,spark:0,progression:REGISTRY.createProgression(),learningCore:null,bestCombo:0,missionStars:{},bite:'Nib',unlockedBites:['Nib'],cosmetics:[],equippedCosmetic:null,programmableBits:{},activeProgrammableBitId:null,mastery:{math:10,words:10,spanish:10},skills:{},mistakes:[],practice:[],snap:[],sessions:[],settings:{reducedMotion:false,cameraMotionReduction:false,largeTargets:false,highContrast:false,captions:false,dyslexicFont:false,textScale:'1',qualityTier:'balanced',soundOn:true,musicOn:false,enemySpeed:'normal'},controls:{dailyMinutes:30,maxSessionMinutes:20,requireParentForPractice:false}}}
+function blank(name='Kid 1'){return {id:(crypto.randomUUID?.()||('p-'+Date.now()+'-'+Math.random())),name,score:0,stars:0,spark:0,progression:REGISTRY.createProgression(),learningCore:null,bestCombo:0,missionStars:{},bite:'Nib',unlockedBites:['Nib'],cosmetics:[],equippedCosmetic:null,programmableBits:{},activeProgrammableBitId:null,mastery:{math:10,words:10,spanish:10},skills:{},mistakes:[],practice:[],snap:[],sessions:[],settings:{reducedMotion:false,cameraMotionReduction:false,largeTargets:false,highContrast:false,captions:false,dyslexicFont:false,textScale:'1',qualityTier:'balanced',soundOn:true,musicOn:false,volume:80,enemySpeed:'normal'},controls:{dailyMinutes:30,maxSessionMinutes:20,requireParentForPractice:false}}}
 let LOADED_STORE_RAW=null;
 const SCHEMA_VERSION=9;
  const DEF={schemaVersion:SCHEMA_VERSION,registryVersion:REGISTRY.registryVersion,active:0,profiles:[blank()],deletedProfiles:[]};let STORE=load(),G=null;function P(){return STORE.profiles[STORE.active]}
@@ -144,17 +144,14 @@ window.BrainBiteGame={
     const accepted=resolveLiveActivity(score.actual,{responseTimeMs:score.elapsedMs,assisted:score.support!=='independent',hintsUsed:hints,randomLike:!score.plausibleTiming});
     return {accepted,score};
   },
+  bossState(){if(!G?.bossRun)return null;const BP=window.BrainBiteBossPhases;const phase=BP.currentPhase(G.bossRun);const prompt=webglPrompt();return {phase:phase.id,phaseNumber:G.bossRun.phase+1,blocked:phase.id==='tentacle-block'?BP.blockedChoice(prompt.choices,prompt.targets,G.bossRun.hits+Number(G.m.id)):null,inked:phase.id==='ink-cloud'&&Date.now()>=(G.inkAt||0)&&Date.now()>=(G.peekUntil||0),streak:G.bossRun.streak,hits:G.bossRun.hits}},
+  rescueValue(){if(!G?.m||G.m.boss||G.rescued||G.twist?.active||!document.documentElement.classList.contains('presentation-webgl'))return null;if(!skillReviewDue(G.m.skill))return null;return webglPrompt().targets[0]??null},
+  nibblerState(){if(!G?.nibbler)return null;const count=webglPrompt().choices.length||4;return {slot:G.nibbler.slot,next:window.BrainBiteRunBuilder.nibblerNext(G.nibbler.slot,G.nibbler.lastChosen,count),count}},
   pillarChoices(){
     if(!G?.m)return [];
     // Prefer screenshot-like fraction set for fractions missions
     if(G.m.skill==='fractions' && document.documentElement.classList.contains('presentation-match'))return ['1/3','2/4','2/4','3/4'];
-    if(document.documentElement.classList.contains('presentation-webgl')){
-      const remaining=G.webglRemaining||[];
-      const wrong=[...new Set((G.m.wrong||[]).map(String))];
-      const offset=wrong.length?G.eaten%wrong.length:0;
-      const fillers=[...wrong.slice(offset),...wrong.slice(0,offset)];
-      return [...new Set([remaining[0],...fillers].filter(Boolean))].slice(0,4);
-    }
+    if(document.documentElement.classList.contains('presentation-webgl'))return webglPrompt().choices;
     if(G.activity&&!isMatchFractionCompatibilityPath()){
       const used=new Set(activityProgress(G.activity.challenge).map(value=>String(value)));
       return activityChoices(G.activity.challenge).filter(value=>!used.has(String(value)));
@@ -175,19 +172,30 @@ window.BrainBiteGame={
     // MATCH fraction plates / WebGL pillars resolve by LearningCore answer sets (no 5×5 cell required).
     // MATCH non-fractions DOM battle uses the normal board path below.
     if(presentation){
+      const prompt=webgl?webglPrompt():null;
+      const chosenSlot=prompt?prompt.choices.indexOf(target):-1;
+      if(prompt?.stage==='twist')return resolveTwist(target,chosenSlot);
+      if(webgl&&G.bossRun?.won)return false;
+      const bossNow=webgl?BrainBiteGame.bossState():null;
+      if(bossNow?.blocked&&String(bossNow.blocked)===target){$('feedback').textContent='That pillar is wrapped in a tentacle! Pick another.';return false}
       const remainingIndex=webgl?(G.webglRemaining||[]).indexOf(target):-1;
       const ok=webgl?remainingIndex>=0:(G.m.correct||[]).map(String).includes(target);
+      const finale=prompt?.stage==='finale'&&!G.m.boss;
+      const rescue=webgl&&BrainBiteGame.rescueValue()===target;
       if(ok){
         if(webgl)G.webglRemaining.splice(remainingIndex,1);
         G.combo++;G.max=Math.max(G.max,G.combo);G.eaten++;G.correct++;
-        awardProgressionScore(100*G.combo);P().mastery[G.m.world]=Math.min(100,P().mastery[G.m.world]+1);
-        updateSkill(G.m.skill,true,{...attemptSupport(),source:G.source||'mission'});G.retryAssist=false;$('feedback').textContent='CHOMP! Correct.';fileCue(G.combo>=8?'super':'correct');
+        awardProgressionScore((finale?200:100)*G.combo);P().mastery[G.m.world]=Math.min(100,P().mastery[G.m.world]+1);
+        updateSkill(G.m.skill,true,{...attemptSupport(),source:G.source||'mission'});G.retryAssist=false;$('feedback').textContent=finale?'Final bite! Double points!':'CHOMP! Correct.';fileCue(G.combo>=8?'super':'correct');
         emitAnswer(target,true,G.m.boss?G.boss<=25:G.eaten>=G.total);
+        if(rescue){G.rescued=true;awardProgressionScore(50);$('feedback').textContent='Rescue! A review answer brought back. +50 BrainBites';}
+        if(webgl)afterWebglAnswer(chosenSlot,true,(prompt?.targets?.length||0)>1);
+        if(webgl&&G.bossRun){if(applyBossAnswer(true)){draw();complete();return true}draw();return true}
         if(G.m.boss){G.boss=Math.max(0,G.boss-25);if(G.boss===0){draw();complete();return true}}
         else if(G.eaten>=G.total){draw();complete();return true}
         draw();return true;
       }
-      const outcome=updateSkill(G.m.skill,false,{...attemptSupport(),independent:false,source:G.source||'mission'});if(outcome?.contentQuarantined){$('feedback').textContent=CONTENT_UNAVAILABLE_MESSAGE;draw();return false}G.combo=0;G.wrong++;G.lives--;P().mastery[G.m.world]=Math.max(0,P().mastery[G.m.world]-.5);P().mistakes.push({skill:G.m.skill,chosen:target,ts:Date.now()});$('feedback').textContent=wrongAnswerFeedback(target);fileCue('wrong');emitAnswer(target,false,false);draw();handleOutOfLives();return false;
+      const outcome=updateSkill(G.m.skill,false,{...attemptSupport(),independent:false,source:G.source||'mission'});if(outcome?.contentQuarantined){$('feedback').textContent=CONTENT_UNAVAILABLE_MESSAGE;draw();return false}G.combo=0;G.wrong++;G.lives--;P().mastery[G.m.world]=Math.max(0,P().mastery[G.m.world]-.5);P().mistakes.push({skill:G.m.skill,chosen:target,ts:Date.now()});$('feedback').textContent=wrongAnswerFeedback(target);fileCue('wrong');emitAnswer(target,false,false);if(webgl)afterWebglAnswer(chosenSlot,false);if(webgl&&G.bossRun)applyBossAnswer(false);draw();handleOutOfLives();return false;
     }
     for(let y=0;y<5;y++)for(let x=0;x<5;x++){
       const c=G.cells[ix(x,y)];
@@ -205,7 +213,7 @@ let audioCtx=null,musicOsc=null,musicGain=null;
 const BOSS_PHASES=3;
 
 const AUDIO_FILES={correct:'audio/bite-correct.wav',wrong:'audio/bite-wrong.wav',hit:'audio/enemy-hit.wav',boss:'audio/boss-hit.wav',clear:'audio/mission-clear.wav',super:'audio/super-bite.wav'};
-async function fileCue(name){if(!P().settings.soundOn)return;const src=AUDIO_FILES[name];if(!src)return cue(name);try{const a=new Audio(src);a.volume=.35;await a.play()}catch{cue(name)}}
+async function fileCue(name){if(!P().settings.soundOn)return;const src=AUDIO_FILES[name];if(!src)return cue(name);try{const a=new Audio(src);a.volume=.35*volumeLevel();await a.play()}catch{cue(name)}}
 
 function audioContext(){if(!audioCtx)try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch{}return audioCtx}
 function cue(name){
@@ -214,12 +222,41 @@ function cue(name){
  const v=map[name];if(!v)return;const c=audioContext();if(!c)return;
  const o=c.createOscillator(),g=c.createGain();o.frequency.value=v[0];g.gain.setValueAtTime(.035,c.currentTime);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+v[1]);o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+v[1]);
 }
+// ---- Sound (G7) ----------------------------------------------------------------------------
+// Music is procedural (Web Audio oscillators), so it adds no payload and nothing to license.
+// It is off by default, follows the volume slider, and ducks while text is read aloud.
+const WORLD_TUNES={
+ math:{bpm:100,root:261.63,scale:[0,2,4,7,9,12],melody:[0,2,4,2,5,4,2,1,0,2,4,5,4,2,1,0],bass:[0,0,3,3,4,4,3,3]},
+ words:{bpm:88,root:220,scale:[0,2,3,5,7,10,12],melody:[0,2,4,3,2,0,4,5,6,5,4,2,3,2,1,0],bass:[0,0,5,5,3,3,4,4]},
+ spanish:{bpm:112,root:293.66,scale:[0,2,4,5,7,9,12],melody:[0,4,2,4,5,4,2,0,1,2,4,5,6,5,4,2],bass:[0,0,3,3,4,4,0,0]},
+ home:{bpm:92,root:246.94,scale:[0,2,4,7,9,12],melody:[0,2,4,5,4,2,0,1,2,4,2,1,0,1,2,0],bass:[0,0,3,3,4,4,3,3]},
+};
+let musicTimer=null,musicStep=0,musicNextAt=0,musicDucked=false;
+function volumeLevel(){const v=Number(P()?.settings?.volume);return Number.isFinite(v)?Math.max(0,Math.min(1,v/100)):.8}
+function currentTune(){const screen=document.querySelector('.screen.show')?.id;const world=G?.m?.world&&screen==='game'?G.m.world:['math','words','spanish'].includes(screen)?screen:'home';return WORLD_TUNES[world]||WORLD_TUNES.home}
+function musicNote(c,freq,at,length,type,gain){const o=c.createOscillator(),g=c.createGain();o.type=type;o.frequency.value=freq;g.gain.setValueAtTime(0,at);g.gain.linearRampToValueAtTime(gain,at+.02);g.gain.exponentialRampToValueAtTime(.0005,at+length);o.connect(g);g.connect(musicGain);o.start(at);o.stop(at+length+.02)}
+function scheduleMusic(){
+ const c=audioContext();if(!c||!musicGain)return;
+ const tune=currentTune(),beat=60/tune.bpm/2;
+ while(musicNextAt<c.currentTime+.35){
+  const i=musicStep%tune.melody.length;const degree=tune.scale[tune.melody[i]%tune.scale.length];
+  musicNote(c,tune.root*Math.pow(2,degree/12),musicNextAt,beat*.9,'triangle',.05);
+  if(i%2===0){const b=tune.scale[tune.bass[(i/2)%tune.bass.length]%tune.scale.length];musicNote(c,tune.root/2*Math.pow(2,b/12),musicNextAt,beat*1.8,'sine',.06)}
+  musicNextAt+=beat;musicStep++;
+ }
+}
 function syncMusic(){
  const c=audioContext();
- if(!P().settings.musicOn||!c){if(musicOsc){try{musicOsc.stop()}catch{}musicOsc=null}return}
- if(musicOsc)return;
- musicOsc=c.createOscillator();musicGain=c.createGain();musicOsc.type='sine';musicOsc.frequency.value=110;musicGain.gain.value=.008;musicOsc.connect(musicGain);musicGain.connect(c.destination);musicOsc.start();
+ if(!P().settings.musicOn||!c||document.visibilityState==='hidden'){clearInterval(musicTimer);musicTimer=null;if(musicGain){try{musicGain.disconnect()}catch{}musicGain=null}return}
+ if(!musicGain){musicGain=c.createGain();musicGain.connect(c.destination);musicNextAt=c.currentTime+.1;musicStep=0}
+ musicGain.gain.value=.5*volumeLevel()*(musicDucked?.25:1);
+ if(!musicTimer)musicTimer=setInterval(scheduleMusic,120);
+ scheduleMusic();
 }
+function duckMusic(on){musicDucked=!!on;if(musicGain)musicGain.gain.value=.5*volumeLevel()*(musicDucked?.25:1)}
+// Short procedural cues for the new moments; they respect Sound effects and the volume.
+const SYNTH_CUES={hop:[[520,.05,'square'],[780,.06,'square']],chomp:[[180,.07,'sawtooth'],[120,.08,'sawtooth']],spit:[[300,.05,'square'],[160,.1,'square']],chest:[[660,.08,'triangle'],[880,.08,'triangle'],[1320,.16,'triangle']],phase:[[196,.12,'sawtooth'],[147,.2,'sawtooth']],tap:[[900,.03,'sine']]};
+function synthCue(name){if(!P().settings.soundOn)return;const steps=SYNTH_CUES[name];const c=audioContext();if(!steps||!c)return;let at=c.currentTime;for(const [freq,len,type] of steps){const o=c.createOscillator(),g=c.createGain();o.type=type;o.frequency.value=freq;g.gain.setValueAtTime(.05*volumeLevel(),at);g.gain.exponentialRampToValueAtTime(.001,at+len);o.connect(g);g.connect(c.destination);o.start(at);o.stop(at+len+.01);at+=len*.8}}
 
 
 
@@ -1325,10 +1362,10 @@ const BITES=[
  {name:'Scout',emoji:'🟣',unlockStars:60}
 ];
 const SHOP=[
- {id:'space_trail',name:'Space Trail',cost:15},
- {id:'book_glasses',name:'Wordwood Glasses',cost:20},
- {id:'rainbow_cape',name:'Rainbow Cape',cost:25},
- {id:'boss_crown',name:'Boss Crown',cost:35}
+ {id:'space_trail',name:'Space Trail',cost:6},
+ {id:'book_glasses',name:'Wordwood Glasses',cost:12},
+ {id:'rainbow_cape',name:'Rainbow Cape',cost:20},
+ {id:'boss_crown',name:'Boss Crown',cost:36}
 ];
 const REVIEW_MS={first:10*60*1000,second:24*60*60*1000,mastered:3*24*60*60*1000};
 let parentUnlocked=false,parentUnlockedUntil=0,deferredPrompt=null;
@@ -1489,6 +1526,7 @@ function migrateStore(x){
    if(!p.settings.qualityTier)p.settings.qualityTier='balanced';
    if(p.settings.soundOn===undefined)p.settings.soundOn=true;
    if(p.settings.musicOn===undefined)p.settings.musicOn=false;
+   if(!Number.isFinite(Number(p.settings.volume)))p.settings.volume=80;
    if(!p.settings.enemySpeed)p.settings.enemySpeed='normal';if(!p.controls||typeof p.controls!=='object')p.controls={};
    p.controls.dailyMinutes=Math.max(5,Math.min(180,Number(p.controls.dailyMinutes)||30));p.controls.maxSessionMinutes=Math.max(5,Math.min(120,p.controls.dailyMinutes,Number(p.controls.maxSessionMinutes)||20));delete p.controls.requireParentForSnap;p.controls.requireParentForPractice=!!p.controls.requireParentForPractice;
  });
@@ -1701,11 +1739,19 @@ function profileXp(){
  const current=score%300;
  return {current,max:300,percent:Math.max(0,Math.min(100,Math.round(current/3)))};
 }
-function streakCount(){
- const seen=new Set((P().sessions||[]).slice(-30).map(s=>new Date(s.ts).toDateString()));
- const cutoff=Date.now()-7*24*60*60*1000;
- return [...seen].filter(day=>new Date(day).getTime()>=cutoff).length;
+// Honest daily streak (G6.5): a day counts only when a mission or practice was finished on
+// that calendar day in local time. A gap is never "lost", it is "Welcome back!".
+function localDayKey(ts){const d=new Date(ts);return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`}
+function streakState(now=Date.now()){
+ const played=new Set((P().sessions||[]).slice(-60).map(s=>localDayKey(s.ts)));
+ const day=offset=>{const d=new Date(now);d.setHours(12,0,0,0);d.setDate(d.getDate()-offset);return d};
+ const week=Array.from({length:7},(_,i)=>{const d=day(6-i);return {key:localDayKey(d.getTime()),label:d.toLocaleDateString(undefined,{weekday:'short'}),played:played.has(localDayKey(d.getTime()))}});
+ let run=0;for(let i=played.has(localDayKey(day(0).getTime()))?0:1;played.has(localDayKey(day(i).getTime()));i++)run++;
+ const playedToday=played.has(localDayKey(day(0).getTime()));
+ const label=run>=2?`${run} days in a row!`:playedToday?'You played today!':played.size?'Welcome back!':'Keep it up';
+ return {run,week,label,playedToday};
 }
+function streakCount(){return streakState().run}
 function nextRewardState(){
  const score=Math.max(0,P().score||0);
  const remainder=score%500;
@@ -1727,18 +1773,9 @@ function worldLabelFor(world){return worldMeta(world).title.toUpperCase();}
 // badge, and a chest waits after the boss. The text label carries the same information.
 const MINIMAP_POINTS=[[18,100],[42,86],[66,98],[92,84],[112,62],[90,44],[64,52],[40,38],[62,20],[96,18]];
 function svgEl(name,attrs={},children=[]){const el=document.createElementNS('http://www.w3.org/2000/svg',name);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,String(v));children.forEach(child=>el.appendChild(child));return el}
-function renderMinimap(mission){
- const title=$('minimapTitle'),nodes=$('minimapNodes');
- if(!title||!nodes)return;
- const world=mission?.world;
- const worldDefinition=world?REGISTRY.getWorld(world):null;
- const ids=worldDefinition?.missionIds||[];
- const completed=progression().completedMissionIds;
- title.textContent=world?worldMeta(world).title:'Jungle Circuit';
- nodes.replaceChildren();
- if(!ids.length){nodes.setAttribute('aria-label','Mission route map');return}
- const done=ids.filter(id=>completed.includes(id)).length;
- const points=ids.map((_,i)=>MINIMAP_POINTS[i]||[20+(i%5)*20,100-Math.floor(i/5)*40]);
+function routePoint(i){return MINIMAP_POINTS[i]||[20+(i%5)*20,100-Math.floor(i/5)*40]}
+function buildRouteSvg(ids,completed,currentId,starsById=null){
+ const points=ids.map((_,i)=>routePoint(i));
  const chest=[124,26];
  const d=[...points,chest].map(([x,y],i,all)=>{if(!i)return `M${x} ${y}`;const [px,py]=all[i-1];const mx=(px+x)/2;return `Q${mx} ${py} ${x} ${y}`}).join(' ');
  const svg=svgEl('svg',{viewBox:'0 0 140 120',class:'mm-svg','aria-hidden':'true',focusable:'false'},[
@@ -1759,16 +1796,43 @@ function renderMinimap(mission){
  };
  ids.forEach((id,index)=>{
   const definition=REGISTRY.getMission(id);
-  const isDone=completed.includes(id),isHere=id===mission?.id,isBoss=!!definition?.boss;
+  const isDone=completed.includes(id),isHere=id===currentId,isBoss=!!definition?.boss;
   const kind=isHere?'here':isDone?'done':isBoss?'boss':'locked';
   const g=node(...points[index],kind);
   g.appendChild(svgEl('title',{},[document.createTextNode(`${id}. ${definition?.title||'Mission'}${isDone?' (complete)':isHere?' (current)':' (locked)'}`)]));
+  const stars=Number(starsById?.[id])||0;
+  if(stars&&isDone){const label=svgEl('text',{y:13,'text-anchor':'middle','font-size':6,fill:'#ffd24a',stroke:'#3a2400','stroke-width':.4,class:'mm-stars'});label.textContent='\u2605'.repeat(stars)+'\u2606'.repeat(3-stars);g.appendChild(label)}
   svg.appendChild(g);
  });
  svg.appendChild(node(...chest,'chest'));
- nodes.appendChild(svg);
+ return svg;
+}
+function renderMinimap(mission){
+ const title=$('minimapTitle'),nodes=$('minimapNodes');
+ if(!title||!nodes)return;
+ const world=mission?.world;
+ const worldDefinition=world?REGISTRY.getWorld(world):null;
+ const ids=worldDefinition?.missionIds||[];
+ const completed=progression().completedMissionIds;
+ title.textContent=world?worldMeta(world).title:'Jungle Circuit';
+ nodes.replaceChildren();
+ if(!ids.length){nodes.setAttribute('aria-label','Mission route map');return}
+ const done=ids.filter(id=>completed.includes(id)).length;
+ nodes.appendChild(buildRouteSvg(ids,completed,mission?.id));
  const next=ids.find(id=>!completed.includes(id));
  nodes.setAttribute('aria-label',`${title.textContent} route: ${done} of ${ids.length} missions complete${mission?`, current mission ${mission.id}`:''}${next&&next!==mission?.id?`, next mission ${next}`:''}`);
+}
+// World map (G6.2): the same route, large, on each world screen. Unlocked nodes are tap
+// targets; the mission list below stays the accessible path, so the map is aria-hidden.
+function renderWorldMap(world,container){
+ const ids=REGISTRY.getWorld(world)?.missionIds||[];
+ if(!ids.length)return;
+ const completed=progression().completedMissionIds;
+ const next=ids.find(id=>!completed.includes(id)&&REGISTRY.isMissionUnlocked(progression(),id));
+ const map=document.createElement('div');map.className='world-map';map.setAttribute('aria-hidden','true');
+ map.appendChild(buildRouteSvg(ids,completed,next,P().missionStars||{}));
+ ids.forEach((id,i)=>{const mission=REGISTRY.getMission(id);if(!mission||!unlocked(mission))return;const [x,y]=routePoint(i);const b=document.createElement('button');b.type='button';b.tabIndex=-1;b.className='world-map-node';b.style.left=`${(x/140)*100}%`;b.style.top=`${(y/120)*100}%`;const stars=Number(P().missionStars?.[id])||0;b.title=`${id}. ${mission.title}${stars?` (${stars} of 3 stars)`:''}`;b.onclick=()=>start(id);map.appendChild(b)});
+ container.appendChild(map);
 }
 function missionStatus(world,id){
  const profile=P();
@@ -2260,8 +2324,8 @@ function render(){
  const homeRewardTitle=$('homeRewardTitle');if(homeRewardTitle)homeRewardTitle.textContent=`Gain ${reward.remaining} more XP`;
  const homeRewardBar=$('homeRewardBar');if(homeRewardBar)homeRewardBar.style.width=`${reward.percent}%`;
  const homeRewardText=$('homeRewardText');if(homeRewardText)homeRewardText.textContent='Earn BrainBites to reach the next level!';
- const homeStreak=$('homeStreak');if(homeStreak)homeStreak.textContent=streak?`${streak}-day streak`:'Keep it up';
- const homeStreakDots=$('homeStreakDots');if(homeStreakDots)homeStreakDots.innerHTML=Array.from({length:7},(_,i)=>`<span class="${i<streak?'on':''}"></span>`).join('');
+ const streakInfo=streakState();const homeStreak=$('homeStreak');if(homeStreak)homeStreak.textContent=streakInfo.label;
+ const homeStreakDots=$('homeStreakDots');if(homeStreakDots){homeStreakDots.replaceChildren(...streakInfo.week.map(d=>{const dot=document.createElement('span');if(d.played)dot.className='on';dot.title=`${d.label}: ${d.played?'played':'not played'}`;return dot}));homeStreakDots.setAttribute('role','img');homeStreakDots.setAttribute('aria-label',`Played ${streakInfo.week.filter(d=>d.played).length} of the last 7 days`)}
  const comboBanner=$('comboBanner');if(comboBanner)comboBanner.textContent=`x${G?.combo||0}`;
  const battleProfileName=$('battleProfileName');if(battleProfileName)battleProfileName.textContent=profile.name;
  const battleProfileLevel=$('battleProfileLevel');if(battleProfileLevel)battleProfileLevel.textContent=`Level ${profileLevel()}`;
@@ -2271,7 +2335,7 @@ function render(){
  const battleGoalText=$('battleGoalText');if(battleGoalText)battleGoalText.textContent=G?.m?.boss?'Finish the arena phase to push the boss back.':'Choose the correct tile to keep moving through the jungle.';
  renderWorldShowcase();WORLDS.forEach(w=>renderList(w.id+'List',w.id));$('parentMath').textContent=Math.round(P().mastery.math)+'%';$('parentWords').textContent=Math.round(P().mastery.words)+'%';$('parentSpanish').textContent=Math.round(P().mastery.spanish)+'%';renderMistakeRows();renderProfiles();renderChildProfiles();unlockBites();renderBites();renderParent();renderDiagnostics();renderSync();renderControls();renderIntegrations();renderRelease();renderQA();applySettings();renderLaunchHint();renderFirstRun();$('saveHealth').textContent=`Save healthy · Backup ${localStorage.getItem(BACK)?'available':'not created yet'}`}
 function unlocked(m){return !!m&&REGISTRY.isMissionUnlocked(progression(),m.id)}
-function renderList(id,world){const l=$(id);l.innerHTML='';const meta=worldMeta(world);const count=prog(world);const worldDefinition=REGISTRY.getWorld(world);const bosses=MISSIONS.filter(m=>m.world===world&&m.boss).length;const completed=progression().completedMissionIds;const clearedBosses=MISSIONS.filter(m=>m.world===world&&m.boss&&completed.includes(m.id)).length;l.innerHTML=`<div class="world-banner world-${world}"><img src="${meta.art}" alt="${meta.title}"><div><p class="world-tag">${meta.tag}</p><h3>${meta.title}</h3><p>${meta.summary}</p><p class="world-progress">${count}/${worldDefinition.missionIds.length} missions &middot; ${clearedBosses}/${bosses} bosses cleared</p></div></div>`;MISSIONS.filter(m=>m.world===world).forEach(m=>{const on=unlocked(m),done=completed.includes(m.id),gate=on?registryMissionGate(m):null,available=!!(on&&gate?.approved),d=document.createElement('div');d.className='mission-row '+world+(on?'':' locked')+(available?'':' unavailable')+(m.boss?' boss':'')+(done?' done':'');d.innerHTML=`<div><div class="mission-topline"><b>${m.id}. ${m.title}</b><span class="mission-badge">${m.boss?'Boss':'Mission'}</span></div><div class="mission-skill">${m.skill}</div></div><button aria-label="${done?'Replay':available?'Play':'Unavailable'} mission ${m.id}: ${m.title}" ${available?'':'disabled'}>${done?'Replay':available?'Play':on?'Unavailable':'Locked'}</button>`;if(available)d.querySelector('button').onclick=()=>start(m.id);l.appendChild(d)})}
+function renderList(id,world){const l=$(id);l.innerHTML='';const meta=worldMeta(world);const count=prog(world);const worldDefinition=REGISTRY.getWorld(world);const bosses=MISSIONS.filter(m=>m.world===world&&m.boss).length;const completed=progression().completedMissionIds;const clearedBosses=MISSIONS.filter(m=>m.world===world&&m.boss&&completed.includes(m.id)).length;l.innerHTML=`<div class="world-banner world-${world}"><img src="${meta.art}" alt="${meta.title}"><div><p class="world-tag">${meta.tag}</p><h3>${meta.title}</h3><p>${meta.summary}</p><p class="world-progress">${count}/${worldDefinition.missionIds.length} missions &middot; ${clearedBosses}/${bosses} bosses cleared</p></div></div>`;renderWorldMap(world,l);MISSIONS.filter(m=>m.world===world).forEach(m=>{const on=unlocked(m),done=completed.includes(m.id),gate=on?registryMissionGate(m):null,available=!!(on&&gate?.approved),d=document.createElement('div');d.className='mission-row '+world+(on?'':' locked')+(available?'':' unavailable')+(m.boss?' boss':'')+(done?' done':'');d.innerHTML=`<div><div class="mission-topline"><b>${m.id}. ${m.title}</b><span class="mission-badge">${m.boss?'Boss':'Mission'}</span>${(()=>{const n=Number(P().missionStars?.[m.id])||0;return n?`<span class="mission-stars" role="img" aria-label="${n} of 3 stars">${'\u2605'.repeat(n)}${'\u2606'.repeat(3-n)}</span>`:''})()}</div><div class="mission-skill">${m.skill}</div></div><button aria-label="${done?'Replay':available?'Play':'Unavailable'} mission ${m.id}: ${m.title}" ${available?'':'disabled'}>${done?'Replay':available?'Play':on?'Unavailable':'Locked'}</button>`;if(available)d.querySelector('button').onclick=()=>start(m.id);l.appendChild(d)})}
 function isMatchFractionCompatibilityPath(){
  return !!G?.m?.skill&&G.m.skill==='fractions'&&document.documentElement.classList.contains('presentation-match')&&!document.documentElement.classList.contains('presentation-match-game-dom')
 }
@@ -2432,7 +2496,7 @@ function setCaption(text){const el=$('captionText');if(!el)return;const on=!!P()
 function start(id,options={}){const m=REGISTRY.getMission(id);return m?launchMission(m,options):false}
 function launchMission(m,{allowLocked=false,progressionEligible=true,assisted=false,source='mission',homeworkMode=false,contentControl=null}={}){const canonical=REGISTRY.getMission(m?.id),missionUnlocked=!!canonical&&REGISTRY.isMissionUnlocked(progression(),canonical.id);if(!m)return false;if(progressionEligible&&!canonical)return false;if(!allowLocked&&!missionUnlocked){$('launchHint').textContent='Complete the earlier mission in this world first.';return false}const gate=contentControl||registryMissionGate(m);if(!gate?.approved)return showContentUnavailable('launchHint');if(!prepareTimeUsageLaunch()){TIME_PENDING_LAUNCH={mission:m,options:{allowLocked,progressionEligible,assisted,source,homeworkMode,contentControl:gate}};return false}TIME_PENDING_LAUNCH=null;if(progressionEligible&&missionUnlocked){P().progression=REGISTRY.normalizeProgression({...progression(),lastMissionId:canonical.id});save()}show('game');applyWorldTheme(m.world);$('prompt').textContent=m.prompt;$('worldLabel').textContent=worldMeta(m.world).title.toUpperCase();renderMinimap(m);$('prompt').lang=m.world==='spanish'?'es':'en';
  if(progressionEligible&&missionUnlocked&&['name','world'].includes(firstRunState(P()).stage)){setFirstRunStage('mission');renderFirstRun();save()}
- const webgl=document.documentElement.classList.contains('presentation-webgl'),bossBox=$('bossBox');bossBox.hidden=!m.boss;bossBox.style.display=m.boss?'':'none';$('bossName').textContent=m.bossName||'Boss';renderBossPortrait(m);const guidedHint=assisted?(m.curriculumChallenge?.supportMetadata?.scaffold||m.curriculumChallenge?.hintMetadata?.hint||''):'';$('feedback').textContent=assisted?`Guided support is on.${guidedHint?` ${guidedHint}`:' This attempt counts as assisted evidence.'}`:`Entering ${worldMeta(m.world).title}.`;G=makeGame(m);G.progressionEligible=!!(progressionEligible&&missionUnlocked);G.internalBubbleReefPreview=G.progressionEligible&&isInternalBubbleReefPreview();G.launchOptions={allowLocked:!!allowLocked,progressionEligible:!!progressionEligible,assisted:!!assisted,source,homeworkMode:!!homeworkMode,contentControl:gate};G.contentControl=gate;G.assisted=!!assisted;G.source=source;G.homeworkMode=!!homeworkMode;G.guidedHint=guidedHint;if(webgl){G.webglRemaining=[...new Set((m.correct||[]).map(String))];G.total=m.boss?Math.min(4,G.webglRemaining.length):G.webglRemaining.length}$('speakPrompt').hidden=false;setCaption(m.prompt);hideBattleToast();hideSnackCard();hideExplainer();clearEnteringStatusSoon();draw();return true}
+ const webgl=document.documentElement.classList.contains('presentation-webgl'),bossBox=$('bossBox');bossBox.hidden=!m.boss;bossBox.style.display=m.boss?'':'none';$('bossName').textContent=m.bossName||'Boss';renderBossPortrait(m);const guidedHint=assisted?(m.curriculumChallenge?.supportMetadata?.scaffold||m.curriculumChallenge?.hintMetadata?.hint||''):'';$('feedback').textContent=assisted?`Guided support is on.${guidedHint?` ${guidedHint}`:' This attempt counts as assisted evidence.'}`:`Entering ${worldMeta(m.world).title}.`;G=makeGame(m);G.progressionEligible=!!(progressionEligible&&missionUnlocked);G.internalBubbleReefPreview=G.progressionEligible&&isInternalBubbleReefPreview();G.launchOptions={allowLocked:!!allowLocked,progressionEligible:!!progressionEligible,assisted:!!assisted,source,homeworkMode:!!homeworkMode,contentControl:gate};G.contentControl=gate;G.assisted=!!assisted;G.source=source;G.homeworkMode=!!homeworkMode;G.guidedHint=guidedHint;if(webgl){G.webglRemaining=[...new Set((m.correct||[]).map(String))];G.total=m.boss?Math.min(4,G.webglRemaining.length):G.webglRemaining.length;if(!m.boss)G.nibbler={slot:3,lastChosen:null};else startBossRun()}const nibblerStatus=$('nibblerStatus');if(nibblerStatus)nibblerStatus.textContent=G.nibbler?'A Nibbler is on pillar 4. Biting its pillar costs your combo, never a heart.':'';$('speakPrompt').hidden=false;setCaption(m.prompt);hideBattleToast();hideSnackCard();hideExplainer();clearEnteringStatusSoon();draw();return true}
 function startCurriculumChallenge(challenge,{assisted=false,homeworkMode=false}={}){
  const c=core(),skill=c?.findCurriculumSkill?.(challenge?.skillId),validation=c?.validateGeneratedChallenge?.(challenge,skill||{});
  const gate=c&&skill&&validation?.approved?generatedChallengeGate(challenge,skill,validation):null;
@@ -2461,10 +2525,88 @@ let enteringStatusTimer=null;
 function clearEnteringStatusSoon(){clearTimeout(enteringStatusTimer);enteringStatusTimer=setTimeout(()=>{const f=$('feedback');if(f&&f.textContent.startsWith('Entering '))f.textContent=''},1500)}
 // Boss portrait from the inline sprite (UI rubric B6); unknown bosses keep the plain badge.
 function renderBossPortrait(mission){const art=document.querySelector('#bossBox .boss-art');if(!art)return;const id=String(mission?.bossId||mission?.bossName||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');const symbol=id&&document.getElementById(`b-${id}`);art.replaceChildren();art.classList.toggle('has-portrait',!!symbol);if(!symbol)return;const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('class','ui-icon');svg.setAttribute('aria-hidden','true');svg.setAttribute('focusable','false');const use=document.createElementNS('http://www.w3.org/2000/svg','use');use.setAttribute('href',`#b-${id}`);svg.appendChild(use);art.appendChild(svg)}
+// ---- Run arc, twist and the Nibbler (G4) ------------------------------------------------------
+// content/run-builder.js is pure and deterministic; these wrappers only feed it game state.
+function webglPrompt(){
+ const RB=window.BrainBiteRunBuilder;
+ if(!G?.m||!RB)return {choices:[],targets:[],stage:'core'};
+ const remaining=G.webglRemaining||[];
+ const seed=Number(G.m.id||0)*97+Number(G.eaten||0)*13+(G.twist?.active?7:0)+(G.twistsDone||0)*3;
+ return RB.choicesFor({remaining,wrong:G.m.wrong||[],eaten:G.eaten||0,total:G.total||0,seed,twist:!!G.twist?.active,correctPool:G.m.correct||[]});
+}
+function maybeStartTwist(){
+ const RB=window.BrainBiteRunBuilder;
+ if(!G||G.m.boss||G.twistsDone||!RB)return;
+ const twist=RB.twistFor(G.m.skill);
+ if(!twist||G.eaten!==RB.twistAt({skill:G.m.skill,total:G.total})||!(G.webglRemaining||[]).length)return;
+ G.twist={active:true,prompt:twist.prompt};
+ $('prompt').textContent=twist.prompt;setCaption(twist.prompt);
+ $('feedback').textContent=twist.prompt;
+}
+function endTwist(){if(!G)return;G.twist=null;G.twistsDone=(G.twistsDone||0)+1;$('prompt').textContent=G.m.prompt;setCaption(G.m.prompt)}
+function resolveTwist(target,chosenSlot){
+ const prompt=webglPrompt();
+ const ok=prompt.targets.includes(String(target));
+ if(ok){
+  G.combo++;G.max=Math.max(G.max,G.combo);G.correct++;
+  awardProgressionScore(100*G.combo);P().mastery[G.m.world]=Math.min(100,P().mastery[G.m.world]+1);
+  updateSkill(G.m.skill,true,{...attemptSupport(),source:G.source||'mission'});G.retryAssist=false;
+  $('feedback').textContent='Twist cracked! Back to the main mission.';fileCue(G.combo>=8?'super':'correct');
+  emitAnswer(target,true,false);afterWebglAnswer(chosenSlot,true);endTwist();draw();return true;
+ }
+ const outcome=updateSkill(G.m.skill,false,{...attemptSupport(),independent:false,source:G.source||'mission'});if(outcome?.contentQuarantined){$('feedback').textContent=CONTENT_UNAVAILABLE_MESSAGE;draw();return false}
+ G.combo=0;G.wrong++;G.lives--;P().mistakes.push({skill:G.m.skill,chosen:String(target),ts:Date.now()});
+ $('feedback').textContent=`Not ${target}. ${G.twist?.prompt||''}`.trim();fileCue('wrong');emitAnswer(target,false,false);afterWebglAnswer(chosenSlot,false);draw();handleOutOfLives();return false;
+}
+// The Nibbler only takes the combo when the child had another right answer to choose, so a
+// single target that happens to sit on its pillar never costs anything.
+function afterWebglAnswer(chosenSlot,correct,avoidable=false){
+ const RB=window.BrainBiteRunBuilder;
+ if(!G||G.m.boss||!RB)return;
+ if(!G.nibbler)G.nibbler={slot:3,lastChosen:null};
+ if(correct&&avoidable&&chosenSlot>=0&&chosenSlot===G.nibbler.slot&&G.combo>0){G.combo=0;$('feedback').textContent=`${$('feedback').textContent} The Nibbler snatched your combo!`.trim()}
+ const count=Math.max(1,webglPrompt().choices.length||4);
+ G.nibbler.slot=RB.nibblerNext(G.nibbler.slot,G.nibbler.lastChosen,count);
+ G.nibbler.lastChosen=chosenSlot>=0?chosenSlot:G.nibbler.lastChosen;
+ if(correct)maybeStartTwist();
+ const next=RB.nibblerNext(G.nibbler.slot,G.nibbler.lastChosen,count);
+ const status=$('nibblerStatus');if(status)status.textContent=`The Nibbler is on pillar ${G.nibbler.slot+1} and will hop to pillar ${next+1}.`;
+}
+// A skill is due when LearningCore scheduled its review for now or earlier.
+function skillReviewDue(skill,now=Date.now()){const due=Number(P().learningCore?.skills?.[skill]?.nextReviewAt)||0;return due>0&&due<=now}
+// ---- Boss phases (G5, decision D13) ------------------------------------------------------------
+function startBossRun(){const BP=window.BrainBiteBossPhases;if(!G||!BP)return;G.bossRun=BP.createRun();G.total=BP.TOTAL_HITS;G.boss=100;G.eaten=0;G.inkAt=0;G.peekUntil=0;announceBossPhase(true)}
+function refillBossTargets(){if(!G?.bossRun)return;if(!(G.webglRemaining||[]).length){const pool=[...new Set((G.m.correct||[]).map(String))];G.webglRemaining=window.BrainBiteRunBuilder.permute(pool,G.bossRun.hits+7)}}
+function applyBossAnswer(correct){
+ const BP=window.BrainBiteBossPhases;
+ const result=BP.applyAnswer(G.bossRun,correct);
+ G.bossRun=result.run;G.boss=BP.health(G.bossRun);G.eaten=G.bossRun.hits;
+ refillBossTargets();
+ if(result.hit&&!result.won)fileCue('boss');
+ if(result.phaseChanged)announceBossPhase(false);
+ else if(BP.currentPhase(G.bossRun).id==='ink-cloud'){G.inkAt=Date.now()+BP.PHASES[1].inkAfterMs;scheduleBossRedraw(BP.PHASES[1].inkAfterMs)}
+ if(!correct&&BP.currentPhase(G.bossRun).streak)$('feedback').textContent=`${$('feedback').textContent} Two in a row to land a hit!`.trim();
+ else if(correct&&BP.currentPhase(G.bossRun).streak&&G.bossRun.streak===1)$('feedback').textContent='One more right answer to land the hit!';
+ return result.won;
+}
+let bossRedrawTimer=null;
+function scheduleBossRedraw(ms){clearTimeout(bossRedrawTimer);bossRedrawTimer=setTimeout(()=>{if(G?.bossRun)draw()},ms+30)}
+function announceBossPhase(first){
+ const BP=window.BrainBiteBossPhases;const phase=BP.currentPhase(G.bossRun);const n=G.bossRun.phase+1;
+ const title=`Phase ${n}: ${phase.title}`;synthCue('phase');
+ const cut=$('bossCutin');if(cut){$('bossCutinTitle').textContent=title;$('bossCutinRule').textContent=phase.rule;cut.hidden=false;setTimeout(()=>{cut.hidden=true},1500)}
+ const rule=$('bossRule');if(rule)rule.textContent=phase.rule;
+ $('bossPeek').hidden=phase.id!=='ink-cloud';
+ if(!first){G.paused=true;setTimeout(()=>{if(G&&$('snackCard')?.hidden!==false)G.paused=false},1200)}
+ if(phase.id==='ink-cloud'){G.inkAt=Date.now()+(first?0:1200)+phase.inkAfterMs;scheduleBossRedraw((first?0:1200)+phase.inkAfterMs)}
+ fileCue('boss');
+}
+// Peeking shows the hidden answers for 2 s. It is help, so the next answer counts as assisted.
+function peekBossAnswers(){if(!G?.bossRun)return;const BP=window.BrainBiteBossPhases;if(BP.currentPhase(G.bossRun).id!=='ink-cloud')return;G.retryAssist=true;G.peekUntil=Date.now()+BP.PHASES[1].peekMs;$('feedback').textContent='Peeking! Your next answer counts as a helped answer.';draw();scheduleBossRedraw(BP.PHASES[1].peekMs)}
 // ---- Answer event contract (G2.1) -----------------------------------------------------------
 // Fired once per attempt, after the learning update and before the redraw, so presentation
 // can animate the disc that was chosen. Presentation never decides correctness.
-function emitAnswer(value,correct,final){if(!G)return;const combo=G.combo;window.dispatchEvent(new CustomEvent('bb:answer',{detail:{value:String(value),correct:!!correct,combo,boss:!!G.m?.boss,final:!!final}}));if(correct&&combo>0&&combo%3===0)celebrateCombo(combo)}
+function emitAnswer(value,correct,final){if(!G)return;synthCue(correct?'chomp':'spit');const combo=G.combo;window.dispatchEvent(new CustomEvent('bb:answer',{detail:{value:String(value),correct:!!correct,combo,boss:!!G.m?.boss,final:!!final}}));if(correct&&combo>0&&combo%3===0)celebrateCombo(combo)}
 function celebrateCombo(combo){const panel=document.querySelector('#game .battle-combo');const banner=$('comboBanner');if(banner)banner.dataset.streak=combo>=9?'Unstoppable!':combo>=6?'On fire!':'Hot streak!';if(panel){panel.dataset.streakLabel=`x${combo} ${banner?.dataset.streak||''}`;panel.classList.remove('combo-flash');void panel.offsetWidth;panel.classList.add('combo-flash');setTimeout(()=>panel.classList.remove('combo-flash'),900)}const status=$('comboStatus');if(status)status.textContent=`${combo} in a row! ${banner?.dataset.streak||''}`;comboCue(combo)}
 function comboCue(combo){if(!P().settings.soundOn)return;const c=audioContext();if(!c)return;const base=combo>=9?880:combo>=6?740:620;[0,.09,.18].forEach((delay,i)=>{const o=c.createOscillator(),g=c.createGain();o.type='triangle';o.frequency.value=base*(1+i*.25);g.gain.setValueAtTime(.03,c.currentTime+delay);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+delay+.12);o.connect(g);g.connect(c.destination);o.start(c.currentTime+delay);o.stop(c.currentTime+delay+.13)})}
 // ---- Mission stars and the mission-clear moment (G6.1, G2.5) ------------------------------
@@ -2472,7 +2614,7 @@ function comboCue(combo){if(!P().settings.soundOn)return;const c=audioContext();
 // with no guided help. Stars never gate progress; replays can only raise them.
 function missionStarRating(game){const attempts=(Number(game?.correct)||0)+(Number(game?.wrong)||0);const accuracy=attempts?(Number(game.correct)||0)/attempts:0;const assisted=!!game?.assisted||(Number(game?.assistedAttempts)||0)>0;return 1+(accuracy>=.8?1:0)+(accuracy>=.9&&!assisted?1:0)}
 let clearBannerTimer=null;
-function showClearBanner(screenId,clear){const banner=$('clearBanner'),screen=$(screenId);if(!banner||!screen)return;screen.insertBefore(banner,screen.children[1]||null);$('clearTitle').textContent=clear.title;const stars=$('clearStars');stars.textContent='\u2605'.repeat(clear.stars)+'\u2606'.repeat(3-clear.stars);stars.setAttribute('aria-label',`${clear.stars} of 3 stars`);const points=$('clearPoints');const next=nextMissionAfter(clear.missionId,clear.world);$('clearNext').hidden=!next;$('clearNext').onclick=()=>{hideClearBanner();if(next)start(next.id)};banner.hidden=false;const reduced=document.documentElement.classList.contains('reduced-motion')||matchMedia('(prefers-reduced-motion: reduce)').matches;if(reduced||!clear.earned){points.textContent=clear.earned?`+${clear.earned} BrainBites`:'Practice counts too!'}else{const started=performance.now();const tick=()=>{const k=Math.min(1,(performance.now()-started)/800);points.textContent=`+${Math.round(clear.earned*k)} BrainBites`;if(k<1)requestAnimationFrame(tick)};tick()}clearTimeout(clearBannerTimer);clearBannerTimer=setTimeout(hideClearBanner,12000)}
+function showClearBanner(screenId,clear){synthCue('chest');const banner=$('clearBanner'),screen=$(screenId);if(!banner||!screen)return;screen.insertBefore(banner,screen.children[1]||null);$('clearTitle').textContent=clear.title;const stars=$('clearStars');stars.textContent='\u2605'.repeat(clear.stars)+'\u2606'.repeat(3-clear.stars);stars.setAttribute('aria-label',`${clear.stars} of 3 stars`);const points=$('clearPoints');const next=nextMissionAfter(clear.missionId,clear.world);$('clearNext').hidden=!next;$('clearNext').onclick=()=>{hideClearBanner();if(next)start(next.id)};banner.hidden=false;const reduced=document.documentElement.classList.contains('reduced-motion')||matchMedia('(prefers-reduced-motion: reduce)').matches;if(reduced||!clear.earned){points.textContent=clear.earned?`+${clear.earned} BrainBites`:'Practice counts too!'}else{const started=performance.now();const tick=()=>{const k=Math.min(1,(performance.now()-started)/800);points.textContent=`+${Math.round(clear.earned*k)} BrainBites`;if(k<1)requestAnimationFrame(tick)};tick()}clearTimeout(clearBannerTimer);clearBannerTimer=setTimeout(hideClearBanner,12000)}
 function hideClearBanner(){clearTimeout(clearBannerTimer);clearBannerTimer=null;const banner=$('clearBanner');if(banner)banner.hidden=true}
 function nextMissionAfter(id,world){const ids=REGISTRY.getWorld(world)?.missionIds||[];const nextId=ids[ids.indexOf(Number(id))+1];return nextId&&REGISTRY.isMissionUnlocked(progression(),nextId)?REGISTRY.getMission(nextId):null}
 // ---- Kind failure (G3, decision D11) --------------------------------------------------
@@ -2567,7 +2709,7 @@ function drawActivityBoard(b){
  });
  return true
 }
-function draw(){window.dispatchEvent(new CustomEvent('bb:game-draw'));renderMinimap(G?.m);$('lives').textContent=G.lives;$('combo').textContent=G.combo;const comboBanner=$('comboBanner');if(comboBanner)comboBanner.textContent=`x${G.combo}`;const stars=document.querySelectorAll('#game .battle-stars span');if(stars?.length){const lit=Math.min(3,Math.floor(G.combo/3));stars.forEach((s,i)=>{s.innerHTML=i<lit?'&#9733;':'&#9734;';s.style.color=i<lit?'#f5c518':'#9aa3b5'})}$('targets').textContent=`${G.eaten}/${G.total}`;$('bossHealth').value=G.boss;$('bossHealth').max=100;const phase=G.boss>66?1:G.boss>33?2:3;$('bossPhase').textContent=G.m.boss?`${G.m.bossName} - Phase ${phase} of ${BOSS_PHASES}`:`Phase ${phase} of ${BOSS_PHASES}`;const healthFill=$('healthFill');if(healthFill)healthFill.style.width=`${Math.max(0,Math.min(100,(G.lives/3)*100))}%`;const healthText=$('healthText');if(healthText)healthText.textContent=`${Math.max(0,G.lives)} / 3`;const healthBox=document.querySelector('#game .battle-health');if(healthBox)healthBox.setAttribute('aria-label',`Lives: ${Math.max(0,G.lives)} of 3`);setCaption(G?.m?.prompt);const b=$('board');const battleSurface=document.querySelector('#game .battle-shell');if(G.activity&&!isMatchFractionCompatibilityPath()&&drawActivityBoard(b)){if(battleSurface)battleSurface.dataset.answerSurface='dom';window.BrainBitePresentation?.setBattleChoices?.([]);return}if(battleSurface)battleSurface.dataset.answerSurface='three-d';b.className=`board world-${G.m.world}${G.m.boss?' boss-arena':''}`;b.innerHTML='';for(let y=0;y<5;y++)for(let x=0;x<5;x++){const c=G.cells[ix(x,y)]||{eaten:true,value:''},d=document.createElement('div');d.className='cell';d.setAttribute('role','gridcell');if(x===G.p.x&&y===G.p.y)d.classList.add('player');if(x===G.e.x&&y===G.e.y)d.classList.add('enemy');if(G.mist.some(m=>m.x===x&&m.y===y))d.classList.add('mistake');if(!c.eaten)d.textContent=c.value;b.appendChild(d)}}
+function draw(){window.dispatchEvent(new CustomEvent('bb:game-draw'));renderMinimap(G?.m);$('lives').textContent=G.lives;$('combo').textContent=G.combo;const comboBanner=$('comboBanner');if(comboBanner)comboBanner.textContent=`x${G.combo}`;const stars=document.querySelectorAll('#game .battle-stars span');if(stars?.length){const lit=Math.min(3,Math.floor(G.combo/3));stars.forEach((s,i)=>{s.innerHTML=i<lit?'&#9733;':'&#9734;';s.style.color=i<lit?'#f5c518':'#9aa3b5'})}$('targets').textContent=`${G.eaten}/${G.total}`;$('bossHealth').value=G.boss;$('bossHealth').max=100;const phase=G.bossRun?G.bossRun.phase+1:G.boss>66?1:G.boss>33?2:3;$('bossPhase').textContent=G.m.boss?`${G.m.bossName} - Phase ${phase} of ${BOSS_PHASES}`:`Phase ${phase} of ${BOSS_PHASES}`;const healthFill=$('healthFill');if(healthFill)healthFill.style.width=`${Math.max(0,Math.min(100,(G.lives/3)*100))}%`;const healthText=$('healthText');if(healthText)healthText.textContent=`${Math.max(0,G.lives)} / 3`;const healthBox=document.querySelector('#game .battle-health');if(healthBox)healthBox.setAttribute('aria-label',`Lives: ${Math.max(0,G.lives)} of 3`);setCaption(G?.m?.prompt);const b=$('board');const battleSurface=document.querySelector('#game .battle-shell');if(G.activity&&!isMatchFractionCompatibilityPath()&&drawActivityBoard(b)){if(battleSurface)battleSurface.dataset.answerSurface='dom';window.BrainBitePresentation?.setBattleChoices?.([]);return}if(battleSurface)battleSurface.dataset.answerSurface='three-d';b.className=`board world-${G.m.world}${G.m.boss?' boss-arena':''}`;b.innerHTML='';for(let y=0;y<5;y++)for(let x=0;x<5;x++){const c=G.cells[ix(x,y)]||{eaten:true,value:''},d=document.createElement('div');d.className='cell';d.setAttribute('role','gridcell');if(x===G.p.x&&y===G.p.y)d.classList.add('player');if(x===G.e.x&&y===G.e.y)d.classList.add('enemy');if(G.m.boss&&G.m.world==='spanish'){const n=window.BrainBiteRunBuilder?.ringPosition?.((G.ringStep||0)+1);if(n&&n.x===x&&n.y===y)d.classList.add('enemy-next')}if(G.mist.some(m=>m.x===x&&m.y===y))d.classList.add('mistake');if(!c.eaten)d.textContent=c.value;b.appendChild(d)}}
 function move(dx,dy){if(!G||G.paused||!checkpointGameplayActivity({reason:'activity'}))return;let nx=Math.max(0,Math.min(4,G.p.x+dx)),ny=Math.max(0,Math.min(4,G.p.y+dy));if(nx===G.p.x&&ny===G.p.y)return;G.p={x:nx,y:ny};if(G.activity&&!isMatchFractionCompatibilityPath()){G.moves++;draw();return}G.moves++;bite();bossTick();enemy();hit();draw()}
 function bite(){const c=G.cells[ix(G.p.x,G.p.y)];if(!c||c.eaten)return;c.eaten=true;if(c.correct){G.combo++;G.max=Math.max(G.max,G.combo);G.eaten++;G.correct++;awardProgressionScore(100*G.combo);P().mastery[G.m.world]=Math.min(100,P().mastery[G.m.world]+1);updateSkill(G.m.skill,true,{...attemptSupport(),source:G.source||'mission'});G.retryAssist=false;$('feedback').textContent='CHOMP! Correct.';if(firstRunState(P()).stage==='mission'){setFirstRunStage('done');renderFirstRun();save()}fileCue(G.combo>=8?'super':'correct');emitAnswer(c.value,true,G.m.boss?G.boss<=25:G.eaten>=G.total);if(G.m.boss){G.boss=Math.max(0,G.boss-25);if(G.boss===0)return complete()}else if(G.eaten>=G.total)return complete()}else{const outcome=updateSkill(G.m.skill,false,{...attemptSupport(),independent:false,source:G.source||'mission'});if(outcome?.contentQuarantined){$('feedback').textContent=CONTENT_UNAVAILABLE_MESSAGE;return}G.combo=0;G.wrong++;G.lives--;P().mastery[G.m.world]=Math.max(0,P().mastery[G.m.world]-.5);P().mistakes.push({skill:G.m.skill,chosen:c.value,ts:Date.now()});G.mist.push({x:G.p.x,y:G.p.y});$('feedback').textContent=wrongAnswerFeedback(c.value);fileCue('wrong');emitAnswer(c.value,false,false);handleOutOfLives()}}
 
@@ -2575,14 +2717,14 @@ function bossTick(){
  if(!G.m.boss)return;
  if(G.m.world==='math'&&G.moves%3===0){G.lives--;G.e.x=Math.floor(Math.random()*5);G.e.y=Math.floor(Math.random()*5);$('feedback').textContent='Asteroid blast!'}
  if(G.m.world==='words'&&G.moves%2===0){G.cells=shuffle(G.cells)}
- if(G.m.world==='spanish'&&G.moves%2===0){G.e={x:Math.floor(Math.random()*5),y:Math.floor(Math.random()*5)}}
+ if(G.m.world==='spanish'&&G.moves%2===0){G.ringStep=(G.ringStep||0)+1;G.e=window.BrainBiteRunBuilder?.ringPosition?.(G.ringStep)||{x:0,y:0}}
  handleOutOfLives()
 }
 
 function enemy(){let step=P().settings.enemySpeed==='slow'?2:1;if(G.moves%step)return;let x=G.e.x,y=G.e.y,dx=Math.sign(G.p.x-x),dy=Math.sign(G.p.y-y);if(Math.abs(G.p.x-x)>Math.abs(G.p.y-y))x+=dx;else y+=dy;G.e={x,y}}
 function hit(){if(G.e.x===G.p.x&&G.e.y===G.p.y){G.lives--;G.combo=0;G.e={x:0,y:0};$('feedback').textContent='Bonk! Keep going.';fileCue('hit');handleOutOfLives()}}
 function complete(){if(!checkpointGameplayActivity({reason:'complete'}))return false;const session={mission:G.m.id,world:G.m.world,skillId:G.m.skill,combo:G.max,accuracy:G.correct?Math.round(100*G.correct/Math.max(1,G.correct+G.wrong)):null,moves:G.moves,durationSec:Math.max(1,Math.round((Date.now()-(G.startedAt||Date.now()))/1000)),practice:G.progressionEligible===false,homework:!!G.homeworkMode,source:G.source||'mission',ts:Date.now()};if(G.progressionEligible===false){recordLearningSession(session);save();fileCue('clear');$('feedback').textContent='Practice complete!';setCaption('Practice complete.');setTimeout(()=>{show('home');render()},600);return true}const profile=P(),before=progression(),wasComplete=before.completedMissionIds.includes(G.m.id),next=REGISTRY.completeMission(before,G.m.id);if(!wasComplete&&!next.completedMissionIds.includes(G.m.id)){$('feedback').textContent='This mission is still locked.';return false}profile.progression=next;if(!wasComplete){profile.stars+=3;profile.spark+=(G.m.boss?10:3)}profile.bestCombo=Math.max(profile.bestCombo,G.max);const missionStars=missionStarRating(G);profile.missionStars={...(profile.missionStars||{})};profile.missionStars[G.m.id]=Math.max(Number(profile.missionStars[G.m.id])||0,missionStars);fileCue(G.m.boss?'boss':'clear');recordLearningSession(session);save();if(G.internalBubbleReefPreview)void grantBubbleReefPreviewReward({profileId:profile.id,missionId:G.m.id,progression:next,awardedAt:session.ts,canonicalRewardGranted:!wasComplete});$('feedback').textContent=G.m.boss?`${G.m.bossName} defeated!`:'Mission complete!';setCaption(G.m.boss?`${G.m.bossName} defeated.`:'Mission complete.');const clear={missionId:G.m.id,world:G.m.world,title:G.m.boss?`${G.m.bossName} defeated!`:'Mission complete!',stars:missionStars,earned:Number(G.earned)||0};setTimeout(()=>{const match=document.documentElement.classList.contains('presentation-match');const target=match?'home':G.m.world;show(target);render();showClearBanner(target,clear)},600);return true}
-function applySettings(){let s=P().settings;$('reducedMotion').checked=s.reducedMotion;$('cameraMotionReduction').checked=s.cameraMotionReduction;$('largeTargets').checked=s.largeTargets;$('highContrast').checked=s.highContrast;$('captions').checked=s.captions;$('dyslexicFont').checked=s.dyslexicFont;$('textScale').value=s.textScale||'1';$('qualityTier').value=s.qualityTier||'balanced';$('enemySpeed').value=s.enemySpeed;$('soundOn').checked=s.soundOn;$('musicOn').checked=s.musicOn;syncMusic();const root=document.documentElement;root.classList.toggle('reduced-motion',s.reducedMotion);root.classList.toggle('camera-motion-reduction',s.cameraMotionReduction);root.classList.toggle('large-targets',s.largeTargets);root.classList.toggle('high-contrast',s.highContrast);root.classList.toggle('captions-on',s.captions);root.classList.toggle('dyslexic-font',s.dyslexicFont);root.classList.toggle('quality-ultra',s.qualityTier==='ultra');root.classList.toggle('quality-high',s.qualityTier==='high');root.classList.toggle('quality-balanced',!s.qualityTier||s.qualityTier==='balanced');root.classList.toggle('quality-performance',s.qualityTier==='performance');root.classList.toggle('quality-mobile',s.qualityTier==='mobile');root.classList.toggle('low-end-device',lowEndDevice());root.style.setProperty('--bb-text-scale',String(Number(s.textScale)||1))}
+function applySettings(){let s=P().settings;$('reducedMotion').checked=s.reducedMotion;$('cameraMotionReduction').checked=s.cameraMotionReduction;$('largeTargets').checked=s.largeTargets;$('highContrast').checked=s.highContrast;$('captions').checked=s.captions;$('dyslexicFont').checked=s.dyslexicFont;$('textScale').value=s.textScale||'1';$('qualityTier').value=s.qualityTier||'balanced';$('enemySpeed').value=s.enemySpeed;$('soundOn').checked=s.soundOn;$('musicOn').checked=s.musicOn;$('volume').value=String(Number.isFinite(Number(s.volume))?s.volume:80);$('volumeValue').textContent=`${$('volume').value}%`;syncMusic();const root=document.documentElement;root.classList.toggle('reduced-motion',s.reducedMotion);root.classList.toggle('camera-motion-reduction',s.cameraMotionReduction);root.classList.toggle('large-targets',s.largeTargets);root.classList.toggle('high-contrast',s.highContrast);root.classList.toggle('captions-on',s.captions);root.classList.toggle('dyslexic-font',s.dyslexicFont);root.classList.toggle('quality-ultra',s.qualityTier==='ultra');root.classList.toggle('quality-high',s.qualityTier==='high');root.classList.toggle('quality-balanced',!s.qualityTier||s.qualityTier==='balanced');root.classList.toggle('quality-performance',s.qualityTier==='performance');root.classList.toggle('quality-mobile',s.qualityTier==='mobile');root.classList.toggle('low-end-device',lowEndDevice());root.style.setProperty('--bb-text-scale',String(Number(s.textScale)||1))}
 document.querySelectorAll('[data-screen]').forEach(button=>button.addEventListener('click',()=>show(button.dataset.screen)));
 $('unlockParent').onclick=async()=>{const pin=$('parentPinInput').value,confirmPin=$('confirmParentPin').value;try{if(!readParentAuth()){if(pin!==confirmPin)throw new Error('PIN confirmation does not match.');await createParentAuth(pin);unlockParentAccess();$('parentGateMsg').textContent='Family PIN set. Parent areas are unlocked.'}else{const result=await verifyParentPin(pin);if(result.locked)throw new Error(`Too many attempts. Try again after ${new Date(result.lockedUntil).toLocaleTimeString()}.`);if(!result.ok)throw new Error(`Incorrect PIN. ${result.remaining} attempt(s) remaining.`);unlockParentAccess();$('parentGateMsg').textContent='Parent areas unlocked.'}$('parentGate').hidden=true;$('parentContent').hidden=false;syncNavigationState('parent')}catch(error){$('parentGateMsg').textContent=error.message}finally{$('parentPinInput').value='';$('confirmParentPin').value='';renderParentGate()}};
 $('saveParentPin').onclick=async()=>{const current=$('changeCurrentParentPin').value,next=$('newParentPin').value,confirmPin=$('changeConfirmParentPin').value;try{const verified=await verifyParentPin(current);if(verified.locked)throw new Error(`Too many attempts. Try again after ${new Date(verified.lockedUntil).toLocaleTimeString()}.`);if(!verified.ok)throw new Error('Current PIN is incorrect.');if(next!==confirmPin)throw new Error('New PIN confirmation does not match.');await createParentAuth(next);unlockParentAccess();$('parentPinStatus').textContent='Family PIN changed.'}catch(error){$('parentPinStatus').textContent=error.message}finally{for(const id of ['changeCurrentParentPin','newParentPin','changeConfirmParentPin'])$(id).value=''}};
@@ -2613,13 +2755,13 @@ if(typeof matchMedia==='function'){
 window.addEventListener('resize',updateLandscapePrompt);
 window.addEventListener('orientationchange',updateLandscapePrompt);
 updateLandscapePrompt();
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){captureExitTimeContribution();lockParentAccess();try{audioCtx?.suspend?.()}catch{}}else{try{audioCtx?.resume?.()}catch{}if(gameplayIsVisible()){TIME_RUNTIME.lastTickAt=Date.now();TIME_RUNTIME.lifecycleCaptured=false}}});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){captureExitTimeContribution();lockParentAccess();try{audioCtx?.suspend?.()}catch{}syncMusic()}else{try{audioCtx?.resume?.()}catch{}syncMusic();if(gameplayIsVisible()){TIME_RUNTIME.lastTickAt=Date.now();TIME_RUNTIME.lifecycleCaptured=false}}});
 window.addEventListener('pagehide',()=>{captureExitTimeContribution();lockParentAccess()});
 setInterval(()=>checkpointGameplayActivity({reason:'interval'}),TIME_CHECKPOINT_MS);
 
 
 $('continueBtn').onclick=()=>start(progression().lastMissionId||1);$('exitBtn').onclick=()=>{checkpointGameplayActivity({forceActive:true,reason:'exit'});applyWorldTheme('');show('home')};$('snackPractice').onclick=continueAsPractice;$('clearClose').onclick=hideClearBanner;$('snackRestart').onclick=()=>{hideSnackCard();if(G)G.paused=false;restartCurrentMission()};$('snackMap').onclick=()=>{hideSnackCard();$('exitBtn').click()};
-$('reducedMotion').onchange=e=>{P().settings.reducedMotion=e.target.checked;save()};$('cameraMotionReduction').onchange=e=>{P().settings.cameraMotionReduction=e.target.checked;save()};$('largeTargets').onchange=e=>{P().settings.largeTargets=e.target.checked;save()};$('highContrast').onchange=e=>{P().settings.highContrast=e.target.checked;save()};$('captions').onchange=e=>{P().settings.captions=e.target.checked;save();setCaption(G?.m?.prompt||'')};$('dyslexicFont').onchange=e=>{P().settings.dyslexicFont=e.target.checked;save()};$('textScale').onchange=e=>{P().settings.textScale=e.target.value;save()};$('qualityTier').onchange=e=>{P().settings.qualityTier=e.target.value;save()};$('enemySpeed').onchange=e=>{P().settings.enemySpeed=e.target.value;save()};$('soundOn').onchange=e=>{P().settings.soundOn=e.target.checked;save()};$('musicOn').onchange=e=>{P().settings.musicOn=e.target.checked;syncMusic();save()};
+$('reducedMotion').onchange=e=>{P().settings.reducedMotion=e.target.checked;save()};$('volume').oninput=e=>{P().settings.volume=Number(e.target.value);$('volumeValue').textContent=`${e.target.value}%`;syncMusic()};$('volume').onchange=()=>{save();synthCue('tap')};$('cameraMotionReduction').onchange=e=>{P().settings.cameraMotionReduction=e.target.checked;save()};$('largeTargets').onchange=e=>{P().settings.largeTargets=e.target.checked;save()};$('highContrast').onchange=e=>{P().settings.highContrast=e.target.checked;save()};$('captions').onchange=e=>{P().settings.captions=e.target.checked;save();setCaption(G?.m?.prompt||'')};$('dyslexicFont').onchange=e=>{P().settings.dyslexicFont=e.target.checked;save()};$('textScale').onchange=e=>{P().settings.textScale=e.target.value;save()};$('qualityTier').onchange=e=>{P().settings.qualityTier=e.target.value;save()};$('enemySpeed').onchange=e=>{P().settings.enemySpeed=e.target.value;save()};$('soundOn').onchange=e=>{P().settings.soundOn=e.target.checked;save()};$('musicOn').onchange=e=>{P().settings.musicOn=e.target.checked;syncMusic();save()};
 $('addProfile').onclick=()=>{if(!parentShellRequired('profileActionStatus'))return;let n=$('newProfile').value.trim();if(!n)return;STORE.profiles.push(blank(n));STORE.active=STORE.profiles.length-1;$('newProfile').value='';save();lockParentAccess();show('home')};
 $('exportActiveProfile').onclick=()=>{if(!parentShellRequired('profileActionStatus'))return;const profile=STORE.profiles[STORE.active];if(!profile)return;const b=new Blob([JSON.stringify(externalizeProfile(profile),null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`brainbite-profile-${profile.name.replace(/[^\w-]+/g,'-').toLowerCase()||'kid'}.json`;a.click();URL.revokeObjectURL(a.href)};
 $('deleteActiveProfile').onclick=async event=>{
@@ -2699,12 +2841,13 @@ function speakText(text){
  try{
   speechSynthesis.cancel();
   const utterance=new SpeechSynthesisUtterance(value);
+  duckMusic(true);utterance.onend=utterance.onerror=()=>duckMusic(false);
   utterance.lang=(G?.m?.world==='spanish'||document.querySelector('#prompt')?.lang==='es')?'es-ES':'en-US';
   speechSynthesis.speak(utterance);
   return true;
  }catch{return false}
 }
-$('speakPrompt').onclick=()=>{if(!G)return;speakText(G.m.prompt)};
+$('speakPrompt').onclick=()=>{if(!G)return;const boss=G.bossRun?BrainBiteGame.bossState():null;speakText(boss?.phase==='ink-cloud'?`${G.m.prompt} The choices are: ${BrainBiteGame.pillarChoices().join(', ')}.`:G.m.prompt)};$('bossPeek').onclick=peekBossAnswers;
 const speakFeedback=$('speakFeedback');if(speakFeedback)speakFeedback.onclick=()=>{const text=$('feedback')?.textContent||'';if(!speakText(text))setCaption('Nothing to read yet.')};
 
 const codeRun=$('codeRun'),codeStep=$('codeStep'),codeReset=$('codeReset'),codeSuggest=$('codeSuggest');

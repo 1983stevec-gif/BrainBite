@@ -248,6 +248,7 @@ function drawDiscFace(ctx, size, value, state) {
   ctx.clearRect(0, 0, size, size);
   const wood = ctx.createRadialGradient(c - r * 0.3, c - r * 0.35, r * 0.1, c, c, r);
   if (state === 'correct') { wood.addColorStop(0, '#d9ffc2'); wood.addColorStop(1, '#3a9c3f'); }
+  else if (state === 'rescue') { wood.addColorStop(0, '#fff3b0'); wood.addColorStop(0.6, '#f5c518'); wood.addColorStop(1, '#b7791f'); }
   else if (state === 'wrong') { wood.addColorStop(0, '#ffd0c4'); wood.addColorStop(1, '#b8452c'); }
   else { wood.addColorStop(0, '#dcac6c'); wood.addColorStop(0.65, '#c08a4c'); wood.addColorStop(1, '#8a5a2b'); }
   ctx.fillStyle = '#5b3a1a';
@@ -269,9 +270,24 @@ function drawDiscFace(ctx, size, value, state) {
   ctx.lineWidth = size * 0.02;
   ctx.beginPath(); ctx.arc(c, c, r * 0.93, Math.PI * 1.05, Math.PI * 1.75); ctx.stroke();
 
-  ctx.fillStyle = '#2a1a0c';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  if (state === 'ink') {
+    // Ink cloud (boss phase 2): the answer is hidden under a dark blot.
+    ctx.fillStyle = '#1e1b4b';
+    ctx.beginPath();
+    for (let i = 0; i < 9; i += 1) {
+      const a = (i / 9) * Math.PI * 2;
+      ctx.moveTo(c, c);
+      ctx.arc(c + Math.cos(a) * r * 0.3, c + Math.sin(a) * r * 0.3, r * 0.62, 0, Math.PI * 2);
+    }
+    ctx.fill();
+    ctx.fillStyle = '#e9d5ff';
+    ctx.font = `700 ${Math.round(size * 0.3)}px ${DISC_FONT}`;
+    ctx.fillText('?', c, c + size * 0.02);
+    return;
+  }
+  ctx.fillStyle = '#2a1a0c';
   const text = String(value);
   const fraction = text.match(/^(\d+)\s*\/\s*(\d+)$/);
   const maxWidth = r * 1.55;
@@ -332,13 +348,15 @@ export function makeAnswerDisc(value, { size = 512, anisotropy = 4 } = {}) {
   holder.userData = {
     value,
     disc,
+    rescue: false,
     setState(next) {
+      if (next === 'idle' && holder.userData.rescue) next = 'rescue';
       if (next === state) return;
       state = next;
       paint();
-      const glow = next === 'correct' ? 0x3dff8a : next === 'wrong' ? 0xff5a5a : 0x000000;
+      const glow = next === 'correct' ? 0x3dff8a : next === 'wrong' ? 0xff5a5a : next === 'rescue' ? 0xffc93c : 0x000000;
       face.emissive.setHex(glow);
-      face.emissiveIntensity = next === 'idle' ? 0 : 0.35;
+      face.emissiveIntensity = next === 'idle' || next === 'ink' ? 0 : next === 'rescue' ? 0.25 : 0.35;
     },
   };
   return holder;

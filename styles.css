@@ -2602,3 +2602,24 @@ html.presentation-webgl .home-target .orb-glyph{font-size:1.1rem}
 }
 #game .boss-art.has-portrait{background:none;border:0;box-shadow:0 6px 14px rgba(0,0,0,.35);border-radius:50%;overflow:hidden}
 #game .boss-art.has-portrait::before,#game .boss-art.has-portrait::after{content:none}
+
+/* ---- G5 boss phases ----------------------------------------------------------------------- */
+#game .boss-rule{margin:4px 0 0;font-size:.78rem;font-weight:700;color:#e9d5ff}
+#game .boss-peek{margin-top:6px;min-height:44px;padding:6px 14px;border-radius:12px;background:#312e81;color:#fff;border:2px solid #a78bfa}
+#game .boss-cutin{
+  position:fixed;left:50%;top:32%;transform:translate(-50%,-50%);z-index:45;display:grid;gap:4px;text-align:center;
+  padding:16px 26px;border-radius:20px;background:linear-gradient(180deg,#4c1d95,#1e1b4b);color:#fff;
+  border:3px solid #c4b5fd;box-shadow:0 18px 40px rgba(0,0,0,.5);pointer-events:none;animation:bb-cutin 1.5s ease-out both
+}
+#game .boss-cutin[hidden]{display:none}
+#game .boss-cutin strong{font-family:var(--bb-display);font-size:1.6rem}
+@keyframes bb-cutin{0%{opacity:0;transform:translate(-50%,-50%) scale(.7)}15%{opacity:1;transform:translate(-50%,-50%) scale(1.05)}85%{opacity:1}100%{opacity:0}}
+
+/* ---- G6 world map and mission stars -------------------------------------------------------- */
+.world-map{position:relative;width:min(100%,400px);aspect-ratio:140/120;margin:10px auto 14px}
+.world-map .mm-svg{width:100%;height:100%;display:block;border-radius:18px}
+.world-map-node{position:absolute;width:44px;height:44px;min-height:44px;margin:-22px 0 0 -22px;padding:0;border-radius:50%;background:transparent;border:0;box-shadow:none;cursor:pointer}
+.world-map-node:hover{box-shadow:0 0 0 4px rgba(255,210,74,.6)}
+.mission-stars{margin-left:8px;color:#f5c518;letter-spacing:1px}
+.volume-row{display:flex;align-items:center;gap:10px}
+.volume-row input[type=range]{flex:1;min-height:44px}

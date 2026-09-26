@@ -52,6 +52,9 @@ async function boot() {
     if (PresentationAdapter.mode === 'dom') return;
     const choices = window.BrainBiteGame?.pillarChoices?.() || [];
     PresentationAdapter.setBattleChoices(choices);
+    PresentationAdapter.setBattleNibbler(window.BrainBiteGame?.nibblerState?.() || null);
+    PresentationAdapter.setBattleBossState(window.BrainBiteGame?.bossState?.() || null);
+    PresentationAdapter.setBattleRescue(window.BrainBiteGame?.rescueValue?.() ?? null);
     PresentationAdapter.syncBattleHud();
   });
 

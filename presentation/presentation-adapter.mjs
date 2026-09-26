@@ -230,6 +230,15 @@ export const PresentationAdapter = {
   setBattleChoices(choices) {
     battleView?.setChoices?.(choices);
   },
+  setBattleRescue(value) {
+    battleView?.setRescue?.(value);
+  },
+  setBattleBossState(state) {
+    battleView?.setBossState?.(state);
+  },
+  setBattleNibbler(state) {
+    battleView?.setNibbler?.(state);
+  },
   highlightBattle(value) {
     battleView?.highlight?.(value);
   },
@@ -300,6 +309,9 @@ export const PresentationAdapter = {
               });
               const choices = window.BrainBiteGame?.pillarChoices?.() || [];
               this.setBattleChoices(choices);
+              this.setBattleNibbler(window.BrainBiteGame?.nibblerState?.() || null);
+              this.setBattleBossState(window.BrainBiteGame?.bossState?.() || null);
+              this.setBattleRescue(window.BrainBiteGame?.rescueValue?.() ?? null);
               this.syncBattleHud();
             } else {
               const choices = window.BrainBiteGame?.pillarChoices?.() || [];

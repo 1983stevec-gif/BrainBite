@@ -1,10 +1,10 @@
 {
   "schema": "brainbite.package-manifest.v1",
-  "generatedAt": "2026-09-26T01:10:58.979Z",
+  "generatedAt": "2026-09-26T02:11:15.666Z",
   "files": {
     "app.js": {
-      "sha256": "14eaec18755ff49d7f6ab9ad182ab7577698cddf86701fe72d249901c9c7c1f9",
-      "bytes": 257120
+      "sha256": "3864a84bbdd9318baad84b8179acfa5169e5ca0dc84088e7ba0d36c7926a2ee8",
+      "bytes": 271970
     },
     "assets/art/bite-village.svg": {
       "sha256": "10de1eed7772e502d1ac29f41c00e7b51b9dbea230312ece358a0184ebb2e49a",
@@ -81,6 +81,10 @@
     "brainbite-core.mjs": {
       "sha256": "f2a0a551766014e953c9c9c8e46543fededfb207d59982fe1c7bbe0274713e4b",
       "bytes": 159600
+    },
+    "content/boss-phases.js": {
+      "sha256": "e559b3d11dc605c5f489b68a07b2f13736c031f7cd99f35c724473a27666abe8",
+      "bytes": 3161
     },
     "content/bubble-reef/rewards.mjs": {
       "sha256": "3842ff507598c9bffe8da9eddb3725658a9844ccff7c542c1fe0e18f594715ee",
@@ -198,6 +202,10 @@
       "sha256": "636f77c6d13e46b82a4981c2f9f5d6d76defb49e7c349596040f8a8b1e14c299",
       "bytes": 3490
     },
+    "content/run-builder.js": {
+      "sha256": "a66448f874d290d5cd5dc8124616690a3a546a15cde0fe25032b2374216a4554",
+      "bytes": 4917
+    },
     "content/skill-links.v1.json": {
       "sha256": "2c03a23d14e638906e257708188261b57c599a60832cc06be17af0aa62fa2e5c",
       "bytes": 10786
@@ -267,16 +275,16 @@
       "bytes": 4577
     },
     "index.html": {
-      "sha256": "7bc2630abd9ca4011e8710217a262e903e81b0a8badcf503c5f5bdc08e90f83f",
-      "bytes": 42002
+      "sha256": "07e3db4787ef50870516f61104222626c7565eef3cc779734c878c285f52ad77",
+      "bytes": 42640
     },
     "manifest.webmanifest": {
       "sha256": "e008f60c5e4d15a276ae1e7ede78e4c94a68a01f0eda5c8d0c81ddb3694dd499",
       "bytes": 504
     },
     "presentation/boot.mjs": {
-      "sha256": "6db60461e26e5f29bd8311e8b1cc411c96993e466079ee0830b753e1f70debb8",
-      "bytes": 2851
+      "sha256": "af300fd2e664bc6cc2a34b8f752f57f44db633cc7f4f6bec9d10cace601605c5",
+      "bytes": 3118
     },
     "presentation/bubble-reef-base-contribution.mjs": {
       "sha256": "0a16e7dcf9f671ad9bd6fd46988b3f6ab10edc5dc665fe71985026b81cf88cf5",
@@ -323,24 +331,24 @@
       "bytes": 12388
     },
     "presentation/presentation-adapter.mjs": {
-      "sha256": "adeac09505b0e6ab215f29c73779ca414e42579434454f4480f58b9a2cc82bc6",
-      "bytes": 11511
+      "sha256": "d592e44b491222c13307237dbe7f56eec64422930f4544c11105e78d360a45e8",
+      "bytes": 11975
     },
     "presentation/programmable-bit.mjs": {
       "sha256": "259d8b3299b51183b79c28b8db334e1bb210006af36f7798d1a34a0f9fc253b1",
       "bytes": 2769
     },
     "presentation/props.mjs": {
-      "sha256": "576423b4b977c3819513010eb6b5fae1ecd7f65b7ac6466f680f135f1305c101",
-      "bytes": 16961
+      "sha256": "cd0fae8aac62f97ec7291684a1dc2106dc4fe9064f23698e79bdc55ca5d362b7",
+      "bytes": 17782
     },
     "presentation/surface-textures.mjs": {
       "sha256": "aa38e79db3d1bba3d0afb266c5e2fe04189b042bed20f5aa4b0b878417207017",
       "bytes": 2255
     },
     "presentation/webgl-battle.mjs": {
-      "sha256": "3c36cfff98104bb142c011d1983aac6eb5a6ec23ea11581a47fa8457167bff71",
-      "bytes": 32043
+      "sha256": "71cc91b9c7c2a273f736cf17c59f0fff5c8c23f5327d181595952a6ab173b962",
+      "bytes": 37938
     },
     "presentation/webgl-home.mjs": {
       "sha256": "55ca50ef0c5d8f653288aaa3ac0c9a9046d0eac44bb79d995e4fc49beacb74a8",
@@ -355,12 +363,12 @@
       "bytes": 3059
     },
     "service-worker.js": {
-      "sha256": "3f9ed223ca40f9ee9e69e038a20256c42803e2e640002d1e955567998874b288",
-      "bytes": 4800
+      "sha256": "f5a9d655f8ec76e90ef37e1b83be9261af8a246d275c36a6b383e7c910288ac9",
+      "bytes": 4860
     },
     "styles.css": {
-      "sha256": "604be5a5a7460dd669f3eedd16cb5b1bea3308d566aa919b98c129f1872c2f39",
-      "bytes": 121194
+      "sha256": "e3973af13d99553b252042a082244c0dbe5aa4d856d7379ab01c6532db007b6d",
+      "bytes": 122846
     },
     "support.html": {
       "sha256": "571ca16966c4ab566b0a247045ba6ee47e7c667494ee3938d4d50df1dcbdbc83",

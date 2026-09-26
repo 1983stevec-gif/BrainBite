@@ -269,6 +269,7 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
       const p = makePillar(value, { anisotropy: Math.min(8, renderer.capabilities.getMaxAnisotropy?.() || 4) });
       const x = list.length === 1 ? 0 : -span / 2 + (span * i) / (list.length - 1 || 1);
       p.position.set(x, 0, 0.6);
+      p.userData.baseX = x;
       scene.add(p);
       pillars.push(p);
       // A new set of answers arriving mid-hop pops in after the chomp instead of
@@ -288,7 +289,7 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
       // disc stays: it is the answer surface.
       if (pillarAsset) p.traverse(child => { if (child.isMesh && child.name !== 'answerDisc') child.visible = false; });
       const button = document.createElement('button');
-      button.type = 'button'; button.textContent = value;
+      button.type = 'button'; button.textContent = value; button.dataset.value = value;
       button.addEventListener('click', () => { if (!disposed && performanceClock.now() >= inputLockedUntil) onSelect?.(value); });
       controls.appendChild(button);
     });
@@ -304,6 +305,9 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
       child.position.x = x / pillarAsset.scale.x;
     });
     host.dataset.answerDiscs = String(pillars.filter(p => p.userData.label).length);
+    placeNibbler();
+    applyRescue();
+    applyBossState();
     layoutAnswerButtons();
     if (reducedMotion) renderFrame();
   }
@@ -340,8 +344,103 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
     });
   }
 
+  // ---- The Nibbler (gameplay G4) --------------------------------------------------------
+  // A small mischief-maker that sits in front of one pillar; a glowing paw print marks the
+  // pillar it will hop to next, so its move is always readable before the child answers.
+  const nibbler = new THREE.Group();
+  nibbler.name = 'nibbler';
+  {
+    const fur = new THREE.MeshStandardMaterial({ color: 0x8b5cf6, roughness: 0.6 });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.34, 16, 12), fur);
+    body.scale.set(1, 0.85, 0.9);
+    const earGeometry = new THREE.ConeGeometry(0.1, 0.24, 8);
+    const earL = new THREE.Mesh(earGeometry, fur); earL.position.set(-0.17, 0.3, 0); earL.rotation.z = 0.3;
+    const earR = new THREE.Mesh(earGeometry, fur); earR.position.set(0.17, 0.3, 0); earR.rotation.z = -0.3;
+    const eyes = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.07, 0.02), new THREE.MeshBasicMaterial({ color: 0xfff7cc }));
+    eyes.position.set(0, 0.06, 0.3);
+    for (const mesh of [body, earL, earR]) mesh.castShadow = true;
+    nibbler.add(body, earL, earR, eyes);
+  }
+  nibbler.visible = false;
+  scene.add(nibbler);
+  const paw = new THREE.Group();
+  {
+    const glow = new THREE.MeshBasicMaterial({ color: 0xffb020, transparent: true, opacity: 0.95, depthWrite: false });
+    const pad = new THREE.Mesh(new THREE.CircleGeometry(0.3, 20), glow);
+    pad.rotation.x = -Math.PI / 2;
+    paw.add(pad);
+    for (const [x, z] of [[-0.27, -0.3], [0, -0.42], [0.27, -0.3]]) {
+      const toe = new THREE.Mesh(new THREE.CircleGeometry(0.11, 12), glow);
+      toe.rotation.x = -Math.PI / 2;
+      toe.position.set(x, 0, z);
+      paw.add(toe);
+    }
+  }
+  paw.visible = false;
+  scene.add(paw);
+  let nibblerState = null;
+  function placeNibbler() {
+    const at = nibblerState ? pillars[nibblerState.slot] : null;
+    const to = nibblerState ? pillars[nibblerState.next] : null;
+    nibbler.visible = Boolean(at);
+    paw.visible = Boolean(to) && nibblerState.next !== nibblerState.slot;
+    if (at) nibbler.position.set(at.position.x, 0.62, at.position.z + 1.05);
+    if (to) paw.position.set(to.position.x, 0.46, to.position.z + 1.05);
+    host.dataset.nibblerSlot = nibblerState ? String(nibblerState.slot) : '';
+    host.dataset.nibblerNext = nibblerState ? String(nibblerState.next) : '';
+  }
+  function setNibbler(state) {
+    nibblerState = state && Number.isInteger(state.slot) ? { slot: state.slot, next: state.next } : null;
+    placeNibbler();
+    if (reducedMotion) renderFrame();
+  }
+
+  // ---- Boss phases (G5): a tentacle wraps one wrong pillar; ink hides the discs ----------
+  const coil = new THREE.Mesh(new THREE.TorusGeometry(0.72, 0.1, 10, 28), new THREE.MeshStandardMaterial({ color: 0x7c3aed, roughness: 0.5, emissive: 0x2e1065, emissiveIntensity: 0.4 }));
+  coil.name = 'tentacleCoil';
+  coil.visible = false;
+  scene.add(coil);
+  let bossState = null;
+  function applyBossState() {
+    const blocked = bossState?.blocked != null ? String(bossState.blocked) : null;
+    const blockedPillar = blocked ? pillars.find(p => String(p.userData.value) === blocked) : null;
+    coil.visible = Boolean(blockedPillar);
+    if (blockedPillar) coil.position.set(blockedPillar.position.x, DISC_Y, blockedPillar.position.z + 0.25);
+    if (bossState) for (const pillar of pillars) pillar.userData.label?.userData.setState?.(bossState.inked ? 'ink' : 'idle');
+    [...controls.children].forEach(button => {
+      const isBlocked = blocked !== null && button.dataset.value === blocked;
+      button.disabled = isBlocked;
+      button.setAttribute('aria-disabled', String(isBlocked));
+      button.title = isBlocked ? 'Wrapped in a tentacle' : '';
+    });
+    host.dataset.bossPhase = bossState?.phase || '';
+    host.dataset.inked = String(Boolean(bossState?.inked));
+  }
+  // Rescue pillar (G6.3): a golden disc marks a target from a skill that is due for review.
+  let rescueValue = null;
+  function applyRescue() {
+    for (const pillar of pillars) {
+      const disc = pillar.userData.label;
+      if (!disc) continue;
+      const on = rescueValue !== null && String(pillar.userData.value) === rescueValue;
+      disc.userData.rescue = on;
+      disc.userData.setState?.(on ? 'rescue' : 'idle');
+    }
+    host.dataset.rescue = rescueValue ?? '';
+  }
+  function setRescue(value) {
+    rescueValue = value === null || value === undefined ? null : String(value);
+    applyRescue();
+    if (reducedMotion) renderFrame();
+  }
+  function setBossState(state) {
+    bossState = state || null;
+    applyBossState();
+    if (reducedMotion) renderFrame();
+  }
+
   function setEncounter(next = {}) {
-    encounter = { boss: Boolean(next.boss), bossName: String(next.bossName || '') };
+    encounter = { boss: Boolean(next.boss), bossName: String(next.bossName || ''), world: String(next.world || '') };
     // Do not mislabel the legacy math/language bosses as Fraction Kraken.
     kraken.visible = encounter.boss && encounter.bossName === 'Fraction Kraken';
     host.dataset.encounter = kraken.visible ? 'fraction-kraken' : encounter.boss ? 'boss' : 'activity';
@@ -626,7 +725,9 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
     position: [0, 0, 0.6], scale: 4 / 3,
   }, root => {
     pillarAsset = root;
+    root.userData.slotChildren = [];
     root.traverse(child => {
+      if ('ABCD'.includes(child.userData.answer_slot || '_')) root.userData.slotChildren.push(child);
       if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
       if (child.userData.brainbite_kind === 'answer_pillar_label') child.visible = false;
       if (/pillar_(ring|shaft)/.test(child.userData.brainbite_kind || '') && child.material) {
@@ -699,11 +800,24 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
     mascot.position.z = MASCOT_HOME.z + offset.z;
     mascot.position.y += offset.y;
     for (let i = effects.length - 1; i >= 0; i -= 1) if (!effects[i](now)) effects.splice(i, 1);
+    // From the second world on the pillars drift slowly (G4.3). It is only visual: answers
+    // never expire, and reduced motion keeps them still.
+    const drifting = encounter.world === 'words' || encounter.world === 'spanish';
     pillars.forEach((pillar, i) => {
       const disc = pillar.userData.label;
       if (disc) disc.position.y = DISC_Y + Math.sin((t / 2.4) * Math.PI * 2 + i * 0.9) * 0.04;
+      if (drifting && pillar.userData.baseX !== undefined) pillar.position.x = pillar.userData.baseX + Math.sin(t * 0.6 + i * 1.7) * 0.14;
     });
+    if (drifting && pillarAsset) {
+      for (const child of pillarAsset.userData.slotChildren || []) {
+        const pillar = pillars['ABCD'.indexOf(child.userData.answer_slot)];
+        if (pillar) child.position.x = pillar.position.x / pillarAsset.scale.x;
+      }
+    }
+    if (drifting && frameCount % 20 === 0) { layoutAnswerButtons(); placeNibbler(); }
     camera.position.y = cameraBaseY + (now < cameraBumpUntil ? 0.05 : 0);
+    if (nibbler.visible) nibbler.rotation.y = Math.sin(t * 3) * 0.35;
+    if (paw.visible) paw.children.forEach(child => { child.material.opacity = 0.7 + Math.sin(t * 4) * 0.25; });
     water.position.y = Math.sin(t * 1.2) * 0.015;
     water.material.map.offset.y = t * 0.008;
     renderFrame();
@@ -720,6 +834,9 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
     getPerformanceReport() { return performanceBudget.report(); },
     setChoices,
     setEncounter,
+    setNibbler,
+    setBossState,
+    setRescue,
     highlight,
     react(state) {
       if (characterAnimation) {
@@ -756,7 +873,7 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
       clearTimeout(restoreTimer);
       controls.remove();
       delete host.dataset.encounter;
-      for (const key of ['characterAnimated', 'characterState', 'characterPoseY', 'graphicsTier', 'shadowSize', 'pixelRatio', 'programmableBit', 'answerDiscs', 'lastAnswer']) delete host.dataset[key];
+      for (const key of ['characterAnimated', 'characterState', 'characterPoseY', 'graphicsTier', 'shadowSize', 'pixelRatio', 'programmableBit', 'answerDiscs', 'lastAnswer', 'nibblerSlot', 'nibblerNext', 'bossPhase', 'inked', 'rescue']) delete host.dataset[key];
       disposeObject(scene);
       sun.shadow.dispose();
       renderer.dispose();

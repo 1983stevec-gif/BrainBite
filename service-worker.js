@@ -1,4 +1,4 @@
-const CACHE = 'brainbite-v2.0-shell-v42-hud-pass';
+const CACHE = 'brainbite-v2.0-shell-v43-fun-pass';
 const FALLBACK = './index.html';
 const CORE = [
   './',
@@ -11,6 +11,8 @@ const CORE = [
   './assets/fonts/nunito-variable.woff2',
   './content/storage-copies.js',
   './content/explainers.js',
+  './content/run-builder.js',
+  './content/boss-phases.js',
   './content/experience-registry.js',
   './content/content-review-manifest.js',
   './content/content-control-gate.js',
