@@ -122,6 +122,7 @@ window.BrainBiteGame={
     if(!typing||!G)return {accepted:false,reason:'typing-unavailable'};
     if(!checkpointGameplayActivity({reason:'activity'}))return {accepted:false,reason:'time-limit'};
     if(G.typingMode?.completed)return {accepted:false,reason:'typing-complete'};
+    if(G.paused)return {accepted:false,reason:'paused'};
     const target=G.typingMode?.target||activityValues(G.activity?.challenge||{})[0]||G.m?.correct?.[0]||'';
     const score=typing.scoreTypingAttempt({attemptId,target,typed,elapsedMs,hints,readAloud,guided});
     if(!score.valid)return {accepted:false,reason:'invalid-typed-attempt',score};
@@ -137,7 +138,7 @@ window.BrainBiteGame={
         }
         G.typingMode.completed=true;draw();complete();return {accepted:true,score,completed:true}
       }
-      if(G.lives<=0){restartCurrentMission();return {accepted:false,score,restarted:true}}
+      if(G.lives<=0){handleOutOfLives();return {accepted:false,score,refilling:true}}
       draw();return {accepted:false,score};
     }
     const accepted=resolveLiveActivity(score.actual,{responseTimeMs:score.elapsedMs,assisted:score.support!=='independent',hintsUsed:hints,randomLike:!score.plausibleTiming});
@@ -164,7 +165,7 @@ window.BrainBiteGame={
     return [...new Set([correct,...wrong].filter(Boolean))].slice(0,4);
   },
   tryAnswer(value){
-    if(!G)return false;
+    if(!G||G.paused)return false;
     if(!checkpointGameplayActivity({reason:'activity'}))return false;
     if(G.activity&&!isMatchFractionCompatibilityPath())return resolveLiveActivity(value);
     const target=String(value);
@@ -180,12 +181,12 @@ window.BrainBiteGame={
         if(webgl)G.webglRemaining.splice(remainingIndex,1);
         G.combo++;G.max=Math.max(G.max,G.combo);G.eaten++;G.correct++;
         awardProgressionScore(100*G.combo);P().mastery[G.m.world]=Math.min(100,P().mastery[G.m.world]+1);
-        updateSkill(G.m.skill,true,{assisted:G.assisted,independent:!G.assisted,hintsUsed:G.assisted?1:0,source:G.source||'mission'});$('feedback').textContent='CHOMP! Correct.';fileCue(G.combo>=8?'super':'correct');
+        updateSkill(G.m.skill,true,{...attemptSupport(),source:G.source||'mission'});G.retryAssist=false;$('feedback').textContent='CHOMP! Correct.';fileCue(G.combo>=8?'super':'correct');
         if(G.m.boss){G.boss=Math.max(0,G.boss-25);if(G.boss===0){draw();complete();return true}}
         else if(G.eaten>=G.total){draw();complete();return true}
         draw();return true;
       }
-      const outcome=updateSkill(G.m.skill,false,{assisted:G.assisted,independent:false,hintsUsed:G.assisted?1:0,source:G.source||'mission'});if(outcome?.contentQuarantined){$('feedback').textContent=CONTENT_UNAVAILABLE_MESSAGE;draw();return false}G.combo=0;G.wrong++;G.lives--;P().mastery[G.m.world]=Math.max(0,P().mastery[G.m.world]-.5);P().mistakes.push({skill:G.m.skill,chosen:target,ts:Date.now()});$('feedback').textContent=incorrectAttemptMessage(target);fileCue('wrong');draw();if(G.lives<=0)restartCurrentMission();return false;
+      const outcome=updateSkill(G.m.skill,false,{...attemptSupport(),independent:false,source:G.source||'mission'});if(outcome?.contentQuarantined){$('feedback').textContent=CONTENT_UNAVAILABLE_MESSAGE;draw();return false}G.combo=0;G.wrong++;G.lives--;P().mastery[G.m.world]=Math.max(0,P().mastery[G.m.world]-.5);P().mistakes.push({skill:G.m.skill,chosen:target,ts:Date.now()});$('feedback').textContent=wrongAnswerFeedback(target);fileCue('wrong');draw();handleOutOfLives();return false;
     }
     for(let y=0;y<5;y++)for(let x=0;x<5;x++){
       const c=G.cells[ix(x,y)];
@@ -195,7 +196,7 @@ window.BrainBiteGame={
         draw();return true;
       }
     }
-    const outcome=updateSkill(G.m.skill,false,{assisted:G.assisted,independent:false,hintsUsed:G.assisted?1:0,source:G.source||'mission'});if(outcome?.contentQuarantined){$('feedback').textContent=CONTENT_UNAVAILABLE_MESSAGE;draw();return false}G.combo=0;G.wrong++;G.lives--;P().mastery[G.m.world]=Math.max(0,P().mastery[G.m.world]-.5);P().mistakes.push({skill:G.m.skill,chosen:target,ts:Date.now()});$('feedback').textContent=incorrectAttemptMessage(target);fileCue('wrong');draw();if(G.lives<=0)restartCurrentMission();return false;
+    const outcome=updateSkill(G.m.skill,false,{...attemptSupport(),independent:false,source:G.source||'mission'});if(outcome?.contentQuarantined){$('feedback').textContent=CONTENT_UNAVAILABLE_MESSAGE;draw();return false}G.combo=0;G.wrong++;G.lives--;P().mastery[G.m.world]=Math.max(0,P().mastery[G.m.world]-.5);P().mistakes.push({skill:G.m.skill,chosen:target,ts:Date.now()});$('feedback').textContent=wrongAnswerFeedback(target);fileCue('wrong');draw();handleOutOfLives();return false;
   }
 };
 
@@ -2318,6 +2319,7 @@ function syncLiveActivityMetrics(){
  G.activity.errorCount=Math.max(0,Number(G.activity.challenge.errors)||0);
 }
 function recordLiveActivityAttempt(correct,value,meta={}){
+ if(G?.retryAssist)meta={...meta,assisted:true,independent:false,hintsUsed:Math.max(1,Number(meta.hintsUsed)||0)};
  const outcome=updateSkill(G.m.skill,correct,{...meta,source:G.source||'mission'});
  if(outcome?.contentQuarantined){
   $('feedback').textContent=CONTENT_UNAVAILABLE_MESSAGE;
@@ -2326,14 +2328,14 @@ function recordLiveActivityAttempt(correct,value,meta={}){
  }
  G.moves++;
  if(correct){
-  G.combo++;G.max=Math.max(G.max,G.combo);G.correct++;awardProgressionScore(100*G.combo);P().mastery[G.m.world]=Math.min(100,P().mastery[G.m.world]+1);$('feedback').textContent='CHOMP! Correct.';fileCue(G.combo>=8?'super':'correct')
+  G.retryAssist=false;G.combo++;G.max=Math.max(G.max,G.combo);G.correct++;awardProgressionScore(100*G.combo);P().mastery[G.m.world]=Math.min(100,P().mastery[G.m.world]+1);$('feedback').textContent='CHOMP! Correct.';fileCue(G.combo>=8?'super':'correct')
  }else{
-  G.combo=0;G.wrong++;G.lives--;P().mastery[G.m.world]=Math.max(0,P().mastery[G.m.world]-.5);P().mistakes.push({skill:G.m.skill,chosen:String(value),ts:Date.now()});$('feedback').textContent=incorrectAttemptMessage(value);fileCue('wrong')
+  G.combo=0;G.wrong++;G.lives--;P().mastery[G.m.world]=Math.max(0,P().mastery[G.m.world]-.5);P().mistakes.push({skill:G.m.skill,chosen:String(value),ts:Date.now()});$('feedback').textContent=wrongAnswerFeedback(value);fileCue('wrong')
  }
  return {correct,value:String(value),at:Date.now(),...meta}
 }
 function resolveLiveActivity(value,meta={}){
- if(!G?.activity||isMatchFractionCompatibilityPath())return false;
+ if(!G?.activity||G.paused||isMatchFractionCompatibilityPath())return false;
  if(!checkpointGameplayActivity({reason:'activity'}))return false;
  const c=core();
  if(!c)return false;
@@ -2345,9 +2347,7 @@ function resolveLiveActivity(value,meta={}){
  const selected=current.selected||[];
  const resolvedValue=picked===undefined?String(value):picked;
  const interactionMeta={
-  assisted:!!G.assisted,
-  independent:!G.assisted,
-  hintsUsed:G.assisted?1:0,
+  ...attemptSupport(),
   responseTimeMs:Math.max(0,Number(meta.responseTimeMs)||0),
   randomLike:meta.randomLike===true,
   ...meta,
@@ -2389,7 +2389,7 @@ function resolveLiveActivity(value,meta={}){
  syncLiveActivityMetrics();
  draw();
  if(next.completed){complete();return true}
- if(G.lives<=0)restartCurrentMission();
+ handleOutOfLives();
  // DOM legacy callers treat a discovered answer tile as handled even when it
  // was a distractor; WebGL keeps its historical false return for misses.
  return currentCorrect||!document.documentElement.classList.contains('presentation-webgl')
@@ -2403,7 +2403,7 @@ function setCaption(text){const el=$('captionText');if(!el)return;const on=!!P()
 function start(id,options={}){const m=REGISTRY.getMission(id);return m?launchMission(m,options):false}
 function launchMission(m,{allowLocked=false,progressionEligible=true,assisted=false,source='mission',homeworkMode=false,contentControl=null}={}){const canonical=REGISTRY.getMission(m?.id),missionUnlocked=!!canonical&&REGISTRY.isMissionUnlocked(progression(),canonical.id);if(!m)return false;if(progressionEligible&&!canonical)return false;if(!allowLocked&&!missionUnlocked){$('launchHint').textContent='Complete the earlier mission in this world first.';return false}const gate=contentControl||registryMissionGate(m);if(!gate?.approved)return showContentUnavailable('launchHint');if(!prepareTimeUsageLaunch()){TIME_PENDING_LAUNCH={mission:m,options:{allowLocked,progressionEligible,assisted,source,homeworkMode,contentControl:gate}};return false}TIME_PENDING_LAUNCH=null;if(progressionEligible&&missionUnlocked){P().progression=REGISTRY.normalizeProgression({...progression(),lastMissionId:canonical.id});save()}show('game');applyWorldTheme(m.world);$('prompt').textContent=m.prompt;$('worldLabel').textContent=worldMeta(m.world).title.toUpperCase();renderMinimap(m);$('prompt').lang=m.world==='spanish'?'es':'en';
  if(progressionEligible&&missionUnlocked&&['name','world'].includes(firstRunState(P()).stage)){setFirstRunStage('mission');renderFirstRun();save()}
- const webgl=document.documentElement.classList.contains('presentation-webgl'),bossBox=$('bossBox');bossBox.hidden=!m.boss;bossBox.style.display=m.boss?'':'none';$('bossName').textContent=m.bossName||'Boss';const guidedHint=assisted?(m.curriculumChallenge?.supportMetadata?.scaffold||m.curriculumChallenge?.hintMetadata?.hint||''):'';$('feedback').textContent=assisted?`Guided support is on.${guidedHint?` ${guidedHint}`:' This attempt counts as assisted evidence.'}`:`Entering ${worldMeta(m.world).title}.`;G=makeGame(m);G.progressionEligible=!!(progressionEligible&&missionUnlocked);G.internalBubbleReefPreview=G.progressionEligible&&isInternalBubbleReefPreview();G.launchOptions={allowLocked:!!allowLocked,progressionEligible:!!progressionEligible,assisted:!!assisted,source,homeworkMode:!!homeworkMode,contentControl:gate};G.contentControl=gate;G.assisted=!!assisted;G.source=source;G.homeworkMode=!!homeworkMode;G.guidedHint=guidedHint;if(webgl){G.webglRemaining=[...new Set((m.correct||[]).map(String))];G.total=m.boss?Math.min(4,G.webglRemaining.length):G.webglRemaining.length}$('speakPrompt').hidden=false;setCaption(m.prompt);hideBattleToast();clearEnteringStatusSoon();draw();return true}
+ const webgl=document.documentElement.classList.contains('presentation-webgl'),bossBox=$('bossBox');bossBox.hidden=!m.boss;bossBox.style.display=m.boss?'':'none';$('bossName').textContent=m.bossName||'Boss';const guidedHint=assisted?(m.curriculumChallenge?.supportMetadata?.scaffold||m.curriculumChallenge?.hintMetadata?.hint||''):'';$('feedback').textContent=assisted?`Guided support is on.${guidedHint?` ${guidedHint}`:' This attempt counts as assisted evidence.'}`:`Entering ${worldMeta(m.world).title}.`;G=makeGame(m);G.progressionEligible=!!(progressionEligible&&missionUnlocked);G.internalBubbleReefPreview=G.progressionEligible&&isInternalBubbleReefPreview();G.launchOptions={allowLocked:!!allowLocked,progressionEligible:!!progressionEligible,assisted:!!assisted,source,homeworkMode:!!homeworkMode,contentControl:gate};G.contentControl=gate;G.assisted=!!assisted;G.source=source;G.homeworkMode=!!homeworkMode;G.guidedHint=guidedHint;if(webgl){G.webglRemaining=[...new Set((m.correct||[]).map(String))];G.total=m.boss?Math.min(4,G.webglRemaining.length):G.webglRemaining.length}$('speakPrompt').hidden=false;setCaption(m.prompt);hideBattleToast();hideSnackCard();hideExplainer();clearEnteringStatusSoon();draw();return true}
 function startCurriculumChallenge(challenge,{assisted=false,homeworkMode=false}={}){
  const c=core(),skill=c?.findCurriculumSkill?.(challenge?.skillId),validation=c?.validateGeneratedChallenge?.(challenge,skill||{});
  const gate=c&&skill&&validation?.approved?generatedChallengeGate(challenge,skill,validation):null;
@@ -2430,6 +2430,41 @@ function makeGame(m){
 // The arrival line is a status, not part of the prompt: clear it once announced.
 let enteringStatusTimer=null;
 function clearEnteringStatusSoon(){clearTimeout(enteringStatusTimer);enteringStatusTimer=setTimeout(()=>{const f=$('feedback');if(f&&f.textContent.startsWith('Entering '))f.textContent=''},1500)}
+// ---- Kind failure (G3, decision D11) --------------------------------------------------
+// Running out of hearts costs time, not progress: Bite has a snack, hearts refill, and the
+// mission continues from the current question. After SNACK_REFILLS refills the child
+// chooses to keep practising (no progression, no rewards) or to go back to the map.
+const SNACK_REFILLS=2,SNACK_MS=2000;
+let snackTimer=null;
+function handleOutOfLives(){
+ if(!G||G.lives>0||G.paused||G.contentQuarantined)return false;
+ G.refills=Number(G.refills)||0;
+ G.paused=true;hideExplainer();
+ if(G.refills<SNACK_REFILLS){
+  G.refills++;showSnackCard(false);
+  clearTimeout(snackTimer);snackTimer=setTimeout(()=>{if(!G?.paused)return;G.lives=3;G.paused=false;G.combo=0;hideSnackCard();$('feedback').textContent='Hearts full. Keep going!';draw()},SNACK_MS);
+ }else showSnackCard(true);
+ draw();return true;
+}
+function showSnackCard(choice){const card=$('snackCard');if(!card)return;$('snackTitle').textContent=choice?'Bite is tired!':'Bite needs a snack!';$('snackText').textContent=choice?'Keep practising for fun, or head back to the map.':'Hearts refill in a moment. Your progress is kept.';$('snackActions').hidden=!choice;card.hidden=false;if(choice)$('snackPractice').focus()}
+function hideSnackCard(){clearTimeout(snackTimer);snackTimer=null;const card=$('snackCard');if(card)card.hidden=true}
+function continueAsPractice(){if(!G)return;G.progressionEligible=false;G.practiceAfterWipeout=true;G.lives=3;G.combo=0;G.paused=false;hideSnackCard();$('feedback').textContent='Practice run: no stars or BrainBites, just learning.';draw()}
+// ---- Explain, then retry (G3) --------------------------------------------------------------
+// A wrong answer shows why for a few seconds. The next attempt is recorded as assisted
+// evidence, because the child has just been shown the reasoning; it can never raise
+// independent mastery.
+let explainerTimer=null;
+function attemptSupport(){const assisted=!!(G?.assisted||G?.retryAssist);return {assisted,independent:!assisted,hintsUsed:assisted?1:0}}
+function wrongAnswerFeedback(value){
+ const message=incorrectAttemptMessage(value);
+ if(!G)return message;
+ G.retryAssist=true;
+ const visual=window.BrainBiteExplainers?.explain?.({prompt:G.m?.prompt,skill:G.m?.skill,chosen:value});
+ if(visual)showExplainer(visual);
+ return visual&&!explanationForCurrentChallenge()&&!G.guidedHint?`Not ${value}. ${visual.text}`:message;
+}
+function showExplainer(visual){const box=$('explainer');if(!box)return;box.innerHTML=visual.svg||'';box.hidden=!visual.svg;clearTimeout(explainerTimer);explainerTimer=setTimeout(hideExplainer,3500)}
+function hideExplainer(){clearTimeout(explainerTimer);explainerTimer=null;const box=$('explainer');if(box){box.hidden=true;box.innerHTML=''}}
 function restartCurrentMission(){const mission=G?.m?structuredClone(G.m):null,options={...(G?.launchOptions||{})},typingMode=G?.typingMode?structuredClone(G.typingMode):null;if(!mission||G?.contentQuarantined)return;setTimeout(()=>{if(G?.contentQuarantined)return;launchMission(mission,options);if(typingMode){G.typingMode={...typingMode,targetIndex:0,target:typingMode.targets?.[0]||typingMode.target,startedAt:Date.now(),attempts:[],completed:false};draw()}},500)}
 function explanationForCurrentChallenge(){
  for(const candidate of [G?.m?.curriculumChallenge,G?.activity?.challenge,G?.m]){
@@ -2488,19 +2523,19 @@ function drawActivityBoard(b){
  return true
 }
 function draw(){window.dispatchEvent(new CustomEvent('bb:game-draw'));renderMinimap(G?.m);$('lives').textContent=G.lives;$('combo').textContent=G.combo;const comboBanner=$('comboBanner');if(comboBanner)comboBanner.textContent=`x${G.combo}`;const stars=document.querySelectorAll('#game .battle-stars span');if(stars?.length){const lit=Math.min(3,Math.floor(G.combo/3));stars.forEach((s,i)=>{s.innerHTML=i<lit?'&#9733;':'&#9734;';s.style.color=i<lit?'#f5c518':'#9aa3b5'})}$('targets').textContent=`${G.eaten}/${G.total}`;$('bossHealth').value=G.boss;$('bossHealth').max=100;const phase=G.boss>66?1:G.boss>33?2:3;$('bossPhase').textContent=G.m.boss?`${G.m.bossName} - Phase ${phase} of ${BOSS_PHASES}`:`Phase ${phase} of ${BOSS_PHASES}`;const healthFill=$('healthFill');if(healthFill)healthFill.style.width=`${Math.max(0,Math.min(100,(G.lives/3)*100))}%`;const healthText=$('healthText');if(healthText)healthText.textContent=`${Math.max(0,G.lives)} / 3`;const healthBox=document.querySelector('#game .battle-health');if(healthBox)healthBox.setAttribute('aria-label',`Lives: ${Math.max(0,G.lives)} of 3`);setCaption(G?.m?.prompt);const b=$('board');const battleSurface=document.querySelector('#game .battle-shell');if(G.activity&&!isMatchFractionCompatibilityPath()&&drawActivityBoard(b)){if(battleSurface)battleSurface.dataset.answerSurface='dom';window.BrainBitePresentation?.setBattleChoices?.([]);return}if(battleSurface)battleSurface.dataset.answerSurface='three-d';b.className=`board world-${G.m.world}${G.m.boss?' boss-arena':''}`;b.innerHTML='';for(let y=0;y<5;y++)for(let x=0;x<5;x++){const c=G.cells[ix(x,y)]||{eaten:true,value:''},d=document.createElement('div');d.className='cell';d.setAttribute('role','gridcell');if(x===G.p.x&&y===G.p.y)d.classList.add('player');if(x===G.e.x&&y===G.e.y)d.classList.add('enemy');if(G.mist.some(m=>m.x===x&&m.y===y))d.classList.add('mistake');if(!c.eaten)d.textContent=c.value;b.appendChild(d)}}
-function move(dx,dy){if(!G||!checkpointGameplayActivity({reason:'activity'}))return;let nx=Math.max(0,Math.min(4,G.p.x+dx)),ny=Math.max(0,Math.min(4,G.p.y+dy));if(nx===G.p.x&&ny===G.p.y)return;G.p={x:nx,y:ny};if(G.activity&&!isMatchFractionCompatibilityPath()){G.moves++;draw();return}G.moves++;bite();bossTick();enemy();hit();draw()}
-function bite(){const c=G.cells[ix(G.p.x,G.p.y)];if(!c||c.eaten)return;c.eaten=true;if(c.correct){G.combo++;G.max=Math.max(G.max,G.combo);G.eaten++;G.correct++;awardProgressionScore(100*G.combo);P().mastery[G.m.world]=Math.min(100,P().mastery[G.m.world]+1);updateSkill(G.m.skill,true,{assisted:G.assisted,independent:!G.assisted,hintsUsed:G.assisted?1:0,source:G.source||'mission'});$('feedback').textContent='CHOMP! Correct.';if(firstRunState(P()).stage==='mission'){setFirstRunStage('done');renderFirstRun();save()}fileCue(G.combo>=8?'super':'correct');if(G.m.boss){G.boss=Math.max(0,G.boss-25);if(G.boss===0)return complete()}else if(G.eaten>=G.total)return complete()}else{const outcome=updateSkill(G.m.skill,false,{assisted:G.assisted,independent:false,hintsUsed:G.assisted?1:0,source:G.source||'mission'});if(outcome?.contentQuarantined){$('feedback').textContent=CONTENT_UNAVAILABLE_MESSAGE;return}G.combo=0;G.wrong++;G.lives--;P().mastery[G.m.world]=Math.max(0,P().mastery[G.m.world]-.5);P().mistakes.push({skill:G.m.skill,chosen:c.value,ts:Date.now()});G.mist.push({x:G.p.x,y:G.p.y});$('feedback').textContent=incorrectAttemptMessage(c.value);fileCue('wrong');if(G.lives<=0)restartCurrentMission()}}
+function move(dx,dy){if(!G||G.paused||!checkpointGameplayActivity({reason:'activity'}))return;let nx=Math.max(0,Math.min(4,G.p.x+dx)),ny=Math.max(0,Math.min(4,G.p.y+dy));if(nx===G.p.x&&ny===G.p.y)return;G.p={x:nx,y:ny};if(G.activity&&!isMatchFractionCompatibilityPath()){G.moves++;draw();return}G.moves++;bite();bossTick();enemy();hit();draw()}
+function bite(){const c=G.cells[ix(G.p.x,G.p.y)];if(!c||c.eaten)return;c.eaten=true;if(c.correct){G.combo++;G.max=Math.max(G.max,G.combo);G.eaten++;G.correct++;awardProgressionScore(100*G.combo);P().mastery[G.m.world]=Math.min(100,P().mastery[G.m.world]+1);updateSkill(G.m.skill,true,{...attemptSupport(),source:G.source||'mission'});G.retryAssist=false;$('feedback').textContent='CHOMP! Correct.';if(firstRunState(P()).stage==='mission'){setFirstRunStage('done');renderFirstRun();save()}fileCue(G.combo>=8?'super':'correct');if(G.m.boss){G.boss=Math.max(0,G.boss-25);if(G.boss===0)return complete()}else if(G.eaten>=G.total)return complete()}else{const outcome=updateSkill(G.m.skill,false,{...attemptSupport(),independent:false,source:G.source||'mission'});if(outcome?.contentQuarantined){$('feedback').textContent=CONTENT_UNAVAILABLE_MESSAGE;return}G.combo=0;G.wrong++;G.lives--;P().mastery[G.m.world]=Math.max(0,P().mastery[G.m.world]-.5);P().mistakes.push({skill:G.m.skill,chosen:c.value,ts:Date.now()});G.mist.push({x:G.p.x,y:G.p.y});$('feedback').textContent=wrongAnswerFeedback(c.value);fileCue('wrong');handleOutOfLives()}}
 
 function bossTick(){
  if(!G.m.boss)return;
  if(G.m.world==='math'&&G.moves%3===0){G.lives--;G.e.x=Math.floor(Math.random()*5);G.e.y=Math.floor(Math.random()*5);$('feedback').textContent='Asteroid blast!'}
  if(G.m.world==='words'&&G.moves%2===0){G.cells=shuffle(G.cells)}
  if(G.m.world==='spanish'&&G.moves%2===0){G.e={x:Math.floor(Math.random()*5),y:Math.floor(Math.random()*5)}}
- if(G.lives<=0)restartCurrentMission()
+ handleOutOfLives()
 }
 
 function enemy(){let step=P().settings.enemySpeed==='slow'?2:1;if(G.moves%step)return;let x=G.e.x,y=G.e.y,dx=Math.sign(G.p.x-x),dy=Math.sign(G.p.y-y);if(Math.abs(G.p.x-x)>Math.abs(G.p.y-y))x+=dx;else y+=dy;G.e={x,y}}
-function hit(){if(G.e.x===G.p.x&&G.e.y===G.p.y){G.lives--;G.combo=0;G.e={x:0,y:0};$('feedback').textContent='Bonk! Keep going.';fileCue('hit');if(G.lives<=0)restartCurrentMission()}}
+function hit(){if(G.e.x===G.p.x&&G.e.y===G.p.y){G.lives--;G.combo=0;G.e={x:0,y:0};$('feedback').textContent='Bonk! Keep going.';fileCue('hit');handleOutOfLives()}}
 function complete(){if(!checkpointGameplayActivity({reason:'complete'}))return false;const session={mission:G.m.id,world:G.m.world,skillId:G.m.skill,combo:G.max,accuracy:G.correct?Math.round(100*G.correct/Math.max(1,G.correct+G.wrong)):null,moves:G.moves,durationSec:Math.max(1,Math.round((Date.now()-(G.startedAt||Date.now()))/1000)),practice:G.progressionEligible===false,homework:!!G.homeworkMode,source:G.source||'mission',ts:Date.now()};if(G.progressionEligible===false){recordLearningSession(session);save();fileCue('clear');$('feedback').textContent='Practice complete!';setCaption('Practice complete.');setTimeout(()=>{show('home');render()},600);return true}const profile=P(),before=progression(),wasComplete=before.completedMissionIds.includes(G.m.id),next=REGISTRY.completeMission(before,G.m.id);if(!wasComplete&&!next.completedMissionIds.includes(G.m.id)){$('feedback').textContent='This mission is still locked.';return false}profile.progression=next;if(!wasComplete){profile.stars+=3;profile.spark+=(G.m.boss?10:3)}profile.bestCombo=Math.max(profile.bestCombo,G.max);fileCue(G.m.boss?'boss':'clear');recordLearningSession(session);save();if(G.internalBubbleReefPreview)void grantBubbleReefPreviewReward({profileId:profile.id,missionId:G.m.id,progression:next,awardedAt:session.ts,canonicalRewardGranted:!wasComplete});$('feedback').textContent=G.m.boss?`${G.m.bossName} defeated!`:'Mission complete!';setCaption(G.m.boss?`${G.m.bossName} defeated.`:'Mission complete.');setTimeout(()=>{const match=document.documentElement.classList.contains('presentation-match');show(match?'home':G.m.world);render()},600);return true}
 function applySettings(){let s=P().settings;$('reducedMotion').checked=s.reducedMotion;$('cameraMotionReduction').checked=s.cameraMotionReduction;$('largeTargets').checked=s.largeTargets;$('highContrast').checked=s.highContrast;$('captions').checked=s.captions;$('dyslexicFont').checked=s.dyslexicFont;$('textScale').value=s.textScale||'1';$('qualityTier').value=s.qualityTier||'balanced';$('enemySpeed').value=s.enemySpeed;$('soundOn').checked=s.soundOn;$('musicOn').checked=s.musicOn;syncMusic();const root=document.documentElement;root.classList.toggle('reduced-motion',s.reducedMotion);root.classList.toggle('camera-motion-reduction',s.cameraMotionReduction);root.classList.toggle('large-targets',s.largeTargets);root.classList.toggle('high-contrast',s.highContrast);root.classList.toggle('captions-on',s.captions);root.classList.toggle('dyslexic-font',s.dyslexicFont);root.classList.toggle('quality-ultra',s.qualityTier==='ultra');root.classList.toggle('quality-high',s.qualityTier==='high');root.classList.toggle('quality-balanced',!s.qualityTier||s.qualityTier==='balanced');root.classList.toggle('quality-performance',s.qualityTier==='performance');root.classList.toggle('quality-mobile',s.qualityTier==='mobile');root.classList.toggle('low-end-device',lowEndDevice());root.style.setProperty('--bb-text-scale',String(Number(s.textScale)||1))}
 document.querySelectorAll('[data-screen]').forEach(button=>button.addEventListener('click',()=>show(button.dataset.screen)));
@@ -2538,7 +2573,7 @@ window.addEventListener('pagehide',()=>{captureExitTimeContribution();lockParent
 setInterval(()=>checkpointGameplayActivity({reason:'interval'}),TIME_CHECKPOINT_MS);
 
 
-$('continueBtn').onclick=()=>start(progression().lastMissionId||1);$('exitBtn').onclick=()=>{checkpointGameplayActivity({forceActive:true,reason:'exit'});applyWorldTheme('');show('home')};
+$('continueBtn').onclick=()=>start(progression().lastMissionId||1);$('exitBtn').onclick=()=>{checkpointGameplayActivity({forceActive:true,reason:'exit'});applyWorldTheme('');show('home')};$('snackPractice').onclick=continueAsPractice;$('snackRestart').onclick=()=>{hideSnackCard();if(G)G.paused=false;restartCurrentMission()};$('snackMap').onclick=()=>{hideSnackCard();$('exitBtn').click()};
 $('reducedMotion').onchange=e=>{P().settings.reducedMotion=e.target.checked;save()};$('cameraMotionReduction').onchange=e=>{P().settings.cameraMotionReduction=e.target.checked;save()};$('largeTargets').onchange=e=>{P().settings.largeTargets=e.target.checked;save()};$('highContrast').onchange=e=>{P().settings.highContrast=e.target.checked;save()};$('captions').onchange=e=>{P().settings.captions=e.target.checked;save();setCaption(G?.m?.prompt||'')};$('dyslexicFont').onchange=e=>{P().settings.dyslexicFont=e.target.checked;save()};$('textScale').onchange=e=>{P().settings.textScale=e.target.value;save()};$('qualityTier').onchange=e=>{P().settings.qualityTier=e.target.value;save()};$('enemySpeed').onchange=e=>{P().settings.enemySpeed=e.target.value;save()};$('soundOn').onchange=e=>{P().settings.soundOn=e.target.checked;save()};$('musicOn').onchange=e=>{P().settings.musicOn=e.target.checked;syncMusic();save()};
 $('addProfile').onclick=()=>{if(!parentShellRequired('profileActionStatus'))return;let n=$('newProfile').value.trim();if(!n)return;STORE.profiles.push(blank(n));STORE.active=STORE.profiles.length-1;$('newProfile').value='';save();lockParentAccess();show('home')};
 $('exportActiveProfile').onclick=()=>{if(!parentShellRequired('profileActionStatus'))return;const profile=STORE.profiles[STORE.active];if(!profile)return;const b=new Blob([JSON.stringify(externalizeProfile(profile),null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`brainbite-profile-${profile.name.replace(/[^\w-]+/g,'-').toLowerCase()||'kid'}.json`;a.click();URL.revokeObjectURL(a.href)};

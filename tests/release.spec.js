@@ -1745,6 +1745,8 @@ test('non-localhost production host launches and completes a canonical registry 
     const mode = window.BrainBiteGame.getContentControl().mode;
     const launched = window.BrainBiteGame.startMission(1);
     for (let guard = 0; guard < 25 && G && !progression().completedMissionIds.includes(1); guard += 1) {
+      // An enemy collision can empty the hearts; Bite's snack pauses input until they refill.
+      for (let wait = 0; wait < 40 && G.paused; wait += 1) await new Promise(resolve => setTimeout(resolve, 100));
       const next = G.cells.find(cell => cell && !cell.eaten && cell.correct);
       if (!next) break;
       window.BrainBiteGame.tryAnswer(next.value);
@@ -1895,10 +1897,14 @@ test('attempt events retain the active profile identity while excluding child or
 
 test('single-learner struggle records review telemetry without quarantine or retry lock', async ({ page }) => {
   await page.waitForFunction(() => !!window.BrainBiteGame && !!window.BrainBiteCore);
-  const result = await page.evaluate(() => {
+  const result = await page.evaluate(async () => {
     window.BrainBiteGame.startMission(1);
     const wrong = String(G.cells.find(cell => !cell.eaten && !cell.correct).value);
-    for (let count = 0; count < 3; count += 1) window.BrainBiteGame.tryAnswer(wrong);
+    // Zero hearts pauses for Bite's snack, then refills (decision D11). The enemy can also
+    // take a heart, so wait out any snack before each attempt rather than assuming counts.
+    const afterSnack = async () => { for (let i = 0; i < 40 && G.paused; i += 1) await new Promise(resolve => setTimeout(resolve, 100)); };
+    for (let count = 0; count < 3; count += 1) { await afterSnack(); window.BrainBiteGame.tryAnswer(wrong); }
+    await afterSnack();
     const before = { lives: G.lives, mastery: P().mastery.math, mistakes: P().mistakes.length, attempts: P().learningCore.skills[G.m.skill].evidence.attempts };
     window.BrainBiteGame.tryAnswer(wrong);
     const identity = G.contentControl.telemetry.contentIdentity;

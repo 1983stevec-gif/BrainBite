@@ -433,3 +433,63 @@ test('backgrounding the app suspends audio and resumes it on return',async({page
   await setVisibility('visible');
   await expect.poll(()=>page.evaluate(()=>audioCtx?.state)).not.toBe('suspended');
 });
+
+// ---- G3 kind failure ---------------------------------------------------------------
+test('running out of hearts refills them and keeps mission progress',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>window.BrainBiteGame.startMission(1));
+  await answerCorrect(page);
+  for(let i=0;i<3;i++)await answerWrong(page);
+  await expect(page.locator('#snackCard')).toBeVisible();
+  await expect(page.locator('#snackTitle')).toHaveText('Bite needs a snack!');
+  await expect(page.locator('#snackActions')).toBeHidden();
+  expect(await page.evaluate(()=>window.BrainBiteGame.tryAnswer(window.BrainBiteGame.getState().webglRemaining[0]))).toBe(false);
+  await expect(page.locator('#snackCard')).toBeHidden({timeout:4000});
+  const state=await page.evaluate(()=>{const g=window.BrainBiteGame.getState();return {lives:g.lives,eaten:g.eaten,refills:g.refills,paused:g.paused,prompt:document.getElementById('prompt').textContent}});
+  expect(state).toMatchObject({lives:3,eaten:1,refills:1,paused:false,prompt:'Bite all even numbers.'});
+  await expect(page.locator('#healthText')).toHaveText('3 / 3');
+});
+
+test('a third wipe-out offers practice or the map instead of another refill',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>window.BrainBiteGame.startMission(1));
+  for(let round=0;round<3;round++){
+    for(let i=0;i<3;i++)await answerWrong(page);
+    if(round<2)await expect(page.locator('#snackCard')).toBeHidden({timeout:4000});
+  }
+  await expect(page.locator('#snackTitle')).toHaveText('Bite is tired!');
+  await expect(page.locator('#snackActions')).toBeVisible();
+  await expect(page.locator('#snackPractice')).toBeFocused();
+  await page.locator('#snackPractice').click();
+  const state=await page.evaluate(()=>{const g=window.BrainBiteGame.getState();return {lives:g.lives,eligible:g.progressionEligible,paused:g.paused}});
+  expect(state).toEqual({lives:3,eligible:false,paused:false});
+  const before=await page.evaluate(()=>P().score);
+  await answerCorrect(page);
+  expect(await page.evaluate(()=>P().score)).toBe(before);
+});
+
+test('back to map from the tired card leaves the battle',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>{window.BrainBiteGame.startMission(1);const g=window.BrainBiteGame.getState();g.refills=2;});
+  for(let i=0;i<3;i++)await answerWrong(page);
+  await page.locator('#snackMap').click();
+  await expect(page.locator('#home')).toHaveClass(/show/);
+});
+
+test('a wrong answer shows a visual explanation and the retry counts as assisted, never independent',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>window.BrainBiteGame.startMission(1));
+  const evidence=()=>page.evaluate(()=>{const e=P().learningCore.skills['even-numbers']?.evidence||{};return {independent:e.independentSuccesses||0,assisted:e.assistedSuccesses||0}});
+  await page.evaluate(()=>window.BrainBiteGame.tryAnswer('3'));
+  await expect(page.locator('#explainer svg')).toBeVisible();
+  await expect(page.locator('#feedback')).toContainText('odd');
+  const before=await evidence();
+  await answerCorrect(page);
+  const afterRetry=await evidence();
+  expect(afterRetry.independent).toBe(before.independent);
+  expect(afterRetry.assisted).toBe(before.assisted+1);
+  await page.waitForTimeout(500);
+  await answerCorrect(page);
+  const afterNext=await evidence();
+  expect(afterNext.independent).toBe(before.independent+1);
+});

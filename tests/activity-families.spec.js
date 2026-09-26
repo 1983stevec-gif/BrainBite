@@ -201,17 +201,19 @@ test('typing assisted launches and completion are idempotent', async ({ page }) 
   expect(result.assisted).toBe(1);
 });
 
-test('typing encounter restart preserves typing mode after zero lives', async ({ page }) => {
+test('typing encounter refills hearts and keeps typing mode after zero lives', async ({ page }) => {
   await boot(page);
   const route = await page.evaluate(() => window.BrainBiteCore.createApprovedCurriculumChallenge('reading-4-inference', { family: 'Letter Trail', seed: 10 }));
   await page.evaluate(challenge => window.BrainBiteGame.startTypingChallenge(challenge), route.challenge);
   const result = await page.evaluate(async () => {
     for (const value of ['wrong-a', 'wrong-b', 'wrong-c']) window.BrainBiteGame.submitTypedAnswer(value, { attemptId: value, elapsedMs: 30000 });
-    await new Promise(resolve => setTimeout(resolve, 650));
+    await new Promise(resolve => setTimeout(resolve, 2300));
     return { typing: window.BrainBiteGame.getState().typingMode, marker: document.querySelector('[data-typing-encounter="true"]') !== null, lives: window.BrainBiteGame.getState().lives };
   });
   expect(result.typing).toBeTruthy();
-  expect(result.typing.completed).toBe(false);
+  expect(result.typing.completed).toBeFalsy();
+  // Hearts refill in place (decision D11): the three typed attempts are kept, not wiped.
+  expect(result.typing.attempts).toHaveLength(3);
   expect(result.marker).toBe(true);
   expect(result.lives).toBe(3);
 });

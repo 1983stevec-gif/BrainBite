@@ -1,4 +1,4 @@
-const CACHE = 'brainbite-v2.0-shell-v39-mobile-blockers';
+const CACHE = 'brainbite-v2.0-shell-v40-kind-failure';
 const FALLBACK = './index.html';
 const CORE = [
   './',
@@ -10,6 +10,7 @@ const CORE = [
   './assets/fonts/fredoka-variable.woff2',
   './assets/fonts/nunito-variable.woff2',
   './content/storage-copies.js',
+  './content/explainers.js',
   './content/experience-registry.js',
   './content/content-review-manifest.js',
   './content/content-control-gate.js',
