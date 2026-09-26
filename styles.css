@@ -1,8 +1,8 @@
-﻿*{box-sizing:border-box}html{font-size:calc(100% * var(--bb-text-scale,1))}body{margin:0;background:#10131c;color:#fff;font-family:system-ui}.dyslexic-font body,.dyslexic-font button,.dyslexic-font input,.dyslexic-font select,.dyslexic-font textarea{font-family:Verdana,Arial,sans-serif}.app{max-width:1120px;margin:auto;padding:16px}header{display:flex;justify-content:space-between;gap:20px}h1{font-size:clamp(2.4rem,7vw,4rem);margin:.1rem 0}nav{display:flex;gap:7px;flex-wrap:wrap;margin:14px 0}button,select,input,textarea{font:inherit}button{border:0;border-radius:12px;padding:10px 14px;font-weight:800}.screen{display:none}.show{display:block}.cards>div,
+*{box-sizing:border-box}html{font-size:calc(100% * var(--bb-text-scale,1))}body{margin:0;background:#10131c;color:#fff;font-family:system-ui}.dyslexic-font body,.dyslexic-font button,.dyslexic-font input,.dyslexic-font select,.dyslexic-font textarea{font-family:Verdana,Arial,sans-serif}.app{max-width:1120px;margin:auto;padding:16px}header{display:flex;justify-content:space-between;gap:20px}h1{font-size:clamp(2.4rem,7vw,4rem);margin:.1rem 0}nav{display:flex;gap:7px;flex-wrap:wrap;margin:14px 0}button,select,input,textarea{font:inherit}button{border:0;border-radius:12px;padding:10px 14px;font-weight:800}.screen{display:none}.show{display:block}.cards>div,
 .screen>h2,
 .panel,
 .mission,
-aside{background:#1b2030;border-radius:20px;padding:18px}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:12px 0}.mission-row{display:grid;grid-template-columns:1fr auto;gap:10px;padding:12px;background:#1b2030;border-radius:14px;margin:8px 0}.locked{opacity:.45}.panel{margin:12px 0}.panel label{display:block;margin:10px 0}.panel input,.panel select,.panel textarea{width:100%;padding:10px;border-radius:10px;border:0;margin-top:5px}.game{display:grid;grid-template-columns:1fr 250px;gap:16px}.board{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;background:#171b27;padding:9px;border-radius:18px;aspect-ratio:1}.cell{display:flex;align-items:center;justify-content:center;background:#262c3c;border-radius:14px;font-weight:900;text-align:center;position:relative;padding:5px}.player{outline:4px solid #fff}.enemy:after{content:'â˜„ï¸';position:absolute}.mistake:after{content:'ðŸ˜µ';position:absolute}.touch{text-align:center;margin-top:10px;display:none}.touch button{margin:3px;min-width:54px;min-height:48px}aside img{width:90px;display:block;margin:auto}.reduced-motion *{animation:none!important}.camera-motion-reduction *, .camera-motion-reduction .bbf-hero,.camera-motion-reduction .bbf-hub-mark,.camera-motion-reduction .bbf-upgraded .bbf-hero{transition:none!important;animation:none!important;transform:none!important}.large-targets .touch button{min-width:68px;min-height:62px}.high-contrast body,.high-contrast{background:#000}.high-contrast .panel,.high-contrast .mission,.high-contrast aside,.high-contrast .mission-row{background:#000;border:2px solid #fff}.captions-on #captionText{opacity:1}.quality-performance .cards>div,
+aside{background:#1b2030;border-radius:20px;padding:18px}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:12px 0}.mission-row{display:grid;grid-template-columns:1fr auto;gap:10px;padding:12px;background:#1b2030;border-radius:14px;margin:8px 0}.locked{opacity:.45}.panel{margin:12px 0}.panel label{display:block;margin:10px 0}.panel input,.panel select,.panel textarea{width:100%;padding:10px;border-radius:10px;border:0;margin-top:5px}.game{display:grid;grid-template-columns:1fr 250px;gap:16px}.board{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;background:#171b27;padding:9px;border-radius:18px;aspect-ratio:1}.cell{display:flex;align-items:center;justify-content:center;background:#262c3c;border-radius:14px;font-weight:900;text-align:center;position:relative;padding:5px}.player{outline:4px solid #fff}.enemy:after{content:'\2604\FE0F';position:absolute}.mistake:after{content:'\1F635';position:absolute}.touch{text-align:center;margin-top:10px;display:none}.touch button{margin:3px;min-width:54px;min-height:48px}aside img{width:90px;display:block;margin:auto}.reduced-motion *{animation:none!important}.camera-motion-reduction *, .camera-motion-reduction .bbf-hero,.camera-motion-reduction .bbf-hub-mark,.camera-motion-reduction .bbf-upgraded .bbf-hero{transition:none!important;animation:none!important;transform:none!important}.large-targets .touch button{min-width:68px;min-height:62px}.high-contrast body,.high-contrast{background:#000}.high-contrast .panel,.high-contrast .mission,.high-contrast aside,.high-contrast .mission-row{background:#000;border:2px solid #fff}.captions-on #captionText{opacity:1}.quality-performance .cards>div,
 .quality-performance .panel,
 .quality-performance .mission,
 .quality-performance aside{box-shadow:none}.quality-performance .board,.quality-mobile .board{gap:4px;padding:6px}.low-end-device .panel,
@@ -562,9 +562,9 @@ body:has(#home.show) nav{
   position:absolute;left:12px;top:50%;transform:translateY(-50%);
   width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:1rem;
 }
-.home-target .currency-star::before{content:"â˜…";background:linear-gradient(180deg,#ffe08a,#f0b429);color:#5a3a00}
-.home-target .currency-gem::before{content:"â—†";background:linear-gradient(180deg,#d2a4ff,#8a4dff);color:#fff}
-.home-target .currency-energy::before{content:"âš¡";background:linear-gradient(180deg,#ffe36a,#ffb000)}
+.home-target .currency-star::before{content:"\2605";background:linear-gradient(180deg,#ffe08a,#f0b429);color:#5a3a00}
+.home-target .currency-gem::before{content:"\25C6";background:linear-gradient(180deg,#d2a4ff,#8a4dff);color:#fff}
+.home-target .currency-energy::before{content:"\26A1";background:linear-gradient(180deg,#ffe36a,#ffb000)}
 .home-target .dash-quick-actions{display:flex;gap:10px;align-items:center}
 .home-target .orb-btn{
   width:64px;height:64px;min-height:64px;border-radius:50%;padding:6px;
@@ -576,7 +576,7 @@ body:has(#home.show) nav{
 .home-target .home-rail button{min-height:70px;border-radius:22px}
 .home-target .rail-worlds{position:relative}
 .home-target .rail-worlds::after{
-  content:"ðŸ”’";position:absolute;right:14px;top:50%;transform:translateY(-50%);opacity:.8
+  content:"\1F512";position:absolute;right:14px;top:50%;transform:translateY(-50%);opacity:.8
 }
 .home-target .home-scene .world-showcase,
 .home-target .home-world-stats{display:none}
@@ -1375,10 +1375,11 @@ html.presentation-match .match-caption-live{
   background:linear-gradient(180deg,rgba(8,16,12,.82),rgba(6,12,10,.9));
 }
 .battle-target .battle-prompt{
-  display:grid;grid-template-columns:48px 1fr;grid-template-rows:auto auto;gap:4px 12px;align-items:center;
-  padding:14px 18px;
+  display:grid;grid-template-columns:auto auto minmax(0,1fr);
+  grid-template-areas:"spk fb prompt" "spk fb status" "spk fb hint";
+  gap:2px 10px;align-items:center;padding:10px 18px;min-height:0;
 }
-.battle-target .battle-prompt button{grid-row:1 / span 2;align-self:center}
+.battle-target .battle-prompt button{align-self:center}
 .battle-target .battle-prompt h2{
   margin:0;font-family:var(--bb-display);font-size:clamp(1.25rem,2.4vw,1.8rem);color:#1c2430;
 }
@@ -1429,7 +1430,7 @@ html.presentation-match .match-caption-live{
   background:#94a3b8;border:2px solid rgba(255,255,255,.35);
 }
 .battle-target .mm-node.done{background:#4ade80;box-shadow:0 0 0 3px rgba(74,222,128,.2)}
-.battle-target .mm-node.done::after{content:"âœ“";font-size:.55rem;color:#064e3b;display:grid;place-items:center;height:100%}
+.battle-target .mm-node.done::after{content:"\2713";font-size:.55rem;color:#064e3b;display:grid;place-items:center;height:100%}
 .battle-target .mm-node.here{background:#38bdf8;width:16px;height:16px;box-shadow:0 0 0 4px rgba(56,189,248,.25)}
 .battle-target .battle-bottom{
   display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;margin-top:8px;
@@ -2251,15 +2252,12 @@ html.presentation-webgl body{background:#091d18}
 
   html.presentation-webgl .battle-target .battle-prompt{
     grid-column:1 / -1;
-    grid-template-columns:34px minmax(0,1fr);
-    grid-template-rows:auto auto auto;
     gap:2px 6px;
     min-height:0;
     padding:7px 9px;
     border-radius:17px;
   }
   html.presentation-webgl .battle-target .battle-prompt button{
-    grid-row:1 / span 3;
     width:44px;height:44px;min-height:44px;padding:0;
   }
   html.presentation-webgl .battle-target .battle-prompt h2{font-size:1.05rem;line-height:1.05}
@@ -2461,4 +2459,50 @@ html:not(.presentation-webgl) .battle-target .minimap{aspect-ratio:auto;flex:1;m
   /* One feedback surface on phones: the prompt card already reports correct/incorrect. */
   html:not(.presentation-webgl) .battle-target .battle-toast{display:none}
   html:not(.presentation-webgl) .battle-target .touch button{min-width:46px;min-height:46px;margin:2px}
+}
+
+/* ---- M1 mobile blockers (2026-09) ---------------------------------------------------
+   Battle prompt card: named grid areas so the two speaker buttons can never push the
+   prompt into a 48px column. #game raises specificity above the older per-layout rules. */
+#game .battle-target .battle-prompt{
+  display:grid;grid-template-columns:auto auto minmax(0,1fr);
+  grid-template-areas:"spk fb prompt" "spk fb status" "spk fb hint";
+  gap:0 10px;align-items:center;padding:7px 16px;min-height:0;
+}
+#game .battle-target .battle-prompt #speakPrompt{grid-area:spk;grid-row:auto}
+#game .battle-target .battle-prompt #speakFeedback{grid-area:fb;grid-row:auto}
+#game .battle-target .battle-prompt #prompt{grid-area:prompt;margin:0;text-align:center;white-space:normal;overflow-wrap:normal;word-break:normal;
+  font-size:clamp(1.15rem,2.2vw,1.9rem);line-height:1.1}
+#game .battle-target .battle-prompt #feedback{grid-area:status;text-align:center;font-size:.8rem;line-height:1.2;min-height:0}
+#game .battle-target .battle-prompt #firstRunHint{grid-area:hint;margin:0;text-align:center;color:#7a4b00;font-size:.8rem;line-height:1.2}
+#game .battle-target .battle-prompt #captionText,
+#game .battle-target .battle-prompt .battle-meta{grid-column:3}
+@media (max-width:600px){
+  #game .battle-target .battle-prompt{padding:6px 8px;gap:1px 6px}
+  #game .battle-target .battle-prompt #prompt{font-size:1.05rem}
+  #game .battle-target .battle-prompt #feedback,
+  #game .battle-target .battle-prompt #firstRunHint{font-size:.72rem;line-height:1.1}
+}
+/* The reward toast is earned: hidden until a correct answer reveals it. */
+#game .battle-toast[hidden]{display:none !important}
+/* Safe areas (notch, home indicator, gesture bars). */
+:root{
+  --bb-safe-top:env(safe-area-inset-top,0px);--bb-safe-right:env(safe-area-inset-right,0px);
+  --bb-safe-bottom:env(safe-area-inset-bottom,0px);--bb-safe-left:env(safe-area-inset-left,0px);
+}
+body{padding:var(--bb-safe-top) var(--bb-safe-right) var(--bb-safe-bottom) var(--bb-safe-left)}
+/* Phones: the route map yields its space to the scene, and the toast floats over it. */
+@media (max-width:600px){
+  #game .battle-target .minimap-card{display:none}
+  #game .battle-target .battle-right{position:relative}
+  #game .battle-target .battle-toast{
+    position:fixed;left:50%;top:calc(var(--bb-safe-top) + 38%);transform:translateX(-50%);
+    z-index:30;width:min(80vw,280px);pointer-events:none;
+  }
+}
+@media (max-width:600px){
+  html.presentation-webgl #game .battle-target .battle-main{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;min-height:0}
+  html.presentation-webgl #game .battle-target .battle-scene{min-height:0;height:100%;grid-template-rows:minmax(0,1fr) auto}
+  html.presentation-webgl #game .battle-target .battle-frame{height:100%;min-height:240px}
+  html.presentation-webgl #game .battle-target .battle-right{grid-template-columns:minmax(0,1fr)}
 }

@@ -1581,6 +1581,10 @@ test('production fonts are self-hosted, precached, and the content security poli
     if (!['127.0.0.1', 'localhost', '::1'].includes(host)) externalHosts.push(host);
   });
   await page.reload();
+  // Nunito is only the fallback after Fredoka, so a page whose text Fredoka fully covers
+  // never needs it. It used to load only because double-encoded glyphs in styles.css fell
+  // through to it; load it explicitly so this test proves self-hosting, not that accident.
+  await page.evaluate(() => Promise.all([document.fonts.load('700 16px Fredoka'), document.fonts.load('800 16px Nunito')]));
   await page.evaluate(() => document.fonts.ready);
   const policy = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
   expect(policy).toContain("default-src 'self'");

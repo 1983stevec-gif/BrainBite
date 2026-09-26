@@ -1,4 +1,4 @@
-﻿import { shouldEnableWebgl, shouldEnableMatch } from './capability.mjs';
+import { shouldEnableWebgl, shouldEnableMatch } from './capability.mjs';
 
 import { createPerformanceBudget } from './performance-budget.mjs';
 

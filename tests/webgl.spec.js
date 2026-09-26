@@ -320,3 +320,116 @@ for(const width of [360,390]){
     }
   });
 }
+
+// ---- M1 mobile blockers ------------------------------------------------------------
+const answerCorrect=page=>page.evaluate(()=>window.BrainBiteGame.tryAnswer(window.BrainBiteGame.getState().webglRemaining[0]));
+const answerWrong=page=>page.evaluate(()=>window.BrainBiteGame.tryAnswer(window.BrainBiteGame.getState().m.wrong[0]));
+
+for(const [width,height] of [[360,740],[390,844],[1024,682],[1280,800]]){
+  test(`battle prompt reads on at most two lines and stays compact at ${width}x${height}`,async({page})=>{
+    await page.setViewportSize({width,height});
+    await page.goto('/?presentation=webgl');
+    await page.evaluate(()=>window.BrainBiteGame.startMission(1));
+    await page.evaluate(()=>document.fonts.ready);
+    await expect(page.locator('#feedback')).toHaveText('',{timeout:3000});
+    const metrics=await page.locator('#prompt').evaluate(el=>{
+      const lineHeight=parseFloat(getComputedStyle(el).lineHeight)||parseFloat(getComputedStyle(el).fontSize)*1.1;
+      return {lines:Math.round(el.getBoundingClientRect().height/lineHeight),width:el.getBoundingClientRect().width};
+    });
+    expect(metrics.lines).toBeLessThanOrEqual(2);
+    expect(metrics.width).toBeGreaterThan(120);
+    const card=await page.locator('#game .battle-prompt').boundingBox();
+    expect(card.height).toBeLessThanOrEqual(width>=1024?90:110);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  });
+}
+
+test('the arrival status clears so the prompt card shows only the prompt',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>window.BrainBiteGame.startMission(1));
+  await expect(page.locator('#feedback')).toContainText('Entering');
+  await expect(page.locator('#feedback')).toHaveText('',{timeout:3000});
+  await expect(page.locator('#feedback')).toHaveAttribute('role','status');
+});
+
+test('the reward toast is hidden until earned and reports the points actually awarded',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>window.BrainBiteGame.startMission(1));
+  const toast=page.locator('#game .battle-toast');
+  await expect(toast).toBeHidden();
+  await answerWrong(page);
+  await expect(toast).toBeHidden();
+  const before=await page.evaluate(()=>window.BrainBiteGame.getState().combo);
+  expect(before).toBe(0);
+  await answerCorrect(page);
+  await expect(toast).toBeVisible();
+  await expect(page.locator('#battleRewardText')).toHaveText('+100 BrainBites');
+  await expect(toast).toBeHidden({timeout:4000});
+  await answerCorrect(page);
+  await expect(page.locator('#battleRewardText')).toHaveText('+200 BrainBites');
+});
+
+test('practice runs never claim BrainBites in the toast',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>window.BrainBiteGame.startPracticeMission(8));
+  await answerCorrect(page);
+  await expect(page.locator('#battleRewardText')).toHaveText('Nice bite!');
+});
+
+test('combo stars start empty and light one star per three-answer streak',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>window.BrainBiteGame.startMission(1));
+  const lit=()=>page.locator('#game .battle-stars span').evaluateAll(spans=>spans.filter(s=>s.textContent==='★').length);
+  expect(await lit()).toBe(0);
+  await answerCorrect(page);await answerCorrect(page);
+  expect(await lit()).toBe(0);
+  await answerCorrect(page);
+  expect(await lit()).toBe(1);
+  await answerWrong(page);
+  expect(await lit()).toBe(0);
+});
+
+test('lives read as hearts out of three, never as a percentage',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>window.BrainBiteGame.startMission(1));
+  await expect(page.locator('#healthText')).toHaveText('3 / 3');
+  await expect(page.locator('#game .battle-health')).toHaveAttribute('aria-label','Lives: 3 of 3');
+  await answerWrong(page);
+  await expect(page.locator('#healthText')).toHaveText('2 / 3');
+  await expect(page.locator('#game .battle-health')).toHaveAttribute('aria-label','Lives: 2 of 3');
+});
+
+test('boss phase never exceeds the total the child is told about',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>window.BrainBiteGame.startPracticeMission(10));
+  for(let i=0;i<3;i++){
+    await expect(page.locator('#bossPhase')).toHaveText(/Phase [1-3] of 3$/);
+    await answerCorrect(page);
+  }
+});
+
+test('phones hide the route map, float the toast, and respect safe-area insets',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>window.BrainBiteGame.startMission(1));
+  await expect(page.locator('#game .minimap-card')).toBeHidden();
+  await answerCorrect(page);
+  expect(await page.locator('#game .battle-toast').evaluate(el=>getComputedStyle(el).position)).toBe('fixed');
+  await page.evaluate(()=>document.documentElement.style.setProperty('--bb-safe-top','30px'));
+  expect(await page.evaluate(()=>getComputedStyle(document.body).paddingTop)).toBe('30px');
+  const frame=await page.locator('#game .battle-frame').boundingBox();
+  expect(frame.height).toBeGreaterThan(300);
+});
+
+test('backgrounding the app suspends audio and resumes it on return',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>{audioContext();});
+  const setVisibility=state=>page.evaluate(value=>{
+    Object.defineProperty(document,'visibilityState',{configurable:true,get:()=>value});
+    document.dispatchEvent(new Event('visibilitychange'));
+  },state);
+  await setVisibility('hidden');
+  await expect.poll(()=>page.evaluate(()=>audioCtx?.state)).toBe('suspended');
+  await setVisibility('visible');
+  await expect.poll(()=>page.evaluate(()=>audioCtx?.state)).not.toBe('suspended');
+});

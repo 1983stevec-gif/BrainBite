@@ -1,4 +1,4 @@
-﻿# BrainBite Batch 8 Status Tracker
+# BrainBite Batch 8 Status Tracker
 
 Date: 2026-09-02
 

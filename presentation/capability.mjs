@@ -1,4 +1,4 @@
-﻿/** Batch 9 — visual match mode uses approved reference plates + hotspots */
+/** Batch 9 — visual match mode uses approved reference plates + hotspots */
 
 export function requestedPresentation() {
   const params = new URLSearchParams(location.search);

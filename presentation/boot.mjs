@@ -1,4 +1,4 @@
-﻿import { PresentationAdapter } from './presentation-adapter.mjs';
+import { PresentationAdapter } from './presentation-adapter.mjs';
 
 async function boot() {
   window.BrainBitePresentation = PresentationAdapter;

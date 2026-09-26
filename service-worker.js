@@ -1,4 +1,4 @@
-const CACHE = 'brainbite-v2.0-shell-v38-first-run-gltf-cache';
+const CACHE = 'brainbite-v2.0-shell-v39-mobile-blockers';
 const FALLBACK = './index.html';
 const CORE = [
   './',

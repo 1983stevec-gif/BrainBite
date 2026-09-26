@@ -1,4 +1,4 @@
-﻿# Gate 8.4 Device Matrix — Operator Checklist
+# Gate 8.4 Device Matrix — Operator Checklist
 
 Date: 2026-09-02  
 App under test: shipping **2D PWA** — open with `?match=0&webgl=0`
