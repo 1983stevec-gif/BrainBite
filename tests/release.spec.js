@@ -1571,7 +1571,9 @@ test('low-end devices surface the reduced-cost mode hint and class', async ({ pa
   });
   await page.reload();
   await expect(page.locator('html')).toHaveClass(/low-end-device/);
-  await expect(page.locator('#launchHint')).toContainText('This device may feel smoother on Performance mode.');
+  // Device advice is for grown-ups: Parents → Advanced, never the child's home screen.
+  await expect(page.locator('#deviceHint')).toContainText('This device may feel smoother on Performance mode');
+  await expect(page.locator('#launchHint')).not.toContainText('Performance');
 });
 
 test('production fonts are self-hosted, precached, and the content security policy is restrictive', async ({ page }) => {

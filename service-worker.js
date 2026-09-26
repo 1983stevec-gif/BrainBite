@@ -1,4 +1,4 @@
-const CACHE = 'brainbite-v2.0-shell-v41-answer-discs';
+const CACHE = 'brainbite-v2.0-shell-v42-hud-pass';
 const FALLBACK = './index.html';
 const CORE = [
   './',

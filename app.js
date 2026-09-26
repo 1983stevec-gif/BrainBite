@@ -1722,6 +1722,11 @@ function currentGoalState(){
  return {world:worldMeta(mission?.world||'math').title,remaining,total:5,progress:Math.round((progress/5)*100)};
 }
 function worldLabelFor(world){return worldMeta(world).title.toUpperCase();}
+// UI Phase 3.1: an illustrated route instead of a grid of dots. A dirt path winds through
+// the world's missions; finished nodes show a check, the current one a pin, the boss its
+// badge, and a chest waits after the boss. The text label carries the same information.
+const MINIMAP_POINTS=[[18,100],[42,86],[66,98],[92,84],[112,62],[90,44],[64,52],[40,38],[62,20],[96,18]];
+function svgEl(name,attrs={},children=[]){const el=document.createElementNS('http://www.w3.org/2000/svg',name);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,String(v));children.forEach(child=>el.appendChild(child));return el}
 function renderMinimap(mission){
  const title=$('minimapTitle'),nodes=$('minimapNodes');
  if(!title||!nodes)return;
@@ -1733,17 +1738,37 @@ function renderMinimap(mission){
  nodes.replaceChildren();
  if(!ids.length){nodes.setAttribute('aria-label','Mission route map');return}
  const done=ids.filter(id=>completed.includes(id)).length;
+ const points=ids.map((_,i)=>MINIMAP_POINTS[i]||[20+(i%5)*20,100-Math.floor(i/5)*40]);
+ const chest=[124,26];
+ const d=[...points,chest].map(([x,y],i,all)=>{if(!i)return `M${x} ${y}`;const [px,py]=all[i-1];const mx=(px+x)/2;return `Q${mx} ${py} ${x} ${y}`}).join(' ');
+ const svg=svgEl('svg',{viewBox:'0 0 140 120',class:'mm-svg','aria-hidden':'true',focusable:'false'},[
+  svgEl('rect',{x:0,y:0,width:140,height:120,rx:12,fill:'#1d4d32'}),
+  svgEl('ellipse',{cx:30,cy:30,rx:34,ry:22,fill:'#2f6b3f'}),svgEl('ellipse',{cx:118,cy:92,rx:30,ry:24,fill:'#2f6b3f'}),
+  svgEl('ellipse',{cx:74,cy:70,rx:26,ry:14,fill:'#2a7f93','fill-opacity':'.75'}),
+  svgEl('path',{d,fill:'none',stroke:'#6b4d2a','stroke-width':12,'stroke-linecap':'round','stroke-linejoin':'round'}),
+  svgEl('path',{d,fill:'none',stroke:'#c9a36a','stroke-width':8,'stroke-linecap':'round','stroke-linejoin':'round'}),
+ ]);
+ const node=(x,y,kind)=>{
+  const g=svgEl('g',{class:`mm-node-svg mm-${kind}`,transform:`translate(${x} ${y})`});
+  if(kind==='done'){g.append(svgEl('circle',{r:6.5,fill:'#3fbf5f',stroke:'#0b3d1c','stroke-width':1.5}),svgEl('path',{d:'M-3 0 L-1 2.6 L3.2 -2.4',fill:'none',stroke:'#fff','stroke-width':1.8,'stroke-linecap':'round','stroke-linejoin':'round'}))}
+  else if(kind==='here'){g.append(svgEl('path',{d:'M0 3 C-5 -3 -6 -6 -6 -9 A6 6 0 1 1 6 -9 C6 -6 5 -3 0 3 Z',fill:'#38bdf8',stroke:'#0c4a6e','stroke-width':1.5}),svgEl('circle',{cy:-9,r:2.4,fill:'#fff'}))}
+  else if(kind==='boss'){g.append(svgEl('circle',{r:7.5,fill:'#8b5cf6',stroke:'#3b0764','stroke-width':1.5}),svgEl('circle',{cx:-2.4,cy:-1.5,r:1.4,fill:'#fff'}),svgEl('circle',{cx:2.4,cy:-1.5,r:1.4,fill:'#fff'}),svgEl('path',{d:'M-4 3.5 Q-2 5.5 0 3.5 Q2 5.5 4 3.5',fill:'none',stroke:'#fff','stroke-width':1.2}))}
+  else if(kind==='chest'){g.append(svgEl('rect',{x:-7,y:-5,width:14,height:10,rx:2,fill:'#b7791f',stroke:'#5b3a1a','stroke-width':1.5}),svgEl('rect',{x:-7,y:-5,width:14,height:4,rx:2,fill:'#d69e2e'}),svgEl('rect',{x:-1.5,y:-2,width:3,height:3,fill:'#fde68a'}))}
+  else{g.append(svgEl('circle',{r:5,fill:'#94a3b8',stroke:'#334155','stroke-width':1.5}))}
+  return g;
+ };
  ids.forEach((id,index)=>{
   const definition=REGISTRY.getMission(id);
-  const node=document.createElement('span');
-  const isDone=completed.includes(id),isHere=id===mission?.id;
-  node.className=`mm-node${isDone?' done':''}${isHere?' here':''}`;
-  node.style.setProperty('--x',`${12+(index%5)*19}%`);
-  node.style.setProperty('--y',`${74-Math.floor(index/5)*38}%`);
-  node.title=`${id}. ${definition?.title||'Mission'}${isDone?' (complete)':isHere?' (current)':' (locked)'}`;
-  nodes.appendChild(node);
+  const isDone=completed.includes(id),isHere=id===mission?.id,isBoss=!!definition?.boss;
+  const kind=isHere?'here':isDone?'done':isBoss?'boss':'locked';
+  const g=node(...points[index],kind);
+  g.appendChild(svgEl('title',{},[document.createTextNode(`${id}. ${definition?.title||'Mission'}${isDone?' (complete)':isHere?' (current)':' (locked)'}`)]));
+  svg.appendChild(g);
  });
- nodes.setAttribute('aria-label',`${title.textContent} route: ${done} of ${ids.length} missions complete${mission?`, current mission ${mission.id}`:''}`);
+ svg.appendChild(node(...chest,'chest'));
+ nodes.appendChild(svg);
+ const next=ids.find(id=>!completed.includes(id));
+ nodes.setAttribute('aria-label',`${title.textContent} route: ${done} of ${ids.length} missions complete${mission?`, current mission ${mission.id}`:''}${next&&next!==mission?.id?`, next mission ${next}`:''}`);
 }
 function missionStatus(world,id){
  const profile=P();
@@ -1870,8 +1895,11 @@ function renderLaunchHint(){
  const lowEnd=lowEndDevice();
  const firstRun=progression(profile).completedMissionIds.length===0;
  el.textContent=firstRun
-  ? `Start with BrainBase, then open a world portal to unlock the Jungle Circuit flow.${lowEnd&&tier==='balanced'?' This device may feel smoother on Performance mode.':''}`
-  : `Resume from your last mission or open BrainBase. Quality tier: ${tier}.${lowEnd&&tier==='balanced'?' Performance mode may be smoother on this device.':''}`;
+  ? 'Tap PLAY to start your first adventure!'
+  : 'Tap PLAY to keep going!';
+ // Device advice is for grown-ups: it lives in Parents → Advanced, not on the child's home.
+ const hint=$('deviceHint');
+ if(hint){const show=lowEnd&&tier==='balanced';hint.hidden=!show;hint.textContent=show?'This device may feel smoother on Performance mode (Settings → Quality tier).':''}
 }
 
 
@@ -2227,11 +2255,11 @@ function render(){
  const homeBrainifacts=$('homeBrainifacts');if(homeBrainifacts)homeBrainifacts.textContent=profile.spark||0;
  const homeGoalTitle=$('homeGoalTitle');if(homeGoalTitle)homeGoalTitle.textContent=`Solve ${goal.total} missions`;
  const homeGoalBar=$('homeGoalBar');if(homeGoalBar)homeGoalBar.style.width=`${goal.progress}%`;
- const homeGoalText=$('homeGoalText');if(homeGoalText)homeGoalText.textContent=`${goal.world} is ready. Complete ${goal.remaining} more mission${goal.remaining===1?'':'s'} to trigger the next reward.`;
+ const homeGoalText=$('homeGoalText');if(homeGoalText)homeGoalText.textContent=`${goal.remaining} more mission${goal.remaining===1?'':'s'} in ${goal.world} for a reward!`;
  const homeGoalReward=$('homeGoalReward');if(homeGoalReward)homeGoalReward.textContent=`${Math.max(50,goal.remaining*25)} Star`;
  const homeRewardTitle=$('homeRewardTitle');if(homeRewardTitle)homeRewardTitle.textContent=`Gain ${reward.remaining} more XP`;
  const homeRewardBar=$('homeRewardBar');if(homeRewardBar)homeRewardBar.style.width=`${reward.percent}%`;
- const homeRewardText=$('homeRewardText');if(homeRewardText)homeRewardText.textContent='Collect enough BrainBites to unlock the next profile boost.';
+ const homeRewardText=$('homeRewardText');if(homeRewardText)homeRewardText.textContent='Earn BrainBites to reach the next level!';
  const homeStreak=$('homeStreak');if(homeStreak)homeStreak.textContent=streak?`${streak}-day streak`:'Keep it up';
  const homeStreakDots=$('homeStreakDots');if(homeStreakDots)homeStreakDots.innerHTML=Array.from({length:7},(_,i)=>`<span class="${i<streak?'on':''}"></span>`).join('');
  const comboBanner=$('comboBanner');if(comboBanner)comboBanner.textContent=`x${G?.combo||0}`;
@@ -2404,7 +2432,7 @@ function setCaption(text){const el=$('captionText');if(!el)return;const on=!!P()
 function start(id,options={}){const m=REGISTRY.getMission(id);return m?launchMission(m,options):false}
 function launchMission(m,{allowLocked=false,progressionEligible=true,assisted=false,source='mission',homeworkMode=false,contentControl=null}={}){const canonical=REGISTRY.getMission(m?.id),missionUnlocked=!!canonical&&REGISTRY.isMissionUnlocked(progression(),canonical.id);if(!m)return false;if(progressionEligible&&!canonical)return false;if(!allowLocked&&!missionUnlocked){$('launchHint').textContent='Complete the earlier mission in this world first.';return false}const gate=contentControl||registryMissionGate(m);if(!gate?.approved)return showContentUnavailable('launchHint');if(!prepareTimeUsageLaunch()){TIME_PENDING_LAUNCH={mission:m,options:{allowLocked,progressionEligible,assisted,source,homeworkMode,contentControl:gate}};return false}TIME_PENDING_LAUNCH=null;if(progressionEligible&&missionUnlocked){P().progression=REGISTRY.normalizeProgression({...progression(),lastMissionId:canonical.id});save()}show('game');applyWorldTheme(m.world);$('prompt').textContent=m.prompt;$('worldLabel').textContent=worldMeta(m.world).title.toUpperCase();renderMinimap(m);$('prompt').lang=m.world==='spanish'?'es':'en';
  if(progressionEligible&&missionUnlocked&&['name','world'].includes(firstRunState(P()).stage)){setFirstRunStage('mission');renderFirstRun();save()}
- const webgl=document.documentElement.classList.contains('presentation-webgl'),bossBox=$('bossBox');bossBox.hidden=!m.boss;bossBox.style.display=m.boss?'':'none';$('bossName').textContent=m.bossName||'Boss';const guidedHint=assisted?(m.curriculumChallenge?.supportMetadata?.scaffold||m.curriculumChallenge?.hintMetadata?.hint||''):'';$('feedback').textContent=assisted?`Guided support is on.${guidedHint?` ${guidedHint}`:' This attempt counts as assisted evidence.'}`:`Entering ${worldMeta(m.world).title}.`;G=makeGame(m);G.progressionEligible=!!(progressionEligible&&missionUnlocked);G.internalBubbleReefPreview=G.progressionEligible&&isInternalBubbleReefPreview();G.launchOptions={allowLocked:!!allowLocked,progressionEligible:!!progressionEligible,assisted:!!assisted,source,homeworkMode:!!homeworkMode,contentControl:gate};G.contentControl=gate;G.assisted=!!assisted;G.source=source;G.homeworkMode=!!homeworkMode;G.guidedHint=guidedHint;if(webgl){G.webglRemaining=[...new Set((m.correct||[]).map(String))];G.total=m.boss?Math.min(4,G.webglRemaining.length):G.webglRemaining.length}$('speakPrompt').hidden=false;setCaption(m.prompt);hideBattleToast();hideSnackCard();hideExplainer();clearEnteringStatusSoon();draw();return true}
+ const webgl=document.documentElement.classList.contains('presentation-webgl'),bossBox=$('bossBox');bossBox.hidden=!m.boss;bossBox.style.display=m.boss?'':'none';$('bossName').textContent=m.bossName||'Boss';renderBossPortrait(m);const guidedHint=assisted?(m.curriculumChallenge?.supportMetadata?.scaffold||m.curriculumChallenge?.hintMetadata?.hint||''):'';$('feedback').textContent=assisted?`Guided support is on.${guidedHint?` ${guidedHint}`:' This attempt counts as assisted evidence.'}`:`Entering ${worldMeta(m.world).title}.`;G=makeGame(m);G.progressionEligible=!!(progressionEligible&&missionUnlocked);G.internalBubbleReefPreview=G.progressionEligible&&isInternalBubbleReefPreview();G.launchOptions={allowLocked:!!allowLocked,progressionEligible:!!progressionEligible,assisted:!!assisted,source,homeworkMode:!!homeworkMode,contentControl:gate};G.contentControl=gate;G.assisted=!!assisted;G.source=source;G.homeworkMode=!!homeworkMode;G.guidedHint=guidedHint;if(webgl){G.webglRemaining=[...new Set((m.correct||[]).map(String))];G.total=m.boss?Math.min(4,G.webglRemaining.length):G.webglRemaining.length}$('speakPrompt').hidden=false;setCaption(m.prompt);hideBattleToast();hideSnackCard();hideExplainer();clearEnteringStatusSoon();draw();return true}
 function startCurriculumChallenge(challenge,{assisted=false,homeworkMode=false}={}){
  const c=core(),skill=c?.findCurriculumSkill?.(challenge?.skillId),validation=c?.validateGeneratedChallenge?.(challenge,skill||{});
  const gate=c&&skill&&validation?.approved?generatedChallengeGate(challenge,skill,validation):null;
@@ -2431,6 +2459,8 @@ function makeGame(m){
 // The arrival line is a status, not part of the prompt: clear it once announced.
 let enteringStatusTimer=null;
 function clearEnteringStatusSoon(){clearTimeout(enteringStatusTimer);enteringStatusTimer=setTimeout(()=>{const f=$('feedback');if(f&&f.textContent.startsWith('Entering '))f.textContent=''},1500)}
+// Boss portrait from the inline sprite (UI rubric B6); unknown bosses keep the plain badge.
+function renderBossPortrait(mission){const art=document.querySelector('#bossBox .boss-art');if(!art)return;const id=String(mission?.bossId||mission?.bossName||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');const symbol=id&&document.getElementById(`b-${id}`);art.replaceChildren();art.classList.toggle('has-portrait',!!symbol);if(!symbol)return;const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('class','ui-icon');svg.setAttribute('aria-hidden','true');svg.setAttribute('focusable','false');const use=document.createElementNS('http://www.w3.org/2000/svg','use');use.setAttribute('href',`#b-${id}`);svg.appendChild(use);art.appendChild(svg)}
 // ---- Answer event contract (G2.1) -----------------------------------------------------------
 // Fired once per attempt, after the learning update and before the redraw, so presentation
 // can animate the disc that was chosen. Presentation never decides correctness.

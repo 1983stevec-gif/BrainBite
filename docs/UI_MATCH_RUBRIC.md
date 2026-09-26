@@ -77,3 +77,27 @@ Battle notes: the prompt card, honest HUD and earned toast were fixed in M1 (the
 estimate before M1 was about 5–7/20). Answers are flat cream labels, not discs; no glow or
 sparkles; minimap is abstract dots; no dock; flat sky and no shadows; at 1024x682 the HUD
 stacks above a letterboxed scene.
+
+### 2026-09-25 — after UI Phases 1–3 (branch `ui/match-targets`), scored by Claude
+
+Captures: `home-webgl-1280.png`, `home-webgl-1024.png`, `battle-webgl-1280.png`,
+`battle-webgl-1024.png`, `battle-correct-webgl-1280.png`, `boss-webgl-1280.png`.
+
+| Home | H1 | H2 | H3 | H4 | H5 | H6 | H7 | H8 | H9 | H10 | Total |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Score | 1 | 1 | 1 | 2 | 1 | 1 | 0 | 1 | 1 | 2 | **11/20** |
+
+Home notes: 1024x682 now gets the floating landscape HUD (H10 0→2); menu and orbs use the
+illustrated icon sprite (H4 1→2; H2 stays 1 because PLAY has no world thumbnail); copy no
+longer uses system language. Environment and lighting (H7, H8) wait for the art pass.
+
+| Battle | B1 | B2 | B3 | B4 | B5 | B6 | B7 | B8 | B9 | B10 | Total |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Score | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 1 | 0 | 1 | **16/20** |
+
+Battle notes: wooden answer discs with stacked fractions (B2 0→2); glow, sparkles, hop and
+chomp, toast only after an earned answer (B3 1→2); illustrated boss portraits (B6 1→2);
+illustrated route map with path, pin, checks, boss badge and chest (B7 0→2). B8 stays 1 on
+purpose: the child dock is not shown over the battle (it duplicates the exit and would pull
+a child out mid-question) nor over home (it duplicates the main menu). B9 waits for the art
+pass (ruins, waterfalls, painted backdrop).

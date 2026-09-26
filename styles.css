@@ -2584,3 +2584,21 @@ html.presentation-webgl .webgl-answer-controls--overlay button:focus-visible{out
   html.presentation-webgl .battle-target .battle-top{pointer-events:none}
   html.presentation-webgl .battle-target .battle-top > *{pointer-events:auto}
 }
+
+/* ---- UI Phase 3.1 illustrated route map --------------------------------------------------- */
+#game .minimap{background:none;border:0;display:grid;place-items:stretch}
+#game .minimap .mm-svg{width:100%;height:100%;display:block;border-radius:14px}
+
+/* ---- UI Phase 3.3 illustrated icons (one inline sprite, no extra requests) ------------------ */
+.ui-sprite{position:absolute;width:0;height:0;overflow:hidden}
+.ui-icon{width:100%;height:100%;display:block}
+.home-target .home-rail .rail-icon .ui-icon,
+html.presentation-webgl .home-target .home-rail .rail-icon .ui-icon{width:78%;height:78%}
+.home-target .orb-glyph .ui-icon{width:1.6em;height:1.6em}
+html.presentation-webgl .home-target .orb-glyph{font-size:1.1rem}
+
+@media (min-width:960px) and (min-height:600px) and (orientation:landscape){
+  html.presentation-webgl .home-target .home-rail .rail-icon{width:40px;height:40px;min-width:40px;border-radius:12px;background:rgba(255,255,255,.14)}
+}
+#game .boss-art.has-portrait{background:none;border:0;box-shadow:0 6px 14px rgba(0,0,0,.35);border-radius:50%;overflow:hidden}
+#game .boss-art.has-portrait::before,#game .boss-art.has-portrait::after{content:none}

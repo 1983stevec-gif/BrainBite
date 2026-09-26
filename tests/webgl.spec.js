@@ -637,3 +637,33 @@ for(const [width,height] of [[1024,682],[1280,800],[1920,1080]]){
     expect(hits).toEqual([true,true,true,true]);
   });
 }
+
+// ---- UI Phase 3 ----------------------------------------------------------------------
+test('the route map is an illustrated path with a pin, checks, a boss badge and a chest',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>window.BrainBiteGame.startMission(1));
+  const map=page.locator('#minimapNodes');
+  await expect(map.locator('svg.mm-svg')).toHaveCount(1);
+  await expect(map.locator('.mm-here')).toHaveCount(1);
+  await expect(map.locator('.mm-boss')).toHaveCount(1);
+  await expect(map.locator('.mm-chest')).toHaveCount(1);
+  await expect(map).toHaveAttribute('role','img');
+  await expect(map).toHaveAttribute('aria-label',/Number Nebula route: 0 of 10 missions complete, current mission 1/);
+  expect(await map.locator('svg [style]').count()).toBe(0);
+});
+
+test('home menu and utility orbs use the illustrated icon sprite, hidden from assistive tech',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  await expect(page.locator('#home .home-rail .rail-icon svg.ui-icon')).toHaveCount(6);
+  await expect(page.locator('#home .orb-glyph svg.ui-icon')).toHaveCount(3);
+  for(const name of ['Continue Adventure','Practice Lab','Worlds','BrainBase','My Bites','Code']){
+    await expect(page.getByRole('button',{name,exact:true}).first()).toBeVisible();
+  }
+  expect(await page.locator('.ui-sprite').getAttribute('aria-hidden')).toBe('true');
+});
+
+test('the child home copy avoids system language',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  const text=await page.locator('#home').innerText();
+  for(const word of ['Quality tier','Performance mode','trigger','profile boost'])expect(text).not.toContain(word);
+});
