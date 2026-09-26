@@ -2542,3 +2542,45 @@ body{padding:var(--bb-safe-top) var(--bb-safe-right) var(--bb-safe-bottom) var(-
   html.presentation-webgl .battle-target .minimap-card{flex:none}
   html.presentation-webgl .battle-target .minimap{flex:none;height:clamp(120px,22vh,190px);min-height:0;aspect-ratio:auto}
 }
+
+/* ---- G2 combo streaks --------------------------------------------------------------------- */
+#game .battle-combo{position:relative}
+#game .battle-combo.combo-flash{animation:bb-combo-flash .9s ease-out}
+#game .battle-combo.combo-flash::after{
+  content:attr(data-streak-label);position:absolute;left:50%;top:100%;transform:translateX(-50%);
+  margin-top:6px;white-space:nowrap;padding:3px 10px;border-radius:999px;
+  background:#ffd24a;color:#3a2400;font:700 .8rem var(--bb-display);box-shadow:0 6px 14px rgba(0,0,0,.35)
+}
+@keyframes bb-combo-flash{0%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,210,74,.9)}30%{transform:scale(1.12);box-shadow:0 0 0 10px rgba(255,210,74,.35)}100%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,210,74,0)}}
+
+/* ---- UI Phase 2.4: answer buttons as hit targets over the wooden discs (>=768px) ------- */
+.webgl-answer-controls.webgl-answer-controls--overlay{inset:0;left:0;right:0;bottom:0;display:block;pointer-events:none}
+html.presentation-webgl .webgl-answer-controls.webgl-answer-controls--overlay{bottom:0}
+.webgl-answer-controls--overlay button,
+html.presentation-webgl .webgl-answer-controls--overlay button{
+  position:absolute;min-width:44px;min-height:44px;padding:0;margin:0;border-radius:50%;
+  background:transparent;border:0;box-shadow:none;color:transparent;text-shadow:none;
+  pointer-events:auto;cursor:pointer;
+}
+.webgl-answer-controls--overlay button:focus-visible,
+html.presentation-webgl .webgl-answer-controls--overlay button:focus-visible{outline:4px solid #ffd24a;outline-offset:2px;box-shadow:0 0 0 8px rgba(255,210,74,.35)}
+
+/* ---- G2.5 mission-clear moment (in-flow on the world screen, never an overlay) ---------- */
+.clear-banner{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;
+  margin:8px 0 14px;padding:12px 16px;border-radius:18px;
+  background:linear-gradient(180deg,#fffdf6,#f3e7c8);color:#1c2430;border:3px solid #4f371d;box-shadow:0 10px 24px rgba(0,0,0,.3)}
+.clear-banner[hidden]{display:none}
+.clear-banner h3{margin:0;font-family:var(--bb-display);font-size:1.3rem}
+.clear-banner p{margin:2px 0 0;font-weight:800}
+.clear-chest{font-size:2.4rem;animation:bb-chest-pop .6s ease-out}
+.clear-stars{color:#e0a100;font-size:1.35rem;letter-spacing:2px}
+.clear-actions{display:flex;gap:8px}
+.clear-actions button{min-height:44px}
+@keyframes bb-chest-pop{0%{transform:translateY(20px) scale(.4);opacity:0}70%{transform:translateY(-4px) scale(1.1);opacity:1}100%{transform:none}}
+@media (max-width:520px){.clear-banner{grid-template-columns:auto minmax(0,1fr)}.clear-actions{grid-column:1/-1;justify-content:flex-end}}
+/* The floating top HUD row spans the full width; only its cards take pointer input, so a
+   disc that sits under the empty part of the row can still be tapped. */
+@media (min-width:960px) and (min-height:600px) and (orientation:landscape){
+  html.presentation-webgl .battle-target .battle-top{pointer-events:none}
+  html.presentation-webgl .battle-target .battle-top > *{pointer-events:auto}
+}

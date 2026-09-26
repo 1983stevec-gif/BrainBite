@@ -511,3 +511,129 @@ test('the 1024x682 target size gets the floating desktop HUD, not the stacked la
   const map=await page.locator('#game .minimap-card').boundingBox();
   expect(map.y).toBeGreaterThan(682/2);
 });
+
+// ---- UI Phase 2 + gameplay G2/G6.1 --------------------------------------------------
+test('answers are wooden discs on the pillars, with invisible hit targets over them on desktop',async({page})=>{
+  await page.setViewportSize({width:1280,height:800});
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>window.BrainBiteGame.startPracticeMission(8));
+  await expect(page.locator('#game .battle-frame')).toHaveAttribute('data-answer-discs','4');
+  const controls=page.locator('.webgl-answer-controls');
+  await expect(controls).toHaveClass(/webgl-answer-controls--overlay/);
+  const frame=await page.locator('#game .battle-frame').boundingBox();
+  const boxes=await page.locator('.webgl-answer-controls button').evaluateAll(buttons=>buttons.map(b=>{const r=b.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,color:getComputedStyle(b).color,name:b.textContent}}));
+  expect(boxes).toHaveLength(4);
+  for(const box of boxes){
+    expect(box.w).toBeGreaterThanOrEqual(44);
+    expect(box.y+box.h/2).toBeLessThan(frame.y+frame.height/2);
+    expect(box.color).toBe('rgba(0, 0, 0, 0)');
+    expect(box.name.length).toBeGreaterThan(0);
+  }
+  for(let i=1;i<boxes.length;i++)expect(boxes[i].x).toBeGreaterThan(boxes[i-1].x+boxes[i-1].w/2);
+});
+
+test('phones keep the labelled answer row under the scene',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>window.BrainBiteGame.startMission(1));
+  await expect(page.locator('.webgl-answer-controls button')).toHaveCount(4);
+  await expect(page.locator('.webgl-answer-controls')).not.toHaveClass(/--overlay/);
+  const color=await page.locator('.webgl-answer-controls button').first().evaluate(b=>getComputedStyle(b).color);
+  expect(color).not.toBe('rgba(0, 0, 0, 0)');
+});
+
+test('bb:answer fires exactly once per attempt with the outcome, before the redraw',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  const events=await page.evaluate(()=>{
+    const seen=[];
+    window.addEventListener('bb:answer',event=>seen.push({...event.detail,choicesAtEvent:window.BrainBiteGame.pillarChoices().length}));
+    window.BrainBiteGame.startMission(1);
+    const g=window.BrainBiteGame.getState();
+    const correct=g.webglRemaining[0];
+    window.BrainBiteGame.tryAnswer(correct);
+    window.BrainBiteGame.tryAnswer(correct);
+    window.BrainBiteGame.tryAnswer(g.m.wrong[0]);
+    return seen;
+  });
+  expect(events.map(e=>e.correct)).toEqual([true,false,false]);
+  expect(events[0]).toMatchObject({combo:1,boss:false,final:false});
+});
+
+test('the scene locks input only during the hop and re-enables it within 700 ms',async({page})=>{
+  await page.setViewportSize({width:1280,height:800});
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>window.BrainBiteGame.startMission(1));
+  await expect(page.locator('#game .battle-frame')).toHaveAttribute('data-answer-discs','4');
+  const correct=await page.evaluate(()=>window.BrainBiteGame.getState().webglRemaining[0]);
+  await page.getByRole('group',{name:'Choose an answer'}).getByRole('button',{name:correct,exact:true}).click();
+  expect(await page.evaluate(()=>window.BrainBiteGame.getState().correct)).toBe(1);
+  const next=await page.evaluate(()=>window.BrainBiteGame.getState().webglRemaining[0]);
+  await page.waitForTimeout(750);
+  await page.getByRole('group',{name:'Choose an answer'}).getByRole('button',{name:next,exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>window.BrainBiteGame.getState().correct)).toBe(2);
+});
+
+test('reduced motion shows the answer state without a hop or particles',async({page})=>{
+  await page.emulateMedia({reducedMotion:'reduce'});
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>window.BrainBiteGame.startMission(1));
+  await expect(page.locator('#game .battle-frame')).toHaveAttribute('data-answer-discs','4');
+  await answerCorrect(page);
+  await expect(page.locator('#game .battle-frame')).toHaveAttribute('data-last-answer','correct');
+  await answerWrong(page);
+  await expect(page.locator('#game .battle-frame')).toHaveAttribute('data-last-answer','wrong');
+  expect(errors).toEqual([]);
+});
+
+test('three in a row flashes the combo panel and announces the streak',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>window.BrainBiteGame.startMission(1));
+  for(let i=0;i<3;i++)await answerCorrect(page);
+  await expect(page.locator('#game .battle-combo')).toHaveClass(/combo-flash/);
+  await expect(page.locator('#comboStatus')).toHaveText(/3 in a row! Hot streak!/);
+});
+
+test('mission stars follow the exact 80% and 90% boundaries and assisted runs cap at two',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  const stars=await page.evaluate(()=>[
+    missionStarRating({correct:79,wrong:21}),missionStarRating({correct:80,wrong:20}),
+    missionStarRating({correct:89,wrong:11}),missionStarRating({correct:90,wrong:10}),
+    missionStarRating({correct:10,wrong:0,assistedAttempts:1}),missionStarRating({correct:10,wrong:0,assisted:true}),
+    missionStarRating({correct:0,wrong:0}),
+  ]);
+  expect(stars).toEqual([1,2,2,3,2,2,1]);
+});
+
+test('finishing a mission shows the clear banner with honest stars, and stars stay per profile',async({page})=>{
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>window.BrainBiteGame.startMission(1));
+  await page.evaluate(async()=>{
+    while(window.BrainBiteGame.getState()?.webglRemaining?.length){
+      window.BrainBiteGame.tryAnswer(window.BrainBiteGame.getState().webglRemaining[0]);
+      await new Promise(r=>setTimeout(r,480));
+    }
+  });
+  await expect(page.locator('#clearBanner')).toBeVisible();
+  await expect(page.locator('#clearStars')).toHaveAttribute('aria-label','3 of 3 stars');
+  await expect(page.locator('#clearPoints')).toHaveText(/\+\d+ BrainBites/);
+  expect(await page.evaluate(()=>P().missionStars[1])).toBe(3);
+  const other=await page.evaluate(()=>{const second=blank('Other Kid');STORE.profiles.push(second);STORE.active=STORE.profiles.length-1;return P().missionStars});
+  expect(other).toEqual({});
+  await page.evaluate(()=>{STORE.active=0});
+  await page.locator('#clearNext').click();
+  await expect(page.locator('#game')).toHaveClass(/show/);
+  expect(await page.evaluate(()=>window.BrainBiteGame.getState().m.id)).toBe(2);
+});
+
+for(const [width,height] of [[1024,682],[1280,800],[1920,1080]]){
+  test(`every disc can be tapped where it is drawn at ${width}x${height}`,async({page})=>{
+    await page.setViewportSize({width,height});
+    await page.goto('/?presentation=webgl');
+    await page.evaluate(()=>window.BrainBiteGame.startPracticeMission(8));
+    await expect(page.locator('#game .battle-frame')).toHaveAttribute('data-answer-discs','4');
+    await expect(page.locator('#feedback')).toHaveText('',{timeout:3000});
+    const hits=await page.locator('.webgl-answer-controls button').evaluateAll(buttons=>buttons.map(b=>{const r=b.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===b}));
+    expect(hits).toEqual([true,true,true,true]);
+  });
+}

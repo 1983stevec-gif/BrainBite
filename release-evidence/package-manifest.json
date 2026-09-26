@@ -1,10 +1,10 @@
 {
   "schema": "brainbite.package-manifest.v1",
-  "generatedAt": "2026-09-26T00:40:00.118Z",
+  "generatedAt": "2026-09-26T00:55:27.600Z",
   "files": {
     "app.js": {
-      "sha256": "127b6392570c6918dee7511f576cd676d0e89f13c90152887300d707c0c21bdf",
-      "bytes": 248856
+      "sha256": "5bacfdd2bfdd236054f15f0d3aec0222504575c066d69a22d4ea6e066cf41494",
+      "bytes": 253456
     },
     "assets/art/bite-village.svg": {
       "sha256": "10de1eed7772e502d1ac29f41c00e7b51b9dbea230312ece358a0184ebb2e49a",
@@ -267,8 +267,8 @@
       "bytes": 4577
     },
     "index.html": {
-      "sha256": "7ff0cc048911194db832f0e2e512c0997c7751aff4cc78257da13110b1de9287",
-      "bytes": 34684
+      "sha256": "727ea7bd04ea2ef3e349535ed4e30bc79d045f83c145abab5e78c3451af61485",
+      "bytes": 35284
     },
     "manifest.webmanifest": {
       "sha256": "e008f60c5e4d15a276ae1e7ede78e4c94a68a01f0eda5c8d0c81ddb3694dd499",
@@ -307,8 +307,8 @@
       "bytes": 1632
     },
     "presentation/jungle-environment.mjs": {
-      "sha256": "4de459ef46c526d46d978aacb75177d90a93a9dd4e3bf638284473999d89906a",
-      "bytes": 10722
+      "sha256": "08260825c4e7d62215f7159b9bb454bf51563ce473a685207a36a06165004ed8",
+      "bytes": 11793
     },
     "presentation/match-fx.mjs": {
       "sha256": "985af83d6dfededf7b2797d94a6aeadf6db56ba3b7f3dd95324b3d0911707366",
@@ -331,20 +331,20 @@
       "bytes": 2769
     },
     "presentation/props.mjs": {
-      "sha256": "fd67ec09fa73ff079bc629fb83422c3a54c2d2e151cd5188a06bbafff0caf8be",
-      "bytes": 11621
+      "sha256": "576423b4b977c3819513010eb6b5fae1ecd7f65b7ac6466f680f135f1305c101",
+      "bytes": 16961
     },
     "presentation/surface-textures.mjs": {
       "sha256": "aa38e79db3d1bba3d0afb266c5e2fe04189b042bed20f5aa4b0b878417207017",
       "bytes": 2255
     },
     "presentation/webgl-battle.mjs": {
-      "sha256": "74695a8187b994d40cb4eb9b47d0436a3ad13ee6e8c03e9b323fb715e466f681",
-      "bytes": 21936
+      "sha256": "3c36cfff98104bb142c011d1983aac6eb5a6ec23ea11581a47fa8457167bff71",
+      "bytes": 32043
     },
     "presentation/webgl-home.mjs": {
-      "sha256": "a1ab8218064ce4134994f6dfee6dc2e6e794f3a4828f21bb23ef4d8cd86e3457",
-      "bytes": 23081
+      "sha256": "55ca50ef0c5d8f653288aaa3ac0c9a9046d0eac44bb79d995e4fc49beacb74a8",
+      "bytes": 23174
     },
     "presentation/world-profiles.mjs": {
       "sha256": "dfe484696c6c56827433b9c44067030e0010acf71a83db41bb14c267b33dc290",
@@ -355,12 +355,12 @@
       "bytes": 3059
     },
     "service-worker.js": {
-      "sha256": "dc6f2538f266ed7d6e2198d236f2a82a611a47116ce21cdce53568f05481c590",
+      "sha256": "74f3e969ac49e087124bdf2040aef82e0ed6ca893b064cadb046ea44c4e54895",
       "bytes": 4804
     },
     "styles.css": {
-      "sha256": "2e343eb331dfc7795320699e801cb3058a3fa92291109857cdc207b13ba6d6fb",
-      "bytes": 116996
+      "sha256": "a6e987a1083232a82362066b1bd50788ef57516812bbffedb3c39a23c5065f5b",
+      "bytes": 120024
     },
     "support.html": {
       "sha256": "571ca16966c4ab566b0a247045ba6ee47e7c667494ee3938d4d50df1dcbdbc83",

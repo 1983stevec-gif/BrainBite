@@ -1,4 +1,4 @@
-const CACHE = 'brainbite-v2.0-shell-v40-kind-failure';
+const CACHE = 'brainbite-v2.0-shell-v41-answer-discs';
 const FALLBACK = './index.html';
 const CORE = [
   './',

@@ -252,3 +252,25 @@ export function fitSceneCamera(camera, aspect, { span, height, target, distance 
   camera.updateProjectionMatrix();
   camera.updateMatrixWorld();
 }
+
+// A vertical-gradient sky dome instead of a flat background colour (UI Phase 2.5). One draw
+// call, no texture, unaffected by fog so the horizon blends into the fog colour.
+export function makeSkyDome({ top = 0x9fd8ff, horizon = 0xe9f6d8, radius = 60 } = {}) {
+  const geometry = new THREE.SphereGeometry(radius, 24, 12);
+  const topColor = new THREE.Color(top);
+  const horizonColor = new THREE.Color(horizon);
+  const colors = [];
+  const position = geometry.getAttribute('position');
+  const mixed = new THREE.Color();
+  for (let i = 0; i < position.count; i += 1) {
+    const k = Math.max(0, Math.min(1, position.getY(i) / radius * 1.6 + 0.15));
+    mixed.copy(horizonColor).lerp(topColor, k);
+    colors.push(mixed.r, mixed.g, mixed.b);
+  }
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  const material = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false });
+  const dome = new THREE.Mesh(geometry, material);
+  dome.name = 'skyDome';
+  dome.renderOrder = -1;
+  return dome;
+}

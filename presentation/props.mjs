@@ -236,6 +236,114 @@ export function makeLabelSprite(text, { w = 256, h = 128, font = 'bold 44px syst
   return sprite;
 }
 
+// ---- Wooden answer discs (UI Phase 2.1) -----------------------------------------------
+// The target shows answers as carved wooden medallions on the pillars. The disc face is a
+// canvas texture so any answer (numbers, stacked fractions, words, Spanish phrases) can be
+// drawn with the self-hosted display font; it is redrawn once that font has loaded.
+const DISC_FONT = 'Fredoka, Nunito, system-ui, sans-serif';
+
+function drawDiscFace(ctx, size, value, state) {
+  const c = size / 2;
+  const r = size * 0.45;
+  ctx.clearRect(0, 0, size, size);
+  const wood = ctx.createRadialGradient(c - r * 0.3, c - r * 0.35, r * 0.1, c, c, r);
+  if (state === 'correct') { wood.addColorStop(0, '#d9ffc2'); wood.addColorStop(1, '#3a9c3f'); }
+  else if (state === 'wrong') { wood.addColorStop(0, '#ffd0c4'); wood.addColorStop(1, '#b8452c'); }
+  else { wood.addColorStop(0, '#dcac6c'); wood.addColorStop(0.65, '#c08a4c'); wood.addColorStop(1, '#8a5a2b'); }
+  ctx.fillStyle = '#5b3a1a';
+  ctx.beginPath(); ctx.arc(c, c, r + size * 0.035, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = wood;
+  ctx.beginPath(); ctx.arc(c, c, r, 0, Math.PI * 2); ctx.fill();
+  // Grain: a few low-alpha arcs, deterministic per value so a disc never flickers.
+  let seed = [...String(value)].reduce((sum, ch) => sum + ch.charCodeAt(0), 7);
+  const rand = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+  ctx.strokeStyle = 'rgba(70,40,15,0.18)';
+  ctx.lineWidth = size * 0.008;
+  for (let i = 0; i < 7; i += 1) {
+    ctx.beginPath();
+    ctx.arc(c + (rand() - 0.5) * r * 0.4, c + (rand() - 0.5) * r * 0.4, r * (0.25 + i * 0.1), rand() * 6, rand() * 6 + 1.6);
+    ctx.stroke();
+  }
+  // Bevel highlight.
+  ctx.strokeStyle = 'rgba(255,240,210,0.45)';
+  ctx.lineWidth = size * 0.02;
+  ctx.beginPath(); ctx.arc(c, c, r * 0.93, Math.PI * 1.05, Math.PI * 1.75); ctx.stroke();
+
+  ctx.fillStyle = '#2a1a0c';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const text = String(value);
+  const fraction = text.match(/^(\d+)\s*\/\s*(\d+)$/);
+  const maxWidth = r * 1.55;
+  if (fraction) {
+    const px = Math.round(size * 0.23);
+    ctx.font = `700 ${px}px ${DISC_FONT}`;
+    ctx.fillText(fraction[1], c, c - size * 0.13);
+    ctx.fillRect(c - size * 0.14, c - size * 0.012, size * 0.28, size * 0.024);
+    ctx.fillText(fraction[2], c, c + size * 0.15);
+    return;
+  }
+  let px = Math.round(size * (text.length <= 2 ? 0.34 : text.length <= 4 ? 0.26 : 0.2));
+  const fits = () => { ctx.font = `700 ${px}px ${DISC_FONT}`; return ctx.measureText(text).width <= maxWidth; };
+  while (!fits() && px > size * 0.11) px -= 2;
+  if (fits()) { ctx.fillText(text, c, c + px * 0.04); return; }
+  // Two lines for long phrases ("muchas gracias").
+  const words = text.split(/\s+/);
+  const half = Math.ceil(words.length / 2);
+  const lines = words.length > 1 ? [words.slice(0, half).join(' '), words.slice(half).join(' ')] : [text];
+  px = Math.round(size * 0.16);
+  const linesFit = () => { ctx.font = `700 ${px}px ${DISC_FONT}`; return lines.every(line => ctx.measureText(line).width <= maxWidth); };
+  while (!linesFit() && px > size * 0.08) px -= 2;
+  lines.forEach((line, i) => ctx.fillText(line, c, c + (i - (lines.length - 1) / 2) * px * 1.05));
+}
+
+export function makeAnswerDisc(value, { size = 512, anisotropy = 4 } = {}) {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = anisotropy;
+  // The cylinder cap's UVs run sideways once the disc is stood up; turn the face upright.
+  texture.center.set(0.5, 0.5);
+  texture.rotation = Math.PI / 2;
+  let state = 'idle';
+  const paint = () => { drawDiscFace(ctx, size, value, state); texture.needsUpdate = true; };
+  paint();
+  // Redraw with the display font once it is available (it is self-hosted and precached).
+  document.fonts?.load?.(`700 64px Fredoka`).then(paint, () => {});
+  const face = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.62, metalness: 0.02, emissive: 0x000000, alphaTest: 0.5 });
+  // One material, one draw call per disc (the battle scene runs close to its 200-call
+  // budget). CylinderGeometry groups are 0 side, 1 top cap, 2 bottom cap: the side's UVs are
+  // pointed at the dark rim ring of the face texture so the edge reads as wood, not as a
+  // smeared copy of the face. The top cap faces the camera once the disc is stood up.
+  const geometry = new THREE.CylinderGeometry(0.62, 0.62, 0.14, 48);
+  const uv = geometry.getAttribute('uv');
+  const side = geometry.groups[0];
+  for (let i = side.start; i < side.start + side.count; i += 1) uv.setXY(geometry.index.getX(i), 0.5, 0.968);
+  geometry.clearGroups();
+  const disc = new THREE.Mesh(geometry, face);
+  disc.rotation.x = Math.PI / 2;
+  disc.name = 'answerDisc';
+  disc.castShadow = true;
+  const holder = new THREE.Group();
+  holder.add(disc);
+  holder.userData = {
+    value,
+    disc,
+    setState(next) {
+      if (next === state) return;
+      state = next;
+      paint();
+      const glow = next === 'correct' ? 0x3dff8a : next === 'wrong' ? 0xff5a5a : 0x000000;
+      face.emissive.setHex(glow);
+      face.emissiveIntensity = next === 'idle' ? 0 : 0.35;
+    },
+  };
+  return holder;
+}
+
 export function makeWorldSign(text) {
   const canvas = document.createElement('canvas');
   canvas.width = 512;

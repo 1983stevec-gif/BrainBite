@@ -159,7 +159,7 @@ approved, 0 rejected** (0 digest mismatches).
   lives in `content/storage-copies.js` and is unit-tested.
 - **The service worker precache is a fixed list.** Adding a runtime asset means updating
   `service-worker.js` *and* the stage allowlist, then bumping the cache name
-  (`brainbite-v2.0-shell-v40-kind-failure`) so clients re-precache.
+  (`brainbite-v2.0-shell-v41-answer-discs`) so clients re-precache.
 - **Fonts are self-hosted and the CSP is strict** (`script-src 'self'`, `worker-src 'self'`,
   no `unsafe-eval`, no wasm compilation). Any new dependency must fit inside that; Draco did
   not (§7).
