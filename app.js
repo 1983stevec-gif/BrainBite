@@ -91,8 +91,11 @@ function generatedChallengeGate(challenge,skill,validation){
   skill,
  })
 }
-function blank(name='Kid 1'){return {id:(crypto.randomUUID?.()||('p-'+Date.now()+'-'+Math.random())),name,score:0,stars:0,spark:0,progression:REGISTRY.createProgression(),learningCore:null,bestCombo:0,missionStars:{},bite:'Nib',unlockedBites:['Nib'],cosmetics:[],equippedCosmetic:null,programmableBits:{},activeProgrammableBitId:null,mastery:{math:10,words:10,spanish:10},skills:{},mistakes:[],practice:[],snap:[],sessions:[],settings:{reducedMotion:false,cameraMotionReduction:false,largeTargets:false,highContrast:false,captions:false,dyslexicFont:false,textScale:'1',qualityTier:'balanced',soundOn:true,musicOn:false,volume:80,enemySpeed:'normal'},controls:{dailyMinutes:30,maxSessionMinutes:20,requireParentForPractice:false}}}
+function blank(name='Kid 1'){return {id:(crypto.randomUUID?.()||('p-'+Date.now()+'-'+Math.random())),name,score:0,stars:0,spark:0,progression:REGISTRY.createProgression(),learningCore:null,bestCombo:0,missionStars:{},bite:'Nib',unlockedBites:['Nib'],cosmetics:[],equippedCosmetic:null,programmableBits:{},activeProgrammableBitId:null,mastery:{math:10,words:10,spanish:10},skills:{},mistakes:[],practice:[],snap:[],sessions:[],settings:{reducedMotion:false,cameraMotionReduction:false,largeTargets:false,highContrast:false,captions:false,dyslexicFont:false,textScale:'1',qualityTier:'balanced',soundOn:true,musicOn:false,volume:80,vibrationOn:true,enemySpeed:'normal'},controls:{dailyMinutes:30,maxSessionMinutes:20,requireParentForPractice:false}}}
 let LOADED_STORE_RAW=null;
+// M2 native save mirror. Set by load() before the first write, so the restore check sees
+// what was on disk at boot, not the blank store that initializeCanonicalState writes.
+var WEB_STORE_MISSING_AT_BOOT=false,NATIVE_MIRROR_STATE='pending',NATIVE_MIRROR_LAST=null;
 const SCHEMA_VERSION=9;
  const DEF={schemaVersion:SCHEMA_VERSION,registryVersion:REGISTRY.registryVersion,active:0,profiles:[blank()],deletedProfiles:[]};let STORE=load(),G=null;function P(){return STORE.profiles[STORE.active]}
  window.BrainBiteProfile={getActiveBit:()=>{const bits=P()?.programmableBits||{};return bits[P()?.activeProgrammableBitId]||Object.values(bits)[0]||null}};
@@ -723,14 +726,27 @@ function readStoredStore(raw){
 function readStoredCopy(key){return readStoredStore(localStorage.getItem(key))}
 
 function writeStoreCopiesUnlocked(store){
- return BrainBiteStorageCopies.writeRotated(localStorage,STORE_COPY_KEYS,store,readStoredCopy);
+ const payload=BrainBiteStorageCopies.writeRotated(localStorage,STORE_COPY_KEYS,store,readStoredCopy);
+ mirrorStoreToNative(payload);
+ return payload;
+}
+// Store apps only: copy each successful save outside the WebView (see storage-copies.js).
+// Held back until the boot-time restore check has finished, so a blank first-boot store
+// can never overwrite a good mirror.
+function mirrorStoreToNative(payload){
+ const platform=window.BrainBitePlatform;
+ if(NATIVE_MIRROR_STATE!=='ready'||!platform?.nativeStore?.available?.()||typeof payload!=='string'||payload===NATIVE_MIRROR_LAST)return;
+ NATIVE_MIRROR_LAST=payload;
+ Promise.resolve(platform.nativeStore.set(BrainBiteStorageCopies.MIRROR_KEY,payload)).catch(()=>{NATIVE_MIRROR_LAST=null});
 }
 
 // Write the reconciled state to every slot. This is only safe once the generations have
 // been unioned, because the result is then a superset of each slot. Ordinary autosaves
 // keep rotating distinct generations through writeStoreCopiesUnlocked.
 function convergeStoreCopiesUnlocked(store){
- return BrainBiteStorageCopies.converge(localStorage,STORE_COPY_KEYS,store);
+ const payload=BrainBiteStorageCopies.converge(localStorage,STORE_COPY_KEYS,store);
+ mirrorStoreToNative(payload);
+ return payload;
 }
 
 // The initial canonical load runs before the ES module that provides LearningCore, so it
@@ -1530,6 +1546,7 @@ function migrateStore(x){
    if(!p.settings.qualityTier)p.settings.qualityTier='balanced';
    if(p.settings.soundOn===undefined)p.settings.soundOn=true;
    if(p.settings.musicOn===undefined)p.settings.musicOn=false;
+   if(p.settings.vibrationOn===undefined)p.settings.vibrationOn=true;
    if(!Number.isFinite(Number(p.settings.volume)))p.settings.volume=80;
    if(!p.settings.enemySpeed)p.settings.enemySpeed='normal';if(!p.controls||typeof p.controls!=='object')p.controls={};
    p.controls.dailyMinutes=Math.max(5,Math.min(180,Number(p.controls.dailyMinutes)||30));p.controls.maxSessionMinutes=Math.max(5,Math.min(120,p.controls.dailyMinutes,Number(p.controls.maxSessionMinutes)||20));delete p.controls.requireParentForSnap;p.controls.requireParentForPractice=!!p.controls.requireParentForPractice;
@@ -1539,7 +1556,7 @@ function migrateStore(x){
  return x;
 }
 
-function load(){LOADED_STORE_RAW=localStorage.getItem(KEY);return mergeStores(null,readAllStoredStores())}
+function load(){LOADED_STORE_RAW=localStorage.getItem(KEY);const copies=readAllStoredStores();WEB_STORE_MISSING_AT_BOOT=copies.length===0;return mergeStores(null,copies)}
 function save(){const startedAt=globalThis.performance?.now?.();if(P()){if(core())projectLearningCore(P(),ensureProfileLearningCore(P()));P().updatedAt=Date.now()}queueSyncEvent({type:'store-update',profileId:P()?.id||null,payload:{active:STORE.active,schemaVersion:STORE.schemaVersion},schemaVersion:STORE.schemaVersion,ts:Date.now()});render();return persistCanonicalState().then(result=>{if(startedAt!=null)window.BrainBitePresentation?.recordSave?.(Math.max(0,globalThis.performance.now()-startedAt));return result})}
 const PARENT_ONLY_SCREENS=new Set(['profiles','recovery','account','integrations','controls','diagnostics','release','qa','advanced']);
 const RETIRED_SCREEN_IDS=new Set(['snap']);
@@ -2728,7 +2745,7 @@ function bossTick(){
 function enemy(){let step=P().settings.enemySpeed==='slow'?2:1;if(G.moves%step)return;let x=G.e.x,y=G.e.y,dx=Math.sign(G.p.x-x),dy=Math.sign(G.p.y-y);if(Math.abs(G.p.x-x)>Math.abs(G.p.y-y))x+=dx;else y+=dy;G.e={x,y}}
 function hit(){if(G.e.x===G.p.x&&G.e.y===G.p.y){G.lives--;G.combo=0;G.e={x:0,y:0};$('feedback').textContent='Bonk! Keep going.';fileCue('hit');handleOutOfLives()}}
 function complete(){if(!checkpointGameplayActivity({reason:'complete'}))return false;const session={mission:G.m.id,world:G.m.world,skillId:G.m.skill,combo:G.max,accuracy:G.correct?Math.round(100*G.correct/Math.max(1,G.correct+G.wrong)):null,moves:G.moves,durationSec:Math.max(1,Math.round((Date.now()-(G.startedAt||Date.now()))/1000)),practice:G.progressionEligible===false,homework:!!G.homeworkMode,source:G.source||'mission',ts:Date.now()};if(G.progressionEligible===false){recordLearningSession(session);save();fileCue('clear');$('feedback').textContent='Practice complete!';setCaption('Practice complete.');setTimeout(()=>{show('home');render()},600);return true}const profile=P(),before=progression(),wasComplete=before.completedMissionIds.includes(G.m.id),next=REGISTRY.completeMission(before,G.m.id);if(!wasComplete&&!next.completedMissionIds.includes(G.m.id)){$('feedback').textContent='This mission is still locked.';return false}profile.progression=next;if(!wasComplete){profile.stars+=3;profile.spark+=(G.m.boss?10:3)}profile.bestCombo=Math.max(profile.bestCombo,G.max);const missionStars=missionStarRating(G);profile.missionStars={...(profile.missionStars||{})};profile.missionStars[G.m.id]=Math.max(Number(profile.missionStars[G.m.id])||0,missionStars);fileCue(G.m.boss?'boss':'clear');recordLearningSession(session);save();if(G.internalBubbleReefPreview)void grantBubbleReefPreviewReward({profileId:profile.id,missionId:G.m.id,progression:next,awardedAt:session.ts,canonicalRewardGranted:!wasComplete});$('feedback').textContent=G.m.boss?`${G.m.bossName} defeated!`:'Mission complete!';setCaption(G.m.boss?`${G.m.bossName} defeated.`:'Mission complete.');const clear={missionId:G.m.id,world:G.m.world,title:G.m.boss?`${G.m.bossName} defeated!`:'Mission complete!',stars:missionStars,earned:Number(G.earned)||0};setTimeout(()=>{const match=document.documentElement.classList.contains('presentation-match');const target=match?'home':G.m.world;show(target);render();showClearBanner(target,clear)},600);return true}
-function applySettings(){let s=P().settings;$('reducedMotion').checked=s.reducedMotion;$('cameraMotionReduction').checked=s.cameraMotionReduction;$('largeTargets').checked=s.largeTargets;$('highContrast').checked=s.highContrast;$('captions').checked=s.captions;$('dyslexicFont').checked=s.dyslexicFont;$('textScale').value=s.textScale||'1';$('qualityTier').value=s.qualityTier||'balanced';$('enemySpeed').value=s.enemySpeed;$('soundOn').checked=s.soundOn;$('musicOn').checked=s.musicOn;$('volume').value=String(Number.isFinite(Number(s.volume))?s.volume:80);$('volumeValue').textContent=`${$('volume').value}%`;syncMusic();const root=document.documentElement;root.classList.toggle('reduced-motion',s.reducedMotion);root.classList.toggle('camera-motion-reduction',s.cameraMotionReduction);root.classList.toggle('large-targets',s.largeTargets);root.classList.toggle('high-contrast',s.highContrast);root.classList.toggle('captions-on',s.captions);root.classList.toggle('dyslexic-font',s.dyslexicFont);root.classList.toggle('quality-ultra',s.qualityTier==='ultra');root.classList.toggle('quality-high',s.qualityTier==='high');root.classList.toggle('quality-balanced',!s.qualityTier||s.qualityTier==='balanced');root.classList.toggle('quality-performance',s.qualityTier==='performance');root.classList.toggle('quality-mobile',s.qualityTier==='mobile');root.classList.toggle('low-end-device',lowEndDevice());root.style.setProperty('--bb-text-scale',String(Number(s.textScale)||1))}
+function applySettings(){let s=P().settings;$('reducedMotion').checked=s.reducedMotion;$('cameraMotionReduction').checked=s.cameraMotionReduction;$('largeTargets').checked=s.largeTargets;$('highContrast').checked=s.highContrast;$('captions').checked=s.captions;$('dyslexicFont').checked=s.dyslexicFont;$('textScale').value=s.textScale||'1';$('qualityTier').value=s.qualityTier||'balanced';$('enemySpeed').value=s.enemySpeed;$('soundOn').checked=s.soundOn;$('musicOn').checked=s.musicOn;if($('vibrationOn'))$('vibrationOn').checked=s.vibrationOn!==false;if($('vibrationRow'))$('vibrationRow').hidden=!window.BrainBitePlatform?.isNativeShell?.();$('volume').value=String(Number.isFinite(Number(s.volume))?s.volume:80);$('volumeValue').textContent=`${$('volume').value}%`;syncMusic();const root=document.documentElement;root.classList.toggle('reduced-motion',s.reducedMotion);root.classList.toggle('camera-motion-reduction',s.cameraMotionReduction);root.classList.toggle('large-targets',s.largeTargets);root.classList.toggle('high-contrast',s.highContrast);root.classList.toggle('captions-on',s.captions);root.classList.toggle('dyslexic-font',s.dyslexicFont);root.classList.toggle('quality-ultra',s.qualityTier==='ultra');root.classList.toggle('quality-high',s.qualityTier==='high');root.classList.toggle('quality-balanced',!s.qualityTier||s.qualityTier==='balanced');root.classList.toggle('quality-performance',s.qualityTier==='performance');root.classList.toggle('quality-mobile',s.qualityTier==='mobile');root.classList.toggle('low-end-device',lowEndDevice());root.style.setProperty('--bb-text-scale',String(Number(s.textScale)||1))}
 document.querySelectorAll('[data-screen]').forEach(button=>button.addEventListener('click',()=>show(button.dataset.screen)));
 $('unlockParent').onclick=async()=>{const pin=$('parentPinInput').value,confirmPin=$('confirmParentPin').value;try{if(!readParentAuth()){if(pin!==confirmPin)throw new Error('PIN confirmation does not match.');await createParentAuth(pin);unlockParentAccess();$('parentGateMsg').textContent='Family PIN set. Parent areas are unlocked.'}else{const result=await verifyParentPin(pin);if(result.locked)throw new Error(`Too many attempts. Try again after ${new Date(result.lockedUntil).toLocaleTimeString()}.`);if(!result.ok)throw new Error(`Incorrect PIN. ${result.remaining} attempt(s) remaining.`);unlockParentAccess();$('parentGateMsg').textContent='Parent areas unlocked.'}$('parentGate').hidden=true;$('parentContent').hidden=false;syncNavigationState('parent')}catch(error){$('parentGateMsg').textContent=error.message}finally{$('parentPinInput').value='';$('confirmParentPin').value='';renderParentGate()}};
 $('saveParentPin').onclick=async()=>{const current=$('changeCurrentParentPin').value,next=$('newParentPin').value,confirmPin=$('changeConfirmParentPin').value;try{const verified=await verifyParentPin(current);if(verified.locked)throw new Error(`Too many attempts. Try again after ${new Date(verified.lockedUntil).toLocaleTimeString()}.`);if(!verified.ok)throw new Error('Current PIN is incorrect.');if(next!==confirmPin)throw new Error('New PIN confirmation does not match.');await createParentAuth(next);unlockParentAccess();$('parentPinStatus').textContent='Family PIN changed.'}catch(error){$('parentPinStatus').textContent=error.message}finally{for(const id of ['changeCurrentParentPin','newParentPin','changeConfirmParentPin'])$(id).value=''}};
@@ -3029,3 +3046,83 @@ new MutationObserver(() => {
  if(!cells.length)return;
  for(let i=0;i<cells.length;i+=5){const row=document.createElement('div');row.setAttribute('role','row');row.setAttribute('aria-rowindex',String(i/5+1));board.insertBefore(row,cells[i]);cells.slice(i,i+5).forEach(cell=>row.appendChild(cell))}
 }).observe(document.body,{childList:true,subtree:true});
+
+/* ---- M2 native shell readiness --------------------------------------------------------
+   Everything below is inert on the web build: each handler first asks BrainBitePlatform
+   whether a native store shell (or the ?native=1 test simulation) is present. */
+
+// Outbound links (Apple 1.3 Kids Category, Google Families): in the store apps, anything
+// that leaves the game, and the footer pages that link onward, sit behind the family PIN.
+document.addEventListener('click',event=>{
+ const link=event.target?.closest?.('a[href]');const platform=window.BrainBitePlatform;
+ if(!link||!platform?.isNativeShell?.())return;
+ const href=link.getAttribute('href')||'';
+ if(link.hasAttribute('download')||href.startsWith('blob:')||href.startsWith('#'))return;
+ const external=platform.isExternalUrl(link.href);
+ if(!external&&!link.hasAttribute('data-parent-gated'))return;
+ if(!hasParentAccess()){
+  event.preventDefault();show('parent');
+  $('parentGateMsg').textContent='Grown-ups only: enter the family PIN, then tap the link again.';
+  return;
+ }
+ if(external){event.preventDefault();void platform.openExternal(link.href)}
+},true);
+
+$('vibrationOn')?.addEventListener('change',event=>{P().settings.vibrationOn=event.target.checked;save()});
+// Light tap on a right answer, double buzz on a wrong one. Presentation only: bb:answer is
+// dispatched after the learning update has already decided correctness.
+window.addEventListener('bb:answer',event=>{
+ const platform=window.BrainBitePlatform,s=P()?.settings;
+ if(!platform?.isNativeShell?.()||!s||s.vibrationOn===false||s.reducedMotion)return;
+ void platform.haptic(event.detail?.correct?'correct':'wrong');
+});
+
+// Android hardware back. Battle: the same checkpointed exit as the pause button. Parent
+// sub-screens: back to the parent hub. Other screens: home. Home: ask before leaving, and
+// only exit once every pending save has finished. The time-limit screen ignores it.
+function handleNativeBack(){
+ const leave=$('leaveDialog');
+ if(leave&&!leave.hidden){leave.hidden=true;return 'dismiss-leave'}
+ const id=document.querySelector('.screen.show')?.id||'home';
+ if(id==='timeup')return 'ignored-timeup';
+ if(id==='game'){if($('snackCard')&&!$('snackCard').hidden)return 'ignored-snack';$('exitBtn').click();return 'exit-mission'}
+ if(PARENT_ONLY_SCREENS.has(id)){show('parent');return 'parent'}
+ if(id==='home'){if(leave){leave.hidden=false;$('leaveStay')?.focus()}return 'confirm-leave'}
+ show('home');return 'home';
+}
+window.addEventListener('bb:native-back',()=>{if(window.BrainBitePlatform?.isNativeShell?.())handleNativeBack()});
+if($('leaveStay'))$('leaveStay').onclick=()=>{$('leaveDialog').hidden=true};
+if($('leaveConfirm'))$('leaveConfirm').onclick=async()=>{
+ $('leaveDialog').hidden=true;
+ await PERSISTENCE_CHAIN.catch(()=>{});
+ await window.BrainBitePlatform?.exitApp?.();
+};
+
+// Boot-time restore: only when all three web generations were unreadable at boot and the
+// native mirror holds a valid store. Then mirroring starts.
+async function restoreFromNativeMirror(){
+ const platform=window.BrainBitePlatform;
+ if(!platform?.nativeStore?.available?.()){NATIVE_MIRROR_STATE='unavailable';return 'unavailable'}
+ let result='web-intact';
+ try{
+  if(WEB_STORE_MISSING_AT_BOOT){
+   const raw=await platform.nativeStore.get(BrainBiteStorageCopies.MIRROR_KEY);
+   const restored=BrainBiteStorageCopies.restoreFromMirror(raw,readStoredStore);
+   if(restored){
+    await PERSISTENCE_CHAIN.catch(()=>{});
+    STORE=mergeStores(null,[restored]);
+    LOADED_STORE_RAW=JSON.stringify(STORE);
+    convergeStoreCopiesUnlocked(STORE);
+    render();applySettings();show('home');
+    result='restored';
+   }else result='no-mirror';
+  }
+ }catch{result='error'}
+ finally{
+  NATIVE_MIRROR_STATE='ready';
+  mirrorStoreToNative(localStorage.getItem(KEY));
+ }
+ return result;
+}
+const NATIVE_MIRROR_RESTORE=restoreFromNativeMirror();
+window.BrainBiteNative={back:handleNativeBack,restore:()=>NATIVE_MIRROR_RESTORE,mirrorState:()=>NATIVE_MIRROR_STATE};

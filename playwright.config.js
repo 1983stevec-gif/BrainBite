@@ -6,7 +6,7 @@ const testBaseUrl = `http://127.0.0.1:${testPort}`;
 export default defineConfig({
   globalSetup: './tests/playwright-global-setup.mjs',
   testDir: 'tests',
-  testMatch: ['release.spec.js', 'brainbase.spec.js', 'match.spec.js', 'activity-families.spec.js', 'webgl.spec.js', 'webgl-accessibility.spec.js', 'webgl-assets.spec.js', 'bubble-reef-preview.spec.js'],
+  testMatch: ['release.spec.js', 'brainbase.spec.js', 'match.spec.js', 'activity-families.spec.js', 'webgl.spec.js', 'webgl-accessibility.spec.js', 'webgl-assets.spec.js', 'bubble-reef-preview.spec.js', 'native-shell.spec.js'],
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,

@@ -1,4 +1,4 @@
-const CACHE = 'brainbite-v2.0-shell-v43-fun-pass';
+const CACHE = 'brainbite-v2.0-shell-v44-native-ready';
 const FALLBACK = './index.html';
 const CORE = [
   './',
@@ -32,6 +32,7 @@ const CORE = [
   './assets/art/bloop.svg',
   './assets/art/scout.svg',
   './assets/art/bite-village.svg',
+  './presentation/platform.js',
   './presentation/boot.mjs',
   './presentation/presentation-adapter.mjs',
   './presentation/capability.mjs',

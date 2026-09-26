@@ -61,5 +61,23 @@
     return payload;
   }
 
-  root.BrainBiteStorageCopies = Object.freeze({ DEFAULT_KEYS, readAll, readEvery, writeRotated, converge });
+  // Native save mirror (store apps only). The WebView's storage can be cleared by the OS
+  // or on reinstall, so native shells keep one more copy outside it. It is a last resort:
+  // it is used only when none of the three web generations is readable, so it can never
+  // roll back a newer web save.
+  const MIRROR_KEY = 'bb-core-v3-native-mirror';
+
+  function shouldRestoreFromMirror(read, keys = DEFAULT_KEYS) {
+    return readAll(read, keys).length === 0;
+  }
+
+  // `parse(raw)` is app.js's validating reader. Returns the store to restore, or null.
+  function restoreFromMirror(raw, parse) {
+    if (typeof raw !== 'string' || !raw) return null;
+    let store = null;
+    try { store = parse(raw); } catch { return null; }
+    return store && Array.isArray(store.profiles) && store.profiles.length > 0 ? store : null;
+  }
+
+  root.BrainBiteStorageCopies = Object.freeze({ DEFAULT_KEYS, MIRROR_KEY, readAll, readEvery, writeRotated, converge, shouldRestoreFromMirror, restoreFromMirror });
 })(typeof window !== 'undefined' ? window : globalThis);

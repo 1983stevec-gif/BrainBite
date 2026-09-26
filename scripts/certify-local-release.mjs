@@ -99,6 +99,7 @@ try {
     ['activity-browser', 'tests/activity-families.spec.js', 'tests/bubble-reef-preview.spec.js'],
     ['webgl-browser', 'tests/webgl.spec.js', 'tests/webgl-accessibility.spec.js', 'tests/webgl-assets.spec.js'],
     ['brainbase-match-browser', 'tests/brainbase.spec.js', 'tests/match.spec.js'],
+    ['native-shell-browser', 'tests/native-shell.spec.js'],
   ];
   for (const [label, ...specs] of browserGroups) {
     // One retry, matching CI. Under load a WebGL mount or a reload can exceed its timeout
