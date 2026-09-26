@@ -37,13 +37,38 @@ jobs:
           path: playwright-report
           if-no-files-found: ignore
           retention-days: 14
-      # One runner owns the smoke inventory, starts its own server, and writes evidence.
+      # One runner owns the smoke inventory, starts its own server, and writes its report to
+      # the git-ignored .playwright-results/ (tracked evidence changes only via evidence:refresh).
       - run: npm run smoke
       - name: Upload smoke evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: smoke-report
-          path: release-evidence/smoke-report.json
+          path: .playwright-results/smoke-report.json
           if-no-files-found: ignore
           retention-days: 14
+      - name: Test runs leave the tracked tree unchanged
+        run: git diff --exit-code --stat
+
+  # The executable rules test needs a real Firestore emulator. It used to run only by hand,
+  # so a rules regression could pass CI silently.
+  firestore-rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Firestore rules against the emulator
+        env:
+          REQUIRE_FIRESTORE_EMULATOR: '1'
+        run: >
+          npx --yes firebase-tools@13 emulators:exec
+          --only firestore --project demo-brainbite --config firebase/firebase.json
+          "cd $GITHUB_WORKSPACE && node --test tests/firebase-security-rules.test.mjs"

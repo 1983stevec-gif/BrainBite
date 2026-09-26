@@ -3,9 +3,11 @@ import { chromium } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openWorld } from './lib/smoke-nav.mjs';
+import { referenceCaptureDir } from './lib/evidence-paths.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
-const out = path.join(root, '..', 'docs', 'references', 'spike');
+const out = referenceCaptureDir;
+await import('node:fs').then(fs => fs.mkdirSync(out, { recursive: true }));
 const base = process.env.BB_BASE || process.env.PLAYWRIGHT_BASE_URL || `http://127.0.0.1:` + String(process.env.BRAINBITE_TEST_PORT || 4318);
 
 async function clearCaches(page) {

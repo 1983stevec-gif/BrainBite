@@ -126,7 +126,7 @@ try {
 
   // One reported smoke runner owns the smoke inventory; the performance probe stays
   // separate because it produces its own evidence pack.
-  await record('smoke-runner', nodeCommand, ['scripts/smoke-runner.mjs']);
+  await record('smoke-runner', nodeCommand, ['scripts/smoke-runner.mjs', '--promote']);
   {
     const entry = results.at(-1);
     try {

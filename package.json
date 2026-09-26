@@ -47,7 +47,8 @@
     "check:firebase:security": "node scripts/validate-firebase-security.mjs",
     "check:evidence": "node scripts/validate-evidence.mjs",
     "check:evidence:ci": "node scripts/validate-evidence.mjs --allow-foreign-checkout",
-    "certify:local": "node scripts/certify-local-release.mjs"
+    "certify:local": "node scripts/certify-local-release.mjs",
+    "evidence:refresh": "node scripts/smoke-runner.mjs --promote"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

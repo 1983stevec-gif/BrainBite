@@ -10,7 +10,7 @@ Fill this out while executing `docs/BATCH_8_EXTERNAL_LAUNCH_PLAN.md` in the real
 
 - In-repo automated release gate is green in this snapshot.
 - Public Privacy, Support, and Terms pages are present and linked from the footer.
-- Gates 8.1â€“8.3 are complete. Gates 8.4â€“8.6 remain pending.
+- Gates 8.1–8.3 are complete. Gates 8.4–8.6 remain pending.
 
 ## Gate 8.1 Real Git Checkout
 
@@ -25,8 +25,8 @@ Evidence:
 
 - Commit: `331cea5` (verified again on 2026-09-02 after `npm ci` + `npm run release:check`)
 - Branch: `main`
-- Remote: `origin` â†’ `https://github.com/1983stevec-gif/BrainBite`
-- Result: PASS â€” 29 content packs, 40 question sets, 16 unit tests, 22 Playwright tests
+- Remote: `origin` → `https://github.com/1983stevec-gif/BrainBite`
+- Result: PASS — 29 content packs, 40 question sets, 16 unit tests, 22 Playwright tests
 
 ## Gate 8.2 Production Firebase Setup
 
@@ -57,9 +57,9 @@ Evidence:
 
 - Account: production Email/Password parent on `brainbite-prod`
 - Learner: local profiles synced under family UID `OvC2ntxWqkcHjZkDuHec4PSkUQk1`
-- Push result: PASS â€” Firestore `families/.../profiles` populated
-- Pull result: PASS â€” operator confirmed Gate 8.3 done (Incognito second session)
-- Merge result: PASS â€” second-session pull restored family progress without reported duplication
+- Push result: PASS — Firestore `families/.../profiles` populated
+- Pull result: PASS — operator confirmed Gate 8.3 done (Incognito second session)
+- Merge result: PASS — second-session pull restored family progress without reported duplication
 
 ## Gate 8.4 Real Device Matrix
 

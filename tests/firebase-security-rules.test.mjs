@@ -140,6 +140,12 @@ rejectsMutation(
 );
 
 const emulatorHost = process.env.FIRESTORE_EMULATOR_HOST;
+// CI sets REQUIRE_FIRESTORE_EMULATOR so a missing emulator fails instead of skipping silently.
+if (process.env.REQUIRE_FIRESTORE_EMULATOR === '1') {
+  test('the Firestore emulator is available when CI requires it', () => {
+    assert.ok(emulatorHost, 'FIRESTORE_EMULATOR_HOST must be set (run under firebase emulators:exec)');
+  });
+}
 
 function tokenFor(uid) {
   const now = Math.floor(Date.now() / 1000);

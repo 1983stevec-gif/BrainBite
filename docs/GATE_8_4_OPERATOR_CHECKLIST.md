@@ -2,7 +2,7 @@
 
 Date: 2026-09-02  
 App under test: shipping **2D PWA** — open with `?match=0&webgl=0`
-Batch 9 MATCH plates / WebGL are optional extras on `batch-9-webgl-spike`
+Live 3D (WebGL) is the default presentation on `main` since PR #1; test the 2D path above and, on each device, also open the default URL once to confirm the 3D scene loads or falls back cleanly.
 
 ## URL
 

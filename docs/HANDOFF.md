@@ -1,17 +1,21 @@
 # BrainBite — closed beta handoff
 
-**Revision:** `3c522ca` on `main`, in sync with `origin/main`, working tree clean.
-**Written:** 2026-09-22.
+**Revision:** this file describes the commit that last changed it
+(`git log -1 --format=%h -- docs/HANDOFF.md`). A hard-coded hash here was always one commit
+behind, because committing the file changes HEAD.
+**Written:** 2026-09-22 · **Updated:** 2026-09-25 (hygiene batch H1–H6, decisions D1–D14).
 
 This document is the entry point. It says what is verified, what is not, who owns what is
 left, and the operational details that are easy to get wrong. The other documents go deeper:
 
 | Document | Contents |
 |---|---|
-| `docs/BRAINBITE_PRODUCTION_GOAL.md` | The authoritative plan and the dated progress ledger |
 | `docs/CLOSED_BETA_READINESS.md` | Verified surface, evidence inventory, defect ledger, external gates, rollback |
-| `docs/BRAINBITE_ENHANCEMENT_PLAN.md` | Enhancement items A–M with acceptance checks and results |
-| `docs/AUDIT_2026-09-21.md` | The audit that this cycle acted on |
+| `docs/BRAINBITE_PRODUCTION_GOAL.md` | The product plan and the dated progress ledger |
+| `docs/GATE_8_*` | Operator checklists and review packets for the external gates |
+| `docs/archive/` | Superseded plans, audits and handoffs (history only; do not act on them) |
+
+`AGENTS.md` points here and nowhere else.
 
 ---
 
@@ -37,10 +41,10 @@ Every row below is reproducible from this revision. Evidence files are committed
 
 | Gate | Command | Result | Evidence |
 |---|---|---|---|
-| Static checks (9) | `npm run check:static` | PASS | console |
+| Static checks (10) | `npm run check:static` | PASS (includes `check:encoding`) | console |
 | Unit tests | `npm run test:unit` | **205/205** | console |
 | Browser suite | `npm run test:e2e` | **161/161** | console |
-| Smoke inventory | `npm run smoke` | **11/11** | `release-evidence/smoke-report.json` |
+| Smoke inventory | `npm run smoke` | **11/11** | `.playwright-results/smoke-report.json`; tracked copy via `npm run evidence:refresh` |
 | Performance probe | `npm run probe:performance` | exit 0, **0 headless budget violations** | `test-results/performance-evidence/summary.json` |
 | Local certification | `npm run certify:local` | **16/16 stages**, 161 browser tests, 0 flaky | `release-evidence/local-certification.json` |
 | Release evidence | `npm run check:evidence` | PASS | `release/v14-evidence.json` |
@@ -83,7 +87,7 @@ None of these can be closed from code. They are re-stated in
 | Spanish fluency review | Human reviewer | `docs/GATE_8_5_SPANISH_INVENTORY.md` |
 | Legal / privacy sign-off | Human reviewer | `docs/GATE_8_5_LEGAL_CLAUSE_MAP.md` |
 | Production domain, HTTPS, support contact | Steve | `docs/GATE_8_6_OPERATOR_CHECKLIST.md` |
-| Production Firebase delete/export | Steve | Needs a signed-in production session |
+| Production Firebase delete/export, cross-family denial in logs | Steve | Needs a signed-in production session. Sign-in, rules deploy, push and two-session pull were done on `brainbite-prod` on 2026-09-02; see `release/v14-evidence.json` → `batch8.firebaseProductionScope` for exactly what was and was not exercised |
 | Store packaging and signing | Steve | The current installer is unsigned |
 
 ---
@@ -99,7 +103,7 @@ None of these can be closed from code. They are re-stated in
 **Content review**: `content/content-review-manifest.js` (105 records; generated rows plus
 two hand-maintained data blocks, `EDUCATOR_APPROVALS` and `REVIEWER_FINDINGS`).
 
-**Tooling** in `scripts/`: nine `check-*.mjs` static validators, `validate-*.mjs` gates,
+**Tooling** in `scripts/`: ten `check-*.mjs` static validators, `validate-*.mjs` gates,
 `smoke-runner.mjs`, `probe-performance.mjs`, `certify-local-release.mjs`, `review-content.mjs`,
 `gen-review-packet.mjs`, `package-manifest.mjs`, `measure-payload.mjs`, `serve.mjs`,
 `stage-site.mjs`, and `scripts/blender/` for the authored 3D kit.
@@ -194,6 +198,12 @@ Two things were measured and deliberately **rejected**:
 ## 8. Operational gotchas
 
 - **`check:evidence` needs a clean tree.** Commit before running it, or it fails by design.
+  Test and smoke runs no longer write tracked files (they write to `.playwright-results/`),
+  so `release:check` can be run twice in a row. To update the committed screenshots in
+  `docs/references/spike/` and `release-evidence/smoke-report.json` on purpose, run
+  `npm run evidence:refresh` and commit the result. `certify:local` promotes automatically.
+- **`check:evidence` also compares the branch** recorded in `release/v14-evidence.json`
+  (`main`). On a feature branch use `npm run check:evidence:ci`.
 - **Run long suites in the foreground.** Backgrounded browser runs get interrupted on this
   host and record no verdict.
 - **Under machine load, WebGL mount and `page.reload` timeouts appear.** Every instance
@@ -209,8 +219,9 @@ Two things were measured and deliberately **rejected**:
   accessor and 4,456 bytes, the mascot by 4 bytes. Verify assets against the committed
   manifest (`--verify-only`), do not expect a rebuild to match.
 - **Not every test file runs in `test:unit`, by design.**
-  `tests/firebase-security-rules.test.mjs` needs `FIRESTORE_EMULATOR_HOST` and is run
-  manually; `tests/native-packaging.test.mjs` runs inside `npm run native:verify`, which
+  `tests/firebase-security-rules.test.mjs` needs `FIRESTORE_EMULATOR_HOST`; CI runs it in the
+  `firestore-rules` job under `firebase emulators:exec` with `REQUIRE_FIRESTORE_EMULATOR=1`
+  so a missing emulator fails instead of skipping; `tests/native-packaging.test.mjs` runs inside `npm run native:verify`, which
   needs the native staging step first.
 - **Line endings.** `.gitattributes` stores and checks out LF for text files. A file written
   with CRLF will show as modified.
@@ -239,7 +250,32 @@ payload could be revisited only if a decoder arrives for another reason.
 
 ---
 
-## 10. Rollback
+## 10. Decisions (recorded 2026-09-25)
+
+Steve accepted the audit's recommendations for D1, D6 and D11–D14 on 2026-09-25 and asked
+for the art pass (so D7 follows its recommendation). Rows marked *recommended* are still
+Steve's to confirm. Change any row here, with a date, if it changes.
+
+| ID | Decision | Choice |
+|---|---|---|
+| D1 | Primary launch channel | Web PWA on GitHub Pages first (closed beta); Windows installer later |
+| D2 | Chompgrid | *Recommended:* park until the BrainBite beta ships; keep it in its own private repo |
+| D3 | Educator for the 75 records | **Open** — Steve to name reviewer and deadline |
+| D4 | Beta scope | *Recommended:* ship with the 30 registry missions; add records as they are approved |
+| D5 | Production domain + support email | **Open** — needed for Gate 8.6 |
+| D6 | Commit authority | Agents work on branches and open PRs; Steve merges |
+| D7 | Art direction | Painted textures + better lighting on the current kit, plus painted far backdrops |
+| D8 | Payload budget | *Recommended:* stay at 4,096 KB raw; pay for new art by optimising |
+| D9 | Bite commission | **Open** — needs Steve's budget approval |
+| D10 | AI generation | *Recommended:* props/blockouts only on a paid plan; never the final Bite |
+| D11 | Lives | Hearts refill and progress is kept (no full-mission restart) |
+| D12 | Timed mode | Parent-enabled only, off by default |
+| D13 | Boss phases shown to kids | 3 |
+| D14 | Mobile wrapper | Capacitor for iOS/Android; Tauri stays for Windows |
+
+---
+
+## 11. Rollback
 
 `docs/CLOSED_BETA_READINESS.md` §7 has the full procedure. The short version:
 

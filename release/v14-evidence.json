@@ -20,7 +20,26 @@
     "gate84RealDeviceMatrix": "PENDING",
     "gate85ExternalReview": "PENDING",
     "gate86ProductionReadiness": "PENDING",
-    "firebaseProjectId": "brainbite-prod"
+    "firebaseProjectId": "brainbite-prod",
+    "firebaseProductionScope": {
+      "source": "Operator-recorded on 2026-09-02 in docs/BATCH_8_STATUS_TRACKER.md (Gates 8.2 and 8.3); not re-run by automation",
+      "exercisedOnProduction": [
+        "Email/Password parent sign-in from BrainBite against brainbite-prod",
+        "firebase/firestore.rules deployed to brainbite-prod",
+        "push of local profiles to families/{uid}/profiles",
+        "pull in a second (incognito) session restoring family progress without reported duplication"
+      ],
+      "notExercisedOnProduction": [
+        "account deletion (Parent → Account → Delete) against brainbite-prod",
+        "cloud export against brainbite-prod",
+        "cross-family read/write denial observed in production logs"
+      ],
+      "automatedCoverage": [
+        "mocked Firebase REST contract in tests/release.spec.js (sign-in, push, pull, family isolation)",
+        "static rules contract and mutation tests (tests/firebase-security-rules.test.mjs, check:firebase:security)",
+        "Firestore emulator enforcement of ownership, bounds, types and tombstones (CI job firestore-rules)"
+      ]
+    }
   },
   "automatedGate": {
     "command": "npm run release:check",
