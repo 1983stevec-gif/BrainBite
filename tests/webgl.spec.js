@@ -493,3 +493,21 @@ test('a wrong answer shows a visual explanation and the retry counts as assisted
   const afterNext=await evidence();
   expect(afterNext.independent).toBe(before.independent+1);
 });
+
+// ---- UI Phase 1.5 ------------------------------------------------------------------
+test('the 1024x682 target size gets the floating desktop HUD, not the stacked layout',async({page})=>{
+  await page.setViewportSize({width:1024,height:682});
+  await page.goto('/?presentation=webgl');
+  await expect(page.locator('#home canvas.webgl-canvas')).toHaveCount(1);
+  const box=await page.locator('#home canvas.webgl-canvas').boundingBox();
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.y+box.height).toBeLessThanOrEqual(682+1);
+  const menu=await page.locator('#home .home-rail').boundingBox();
+  const rail=await page.locator('#home .home-right').boundingBox();
+  expect(menu.x+menu.width).toBeLessThan(512);
+  expect(rail.x).toBeGreaterThan(512);
+  expect(await page.evaluate(()=>document.documentElement.scrollHeight)).toBeLessThanOrEqual(682+1);
+  await page.evaluate(()=>window.BrainBiteGame.startMission(1));
+  const map=await page.locator('#game .minimap-card').boundingBox();
+  expect(map.y).toBeGreaterThan(682/2);
+});

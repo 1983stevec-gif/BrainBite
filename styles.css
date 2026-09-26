@@ -1488,7 +1488,7 @@ body:has(#home.show) nav{transform:none}
 }
 
 /* === WebGL desktop presentation: compact cinematic dashboard === */
-@media (min-width:1100px){
+@media (min-width:960px) and (min-height:600px) and (orientation:landscape){
 html.presentation-webgl #home.screen.show,
 html.presentation-webgl #game.screen.show{
     min-height:0;
@@ -1776,7 +1776,7 @@ html.presentation-webgl .battle-target .battle-right{padding:0;background:none}
 html.presentation-webgl #webglBadge{position:static;width:fit-content;margin:12px 0 0;padding:8px 12px}
 html.presentation-webgl body{background:#091d18}
 
-@media(min-width:1100px){
+@media (min-width:960px) and (min-height:600px) and (orientation:landscape){
   html.presentation-webgl .home-target .home-grid{grid-template-columns:190px minmax(0,1fr) 250px;align-items:stretch}
   html.presentation-webgl .home-target .home-stage{min-height:470px;height:100%}
   html.presentation-webgl .home-target .home-rail{align-content:start}
@@ -1793,7 +1793,7 @@ html.presentation-webgl body{background:#091d18}
   html.presentation-webgl .battle-target .minimap{min-height:190px;aspect-ratio:1.1}
 }
 
-@media(max-width:1099px){html.presentation-webgl .home-target .home-grid,
+@media (max-width:959px), (max-height:599px), (orientation:portrait){html.presentation-webgl .home-target .home-grid,
   html.presentation-webgl .home-target .dash-top,
   html.presentation-webgl .battle-target .battle-top,
   html.presentation-webgl .battle-target .battle-main{grid-template-columns:minmax(0,1fr)}
@@ -1815,7 +1815,7 @@ html.presentation-webgl body{background:#091d18}
 }
 
 /* Live WebGL desktop HUD: let the world become the shell, then float the UI above it. */
-@media (min-width:1100px) and (min-height:700px){
+@media (min-width:960px) and (min-height:600px) and (orientation:landscape){
   html.presentation-webgl body:has(#home.show),
   html.presentation-webgl body:has(#game.show){
     overflow:hidden;
@@ -2073,7 +2073,7 @@ html.presentation-webgl body{background:#091d18}
 }
 
 /* The three world cards are unique navigation, so retain them in stacked layouts. */
-@media (max-width:1099px), (max-height:699px){
+@media (max-width:959px), (max-height:599px), (orientation:portrait){
   html.presentation-webgl .home-target #worldShowcase{display:grid}
 }
 
@@ -2408,8 +2408,9 @@ html:not(.presentation-webgl) .battle-target .minimap{aspect-ratio:auto;flex:1;m
     gap:8px;
   }
   html:not(.presentation-webgl) .battle-target .battle-profile .battle-inline-goal{display:none}
-
-  /* Same one-screen contract for the live 3D battle. */
+}
+/* Same one-screen contract for the live 3D battle, wherever the floating desktop HUD is off. */
+@media (max-width:959px), (max-height:599px), (orientation:portrait){
   html.presentation-webgl .battle-target{
     height:calc(100dvh - 34px);
     grid-template-rows:auto minmax(0,1fr) auto;
@@ -2524,3 +2525,20 @@ body{padding:var(--bb-safe-top) var(--bb-safe-right) var(--bb-safe-bottom) var(-
 #game .battle-target .battle-prompt #explainer{grid-column:3;justify-self:center;margin:4px 0 0;line-height:0}
 #game .battle-target .battle-prompt #explainer[hidden]{display:none}
 #game .battle-target .battle-prompt #explainer svg{max-width:100%;height:auto;max-height:64px}
+
+/* ---- UI Phase 1.5: the floating desktop HUD now starts at 960x600 landscape --------------
+   (was 1100x700, so the 1024x682 target size fell into the stacked tablet layout). The
+   generic <=1180px rules split the menu and the battle side panel into two columns; keep
+   them single-column while the HUD floats over the scene. */
+@media (min-width:960px) and (max-width:1180px) and (min-height:600px) and (orientation:landscape){
+  html.presentation-webgl .home-target .home-rail{grid-template-columns:minmax(0,1fr)}
+  html.presentation-webgl .home-target .home-rail h3{grid-column:auto}
+  html.presentation-webgl .battle-target .battle-right{grid-template-columns:minmax(0,1fr)}
+  html.presentation-webgl .battle-target .battle-inline-goal{display:none}
+}
+/* Target layout: boss card, toast and route map sit bottom-right, clear of the pillar row. */
+@media (min-width:960px) and (min-height:600px) and (orientation:landscape){
+  html.presentation-webgl .battle-target .battle-right{align-self:end;align-content:end;grid-template-rows:none;grid-auto-rows:auto}
+  html.presentation-webgl .battle-target .minimap-card{flex:none}
+  html.presentation-webgl .battle-target .minimap{flex:none;height:clamp(120px,22vh,190px);min-height:0;aspect-ratio:auto}
+}
