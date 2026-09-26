@@ -1,5 +1,6 @@
 import * as THREE from '../vendor/three/three.module.js';
-import { makeMascot, makeTree, makeRock, makeAnswerDisc, disposeObject } from './props.mjs';
+import { mergeGeometries } from '../vendor/three/addons/utils/BufferGeometryUtils.js';
+import { makeMascot, makeTreeGrove, makeRock, makeAnswerDisc, disposeObject } from './props.mjs';
 import { shouldReduceMotion } from './capability.mjs';
 import { loadGltfAsset, disposeGltfAsset } from './gltf-assets.mjs';
 import { addJungleBanks, makeWaterMaterial, fitSceneCamera, makeSkyDome } from './jungle-environment.mjs';
@@ -205,9 +206,8 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
     scene.add(fall);
   }
 
-  for (const [x, z, s] of [[-7, 1, 1.2], [7, 0.5, 1.1], [-6, -3, 1.0], [6.2, -2.5, 1.15], [-3.5, -4.5, 0.9], [3.2, -4.8, 1.0]]) {
-    scene.add(makeTree(x, z, s));
-  }
+  // Instanced like the home scene: the same six trees in one draw per part instead of 13 each.
+  scene.add(makeTreeGrove([[-7, 1, 1.2], [7, 0.5, 1.1], [-6, -3, 1.0], [6.2, -2.5, 1.15], [-3.5, -4.5, 0.9], [3.2, -4.8, 1.0]]));
   scene.add(makeRock(-4.5, 2.5, 1.1), makeRock(4.8, 2.2, 0.9));
 
   const krakenFallback = makeKraken();
@@ -350,31 +350,31 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
   const nibbler = new THREE.Group();
   nibbler.name = 'nibbler';
   {
+    // Body and ears share one material, so they are baked into one mesh: the battle scene
+    // sits near the 200-draw-call budget and each separate shadow caster costs two draws.
     const fur = new THREE.MeshStandardMaterial({ color: 0x8b5cf6, roughness: 0.6 });
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.34, 16, 12), fur);
-    body.scale.set(1, 0.85, 0.9);
-    const earGeometry = new THREE.ConeGeometry(0.1, 0.24, 8);
-    const earL = new THREE.Mesh(earGeometry, fur); earL.position.set(-0.17, 0.3, 0); earL.rotation.z = 0.3;
-    const earR = new THREE.Mesh(earGeometry, fur); earR.position.set(0.17, 0.3, 0); earR.rotation.z = -0.3;
+    const bodyGeometry = new THREE.SphereGeometry(0.34, 16, 12).scale(1, 0.85, 0.9);
+    const ear = (x, tilt) => new THREE.ConeGeometry(0.1, 0.24, 8).toNonIndexed().rotateZ(tilt).translate(x, 0.3, 0);
+    const furGeometry = mergeGeometries([bodyGeometry.toNonIndexed(), ear(-0.17, 0.3), ear(0.17, -0.3)]);
+    bodyGeometry.dispose();
+    const body = new THREE.Mesh(furGeometry, fur);
+    body.castShadow = true;
     const eyes = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.07, 0.02), new THREE.MeshBasicMaterial({ color: 0xfff7cc }));
     eyes.position.set(0, 0.06, 0.3);
-    for (const mesh of [body, earL, earR]) mesh.castShadow = true;
-    nibbler.add(body, earL, earR, eyes);
+    nibbler.add(body, eyes);
   }
   nibbler.visible = false;
   scene.add(nibbler);
   const paw = new THREE.Group();
   {
+    // Pad and toes are one flat mesh (one draw instead of four).
     const glow = new THREE.MeshBasicMaterial({ color: 0xffb020, transparent: true, opacity: 0.95, depthWrite: false });
-    const pad = new THREE.Mesh(new THREE.CircleGeometry(0.3, 20), glow);
-    pad.rotation.x = -Math.PI / 2;
-    paw.add(pad);
-    for (const [x, z] of [[-0.27, -0.3], [0, -0.42], [0.27, -0.3]]) {
-      const toe = new THREE.Mesh(new THREE.CircleGeometry(0.11, 12), glow);
-      toe.rotation.x = -Math.PI / 2;
-      toe.position.set(x, 0, z);
-      paw.add(toe);
-    }
+    const parts = [new THREE.CircleGeometry(0.3, 20)];
+    for (const [x, z] of [[-0.27, -0.3], [0, -0.42], [0.27, -0.3]]) parts.push(new THREE.CircleGeometry(0.11, 12).translate(x, -z, 0));
+    const print = new THREE.Mesh(mergeGeometries(parts), glow);
+    parts.forEach(geometry => geometry.dispose());
+    print.rotation.x = -Math.PI / 2;
+    paw.add(print);
   }
   paw.visible = false;
   scene.add(paw);

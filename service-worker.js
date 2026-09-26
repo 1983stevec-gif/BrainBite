@@ -1,4 +1,4 @@
-const CACHE = 'brainbite-v2.0-shell-v44-native-ready';
+const CACHE = 'brainbite-v2.0-shell-v45-battle-draws';
 const FALLBACK = './index.html';
 const CORE = [
   './',
