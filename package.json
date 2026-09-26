@@ -48,7 +48,8 @@
     "check:evidence": "node scripts/validate-evidence.mjs",
     "check:evidence:ci": "node scripts/validate-evidence.mjs --allow-foreign-checkout",
     "certify:local": "node scripts/certify-local-release.mjs",
-    "evidence:refresh": "node scripts/smoke-runner.mjs --promote"
+    "evidence:refresh": "node scripts/smoke-runner.mjs --promote",
+    "capture:ui": "node scripts/capture-ui.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
