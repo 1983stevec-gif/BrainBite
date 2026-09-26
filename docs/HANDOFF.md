@@ -3,7 +3,7 @@
 **Revision:** this file describes the commit that last changed it
 (`git log -1 --format=%h -- docs/HANDOFF.md`). A hard-coded hash here was always one commit
 behind, because committing the file changes HEAD.
-**Written:** 2026-09-22 · **Updated:** 2026-09-25 (hygiene batch H1–H6, decisions D1–D14).
+**Written:** 2026-09-22 · **Updated:** 2026-09-26 (M2 native-shell readiness, audit F10/F11/F13; earlier: hygiene H1–H6, decisions D1–D14).
 
 This document is the entry point. It says what is verified, what is not, who owns what is
 left, and the operational details that are easy to get wrong. The other documents go deeper:
@@ -42,15 +42,15 @@ Every row below is reproducible from this revision. Evidence files are committed
 | Gate | Command | Result | Evidence |
 |---|---|---|---|
 | Static checks (10) | `npm run check:static` | PASS (includes `check:encoding`) | console |
-| Unit tests | `npm run test:unit` | **205/205** | console |
-| Browser suite | `npm run test:e2e` | **161/161** | console |
+| Unit tests | `npm run test:unit` | **235/235** | console |
+| Browser suite | `npm run test:e2e` | **210/210** (2026-09-26, Linux sandbox, Playwright 1.56, 1 retry: the concurrent-tabs test, then 15/15 in isolation; re-run on Windows with the locked 1.62.1) | console |
 | Smoke inventory | `npm run smoke` | **11/11** | `.playwright-results/smoke-report.json`; tracked copy via `npm run evidence:refresh` |
 | Performance probe | `npm run probe:performance` | exit 0, **0 headless budget violations** | `test-results/performance-evidence/summary.json` |
-| Local certification | `npm run certify:local` | **16/16 stages**, 161 browser tests, 0 flaky | `release-evidence/local-certification.json` |
+| Local certification | `npm run certify:local` | **Not re-run** since the 2026-09-25/26 branches (last: 16/16 stages, 161 browser tests). Run on Windows before merging | `release-evidence/local-certification.json` |
 | Release evidence | `npm run check:evidence` | PASS | `release/v14-evidence.json` |
-| Package integrity | `npm run check:stage` | 96 files, no developer material | `release-evidence/package-manifest.json` |
+| Package integrity | `npm run check:stage` | 100 files, no developer material | `release-evidence/package-manifest.json` |
 | Content review gate | `npm run check:content-review` | PASS, 0 digest mismatches | console |
-| Native shell | `npm run native:verify` | 96 runtime files + 11 shell files; no loopback URL, dev URL, listener, or native permissions | console |
+| Native shell | `npm run native:verify` | 100 runtime files; no loopback URL, dev URL, listener, or native permissions; shell CSP matches `index.html` | console |
 | Remote CI | GitHub Actions | **success** on `main` | Actions run 35798993052 |
 
 Measured budgets (headless-judgeable, all passing):
@@ -156,7 +156,14 @@ approved, 0 rejected** (0 digest mismatches).
   are production-eligible; everything else needs an approval.
 - **Saves use three generations.** `bb-core-v3`, `-back`, `-recovery`, plus a
   `-pre-operation-rollback` written before destructive parent actions. The generation policy
-  lives in `content/storage-copies.js` and is unit-tested.
+  lives in `content/storage-copies.js` and is unit-tested. Store apps add a fourth copy
+  outside the WebView (`bb-core-v3-native-mirror`, Capacitor Preferences), used only when
+  all three web generations are unreadable at boot.
+- **Native shells are detected in one place.** `presentation/platform.js` (classic script,
+  before `app.js`) reports `web`, `capacitor`, `tauri`, or `simulated` (`?native=1`, tests
+  only). In a native shell: no service worker, footer/outbound links need the family PIN,
+  Android back is routed to `handleNativeBack()`, haptics follow the Vibration setting. The
+  web build is unchanged. `tests/native-shell.spec.js` covers it.
 - **The service worker precache is a fixed list.** Adding a runtime asset means updating
   `service-worker.js` *and* the stage allowlist, then bumping the cache name
   (`brainbite-v2.0-shell-v44-native-ready`) so clients re-precache.
@@ -234,6 +241,12 @@ Two things were measured and deliberately **rejected**:
 
 ## 9. Next moves, in order
 
+0. **Push the local stack and open one PR** (Steve). As of 2026-09-26 the branches
+   `mobile/blockers` → `chore/hygiene-2026-09` → `gameplay/kind-failure` → `ui/match-targets`
+   → `gameplay/fun-pass` → `fix/core-audit-f10-f13` → `mobile/runtime-readiness` form one
+   linear stack on top of `main` and none is on GitHub. Pushing the tip and opening a PR
+   `mobile/runtime-readiness` → `main` lets CI run the whole stack. Run `npm ci`,
+   `npm run release:check` and `npm run certify:local` on Windows first.
 1. **Enable GitHub Pages** (Steve, one setting). Then confirm the `pages` workflow goes green
    on `main` and the app is reachable.
 2. **Circulate the review packet** and run `review:approve` / `review:reject` for the 75

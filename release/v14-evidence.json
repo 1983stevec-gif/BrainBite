@@ -46,11 +46,11 @@
     "result": "PASS",
     "contentPacksValidated": 29,
     "questionSetsValidated": 40,
-    "unitTests": 205,
-    "playwrightTests": 161,
+    "unitTests": 235,
+    "playwrightTests": 210,
     "smokeChecks": 11,
     "headlessBudgetViolations": 0,
-    "packageFiles": 96
+    "packageFiles": 100
   },
   "verifiedSurface": [
     "profile isolation across learners, sessions, rewards, and review schedules",
