@@ -1072,6 +1072,7 @@ for (const lockMode of ['web-locks', 'indexed-db', 'local-storage']) {
     expect(ids.every(id => !id.includes(profileId))).toBe(true);
 
     await Promise.all([pageA.reload(), pageB.reload()]);
+    await Promise.all([pageA.evaluate(() => PERSISTENCE_CHAIN), pageB.evaluate(() => PERSISTENCE_CHAIN)]);
     const copies = await pageA.evaluate(id => {
       const summarize = store => {
         const skill = store.profiles.find(profile => profile.id === id).learningCore.skills['math-4-fractions'];
@@ -2088,7 +2089,9 @@ test('Phase 3.1 Practice Lab locked missions complete as non-progression practic
   await page.locator('#playPractice').click();
   await expect(page.locator('#game.show')).toBeVisible();
   await page.evaluate(() => {
-    const correctCells = [...new Set(G.cells.filter(cell => !cell.eaten && cell.correct).map(cell => String(cell.value)))];
+    // In the Classic board, each tap consumes one cell; preserve duplicate answer values
+    // so repeated correct cells are consumed before the test reads the completion session.
+    const correctCells = G.cells.filter(cell => !cell.eaten && cell.correct).map(cell => String(cell.value));
     for (const value of correctCells) window.BrainBiteGame.tryAnswer(value);
   });
 
