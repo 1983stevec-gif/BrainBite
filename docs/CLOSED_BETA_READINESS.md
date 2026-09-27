@@ -8,9 +8,10 @@ This document is the honest state of the closed-beta candidate. It separates wha
 verified locally from what is not, and it does not claim external gates.
 
 The current implementation is on `mobile/runtime-readiness` in [PR #2](https://github.com/1983stevec-gif/BrainBite/pull/2),
-open and mergeable to `main`. Its verified code/evidence commit is
-`a6786aaa04ec09d1ffdda2420ffff30a59b07e4b`; GitHub Actions run 36307503774 passes both
-the full test job and Firestore emulator job. Steve owns the merge under decision D6.
+open and mergeable to `main`. Runtime/evidence baseline `a6786aaa04ec09d1ffdda2420ffff30a59b07e4b`
+and browser-readiness commit `2cf4de6367d7d9cc90fb8549ef687013b5809331` are in the PR.
+GitHub Actions [run 36310559906](https://github.com/1983stevec-gif/BrainBite/actions/runs/36310559906)
+passed the full test job and Firestore emulator job. Steve owns the merge under decision D6.
 
 ## 1. Runtime package
 
@@ -60,12 +61,13 @@ The installer is unsigned and is an internal closed-beta artifact.
 | Area | Evidence |
 |---|---|
 | Unit tests | `236/236` on Windows with the locked install |
-| Browser suite | 210 cases, 0 final failures. Two cases passed on retry in certification; no-retry follow-ups passed `tests/release.spec.js` `92/92` and BrainBase/MATCH `14/14` |
+| Browser suite | Latest CI: 210 passed with zero retries. Earlier Windows certification recorded two retry-only attempts; group reruns passed `tests/release.spec.js` `92/92` and BrainBase/MATCH `14/14`; latest reload-sensitive rerun passed `2/2` |
 | Smoke checks | `11/11` via local certification, evidence in `release-evidence/smoke-report.json` |
 | Repository validators | content, content-review, static (10 checks), runtime, release, Firebase, launch, final, Firebase security, native package, and release evidence — all PASS |
 | Performance budgets (headless-judgeable) | 0 headless budget violations; 26 device-only measurements remain unverified |
 | Offline | service worker precaches 90 assets; offline reload, offline 3D reopen, and PWA installability pass on Chrome and Edge |
 | Profile isolation | unit and browser coverage, plus the cross-tab reconciliation tests in all three lock modes |
+| Native runtime | Fresh `npm run native:build`; `npm run native:verify:runtime` opened BrainBite and its child processes with zero TCP listeners |
 | Content safety | production mode fails closed; 30 reviewed registry missions ship; 75 records remain quarantined or non-production |
 | Accessibility | axe: zero serious/critical violations across 21 primary screens plus the live battle HUD |
 
@@ -178,8 +180,9 @@ Windows-only blind spots:
 | `check:static` failed on six package manifest digests (app.js, index.html, boot.mjs, capability.mjs, service-worker.js, three.module.js) | The manifest hashed raw working-copy bytes; the Windows copy had mixed CRLF/LF endings while CI checked out LF | `.gitattributes` normalizes text to LF in the repository and every checkout; text hashing is line-ending independent and binaries are still hashed byte for byte |
 | `smoke-pwa-installability` failed 10/11 | It hardcoded `D:/Codex/Brainbite` as the repository root, so every manifest icon lookup failed on Linux | The root is derived from the module location; `check:host-paths` joined `check:static` to prevent a recurrence |
 
-The current PR run is green: [GitHub Actions run 36307503774](https://github.com/1983stevec-gif/BrainBite/actions/runs/36307503774)
-passed the full test job and Firestore emulator job on `a6786aa`.
+The current PR run is green: [GitHub Actions run 36310559906](https://github.com/1983stevec-gif/BrainBite/actions/runs/36310559906)
+passed all validators, native package verification, 236 unit tests, 210 browser tests with zero retries,
+11/11 smoke checks, the clean-tree guard, and the Firestore emulator job on `2cf4de6`.
 
 ### Open, non-blocking
 
