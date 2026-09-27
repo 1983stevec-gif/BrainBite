@@ -1767,34 +1767,46 @@ test('non-localhost production host launches and completes a canonical registry 
 });
 
 test('cloud authorization retries once and then requires a fresh sign-in', async ({ page }) => {
-  let firestoreRequests = 0;
-  let refreshRequests = 0;
-  await page.route('https://firestore.googleapis.com/**', async route => {
-    firestoreRequests += 1;
-    await route.fulfill({ status: 401, json: { error: { message: 'expired' } } });
-  });
-  await page.route('https://securetoken.googleapis.com/**', async route => {
-    refreshRequests += 1;
-    await route.fulfill({ json: { id_token: 'refreshed-token', refresh_token: 'refresh-2', user_id: 'family-auth-cap' } });
-  });
   const result = await page.evaluate(async () => {
+    let firestoreRequests = 0;
+    let refreshRequests = 0;
     localStorage.setItem('bb-firebase-session', JSON.stringify({
       idToken: 'expired-token',
       refreshToken: 'refresh-1',
       localId: 'family-auth-cap',
       email: 'parent@example.com',
     }));
-    const client = new BrainBiteFirebaseREST('brainbite-test', 'AIza-test-public-web-key-123456789');
+    const originalFetch = window.fetch;
+    window.fetch = async url => {
+      const target = String(url);
+      if (target.includes('firestore.googleapis.com')) {
+        firestoreRequests += 1;
+        return new Response(JSON.stringify({ error: { message: 'expired' } }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (target.includes('securetoken.googleapis.com')) {
+        refreshRequests += 1;
+        return new Response(JSON.stringify({ id_token: 'refreshed-token', refresh_token: 'refresh-2', user_id: 'family-auth-cap' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      throw new Error(`Unexpected fetch in auth retry test: ${target}`);
+    };
     try {
-      await client.pullProfiles();
-      return { resolved: true, message: '' };
-    } catch (error) {
-      return { resolved: false, message: error.message };
+      const client = new BrainBiteFirebaseREST('brainbite-test', 'AIza-test-public-web-key-123456789');
+      try {
+        await client.pullProfiles();
+        return { resolved: true, message: '', firestoreRequests, refreshRequests };
+      } catch (error) {
+        return { resolved: false, message: error.message, firestoreRequests, refreshRequests };
+      }
+    } finally {
+      window.fetch = originalFetch;
     }
   });
-  expect(result).toEqual({ resolved: false, message: 'Cloud authorization expired. Sign in again.' });
-  expect(firestoreRequests).toBe(2);
-  expect(refreshRequests).toBe(1);
+  expect(result).toEqual({
+    resolved: false,
+    message: 'Cloud authorization expired. Sign in again.',
+    firestoreRequests: 2,
+    refreshRequests: 1,
+  });
 });
 
 test('Firestore size preflight rejects oversized profile and tombstone before any fetch', async ({ page }) => {
