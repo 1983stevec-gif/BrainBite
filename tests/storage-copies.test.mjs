@@ -127,3 +127,27 @@ test('a failed read never produces a partial generation set', () => {
   assert.deepEqual(readAll(readerFor(storage), DEFAULT_KEYS).map(entry => entry.profiles[0].name), ['only']);
   assert.deepEqual(readEvery(readerFor(storage), DEFAULT_KEYS).map(entry => entry.profiles[0].name), ['only', 'only', 'only']);
 });
+
+// M2 native save mirror.
+const { MIRROR_KEY, shouldRestoreFromMirror, restoreFromMirror } = sandbox.BrainBiteStorageCopies;
+const parseStore = raw => { const parsed = JSON.parse(raw); return parsed && Array.isArray(parsed.profiles) ? parsed : null; };
+
+test('the native mirror has its own key, outside the three web generations', () => {
+  assert.equal(MIRROR_KEY, 'bb-core-v3-native-mirror');
+  assert.ok(!Object.values(DEFAULT_KEYS).includes(MIRROR_KEY));
+});
+
+test('the mirror is consulted only when no web generation is readable', () => {
+  assert.equal(shouldRestoreFromMirror(readerFor(fakeStorage())), true);
+  assert.equal(shouldRestoreFromMirror(readerFor(fakeStorage({ [DEFAULT_KEYS.primary]: '{broken', [DEFAULT_KEYS.backup]: 'null' }))), true);
+  assert.equal(shouldRestoreFromMirror(readerFor(fakeStorage({ [DEFAULT_KEYS.recovery]: JSON.stringify(store('old')) }))), false);
+});
+
+test('restoreFromMirror accepts only a valid store with at least one profile', () => {
+  assert.equal(nameOf(JSON.stringify(restoreFromMirror(JSON.stringify(store('kid')), parseStore))), 'kid');
+  assert.equal(restoreFromMirror(null, parseStore), null);
+  assert.equal(restoreFromMirror('', parseStore), null);
+  assert.equal(restoreFromMirror('{broken', parseStore), null);
+  assert.equal(restoreFromMirror(JSON.stringify({ profiles: [] }), parseStore), null);
+  assert.equal(restoreFromMirror(JSON.stringify({ nope: true }), parseStore), null);
+});

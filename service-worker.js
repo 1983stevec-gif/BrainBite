@@ -1,4 +1,4 @@
-const CACHE = 'brainbite-v2.0-shell-v38-first-run-gltf-cache';
+const CACHE = 'brainbite-v2.0-shell-v45-battle-draws';
 const FALLBACK = './index.html';
 const CORE = [
   './',
@@ -10,6 +10,9 @@ const CORE = [
   './assets/fonts/fredoka-variable.woff2',
   './assets/fonts/nunito-variable.woff2',
   './content/storage-copies.js',
+  './content/explainers.js',
+  './content/run-builder.js',
+  './content/boss-phases.js',
   './content/experience-registry.js',
   './content/content-review-manifest.js',
   './content/content-control-gate.js',
@@ -29,6 +32,7 @@ const CORE = [
   './assets/art/bloop.svg',
   './assets/art/scout.svg',
   './assets/art/bite-village.svg',
+  './presentation/platform.js',
   './presentation/boot.mjs',
   './presentation/presentation-adapter.mjs',
   './presentation/capability.mjs',

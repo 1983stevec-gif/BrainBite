@@ -1,8 +1,9 @@
 import * as THREE from '../vendor/three/three.module.js';
-import { makeMascot, makeTree, makeRock, makeLabelSprite, disposeObject } from './props.mjs';
+import { mergeGeometries } from '../vendor/three/addons/utils/BufferGeometryUtils.js';
+import { makeMascot, makeTreeGrove, makeRock, makeAnswerDisc, disposeObject } from './props.mjs';
 import { shouldReduceMotion } from './capability.mjs';
 import { loadGltfAsset, disposeGltfAsset } from './gltf-assets.mjs';
-import { addJungleBanks, makeWaterMaterial, fitSceneCamera } from './jungle-environment.mjs';
+import { addJungleBanks, makeWaterMaterial, fitSceneCamera, makeSkyDome } from './jungle-environment.mjs';
 import { createCharacterAnimation } from './character-animation.mjs';
 import { createQualityController } from './graphics-quality.mjs';
 import { createPerformanceBudget } from './performance-budget.mjs';
@@ -70,7 +71,18 @@ function makeKraken() {
   return g;
 }
 
-function makePillar(value) {
+const DISC_Y = 3.45;
+
+// Camera framing per aspect ratio. Landscape keeps the original composition. Portrait
+// phones frame the four discs edge to edge and look down onto the pier, so the tall frame
+// shows the answers large instead of a thin band of scene between sky and water.
+function battleFraming(aspect) {
+  if (aspect >= 1) return { span: 10.8, height: 6.5, target: [0, 1.2, 1], distance: 15.5 };
+  const k = Math.max(0, Math.min(1, (1 - aspect) / 0.55));
+  return { span: 10.8 - 2.2 * k, height: 6.5 + 5.5 * k, target: [0, 1.2 + 0.6 * k, 1 + 1.6 * k], distance: 15.5 - 3 * k };
+}
+
+function makePillar(value, { anisotropy = 4 } = {}) {
   const group = new THREE.Group();
   const stone = new THREE.MeshStandardMaterial({ color: 0x9aa39c, roughness: 0.88 });
   const moss = new THREE.MeshStandardMaterial({ color: 0x5f8f4a, roughness: 0.9 });
@@ -93,10 +105,13 @@ function makePillar(value) {
   ring.position.y = 0.08;
   ring.name = 'ring';
 
-  const label = makeLabelSprite(value);
-  label.position.set(0, 3.12, 0.45);
+  // Wooden answer disc, tilted slightly toward the camera.
+  const label = makeAnswerDisc(value, { anisotropy });
+  label.position.set(0, DISC_Y, 0.2);
+  label.rotation.x = -0.18;
   label.name = 'label';
 
+  for (const mesh of [base, col, mossPatch, top]) { mesh.castShadow = true; mesh.receiveShadow = true; }
   group.add(base, col, mossPatch, top, ring, label);
   group.userData = { value, col, ring, label };
   return group;
@@ -126,9 +141,11 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x72b9be);
   scene.fog = new THREE.Fog(0x83b7aa, 16, 36);
+  scene.add(makeSkyDome({ top: 0x8fcff5, horizon: 0xcfe8d2 }));
 
   const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 120);
-  fitSceneCamera(camera, width / height, { span: 10.8, height: 6.5, target: [0, 1.2, 1], distance: 15.5 });
+  fitSceneCamera(camera, width / height, battleFraming(width / height));
+  let cameraBaseY = camera.position.y;
   addJungleBanks(scene);
 
   scene.add(new THREE.HemisphereLight(0xeaf9ff, 0x355f2b, 1.0));
@@ -189,9 +206,8 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
     scene.add(fall);
   }
 
-  for (const [x, z, s] of [[-7, 1, 1.2], [7, 0.5, 1.1], [-6, -3, 1.0], [6.2, -2.5, 1.15], [-3.5, -4.5, 0.9], [3.2, -4.8, 1.0]]) {
-    scene.add(makeTree(x, z, s));
-  }
+  // Instanced like the home scene: the same six trees in one draw per part instead of 13 each.
+  scene.add(makeTreeGrove([[-7, 1, 1.2], [7, 0.5, 1.1], [-6, -3, 1.0], [6.2, -2.5, 1.15], [-3.5, -4.5, 0.9], [3.2, -4.8, 1.0]]));
   scene.add(makeRock(-4.5, 2.5, 1.1), makeRock(4.8, 2.2, 0.9));
 
   const krakenFallback = makeKraken();
@@ -250,17 +266,35 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
     controls.replaceChildren();
     const span = 7.2;
     list.forEach((value, i) => {
-      const p = makePillar(value);
+      const p = makePillar(value, { anisotropy: Math.min(8, renderer.capabilities.getMaxAnisotropy?.() || 4) });
       const x = list.length === 1 ? 0 : -span / 2 + (span * i) / (list.length - 1 || 1);
       p.position.set(x, 0, 0.6);
+      p.userData.baseX = x;
       scene.add(p);
       pillars.push(p);
-      if (pillarAsset) p.traverse(child => { if (child.isMesh) child.visible = false; });
+      // A new set of answers arriving mid-hop pops in after the chomp instead of
+      // overlapping the disc being eaten.
+      const popAt = inputLockedUntil + 120;
+      if (!reducedMotion && performanceClock.now() < popAt && p.userData.label) {
+        const disc = p.userData.label;
+        disc.scale.setScalar(0.001);
+        effects.push(now => {
+          if (!disc.parent) return false;
+          const k = Math.max(0, Math.min(1, (now - popAt) / 260));
+          disc.scale.setScalar(Math.max(0.001, k < 1 ? 1.15 * Math.sin(k * Math.PI / 2) : 1));
+          return k < 1;
+        });
+      }
+      // With the authored pillar kit installed, the procedural stone is hidden but the
+      // disc stays: it is the answer surface.
+      if (pillarAsset) p.traverse(child => { if (child.isMesh && child.name !== 'answerDisc') child.visible = false; });
       const button = document.createElement('button');
-      button.type = 'button'; button.textContent = value;
-      button.addEventListener('click', () => { if (!disposed) onSelect?.(value); });
+      button.type = 'button'; button.textContent = value; button.dataset.value = value;
+      button.addEventListener('click', () => { if (!disposed && performanceClock.now() >= inputLockedUntil) onSelect?.(value); });
       controls.appendChild(button);
     });
+    // The authored plate is a blank plaque on the column face; the wooden disc on top is
+    // the answer surface, so plate, label and gem stay hidden.
     // The exported kit has four slots; reposition and hide unused slots to match
     // the actual question instead of leaving decorative but clickable answers.
     pillarAsset?.traverse(child => {
@@ -270,11 +304,143 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
       const x = list.length <= 1 ? 0 : -span / 2 + span * index / (list.length - 1);
       child.position.x = x / pillarAsset.scale.x;
     });
+    host.dataset.answerDiscs = String(pillars.filter(p => p.userData.label).length);
+    placeNibbler();
+    applyRescue();
+    applyBossState();
+    layoutAnswerButtons();
+    if (reducedMotion) renderFrame();
+  }
+
+  // UI Phase 2.4: on tablets and desktops the accessible answer buttons become invisible
+  // hit targets laid over each disc, so tapping the disc works and keyboard focus draws a
+  // ring around it. Phones keep the labelled button row under the scene.
+  const OVERLAY_MIN_WIDTH = 768;
+  const projected = new THREE.Vector3();
+  const projectedEdge = new THREE.Vector3();
+  function layoutAnswerButtons() {
+    const w = host.clientWidth;
+    const h = host.clientHeight;
+    const overlay = w >= OVERLAY_MIN_WIDTH && pillars.length > 0;
+    controls.classList.toggle('webgl-answer-controls--overlay', overlay);
+    const buttons = [...controls.children];
+    if (!overlay) {
+      buttons.forEach(button => { button.style.left = ''; button.style.top = ''; button.style.width = ''; button.style.height = ''; });
+      return;
+    }
+    camera.updateMatrixWorld();
+    pillars.forEach((pillar, i) => {
+      const button = buttons[i];
+      if (!button) return;
+      projected.set(pillar.position.x, DISC_Y, pillar.position.z + 0.2).project(camera);
+      projectedEdge.set(pillar.position.x + 0.62, DISC_Y, pillar.position.z + 0.2).project(camera);
+      const cx = (projected.x + 1) / 2 * w;
+      const cy = (1 - projected.y) / 2 * h;
+      const size = Math.max(56, Math.abs(projectedEdge.x - projected.x) * w * 1.15);
+      button.style.left = `${Math.round(cx - size / 2)}px`;
+      button.style.top = `${Math.round(cy - size / 2)}px`;
+      button.style.width = `${Math.round(size)}px`;
+      button.style.height = `${Math.round(size)}px`;
+    });
+  }
+
+  // ---- The Nibbler (gameplay G4) --------------------------------------------------------
+  // A small mischief-maker that sits in front of one pillar; a glowing paw print marks the
+  // pillar it will hop to next, so its move is always readable before the child answers.
+  const nibbler = new THREE.Group();
+  nibbler.name = 'nibbler';
+  {
+    // Body and ears share one material, so they are baked into one mesh: the battle scene
+    // sits near the 200-draw-call budget and each separate shadow caster costs two draws.
+    const fur = new THREE.MeshStandardMaterial({ color: 0x8b5cf6, roughness: 0.6 });
+    const bodyGeometry = new THREE.SphereGeometry(0.34, 16, 12).scale(1, 0.85, 0.9);
+    const ear = (x, tilt) => new THREE.ConeGeometry(0.1, 0.24, 8).toNonIndexed().rotateZ(tilt).translate(x, 0.3, 0);
+    const furGeometry = mergeGeometries([bodyGeometry.toNonIndexed(), ear(-0.17, 0.3), ear(0.17, -0.3)]);
+    bodyGeometry.dispose();
+    const body = new THREE.Mesh(furGeometry, fur);
+    body.castShadow = true;
+    const eyes = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.07, 0.02), new THREE.MeshBasicMaterial({ color: 0xfff7cc }));
+    eyes.position.set(0, 0.06, 0.3);
+    nibbler.add(body, eyes);
+  }
+  nibbler.visible = false;
+  scene.add(nibbler);
+  const paw = new THREE.Group();
+  {
+    // Pad and toes are one flat mesh (one draw instead of four).
+    const glow = new THREE.MeshBasicMaterial({ color: 0xffb020, transparent: true, opacity: 0.95, depthWrite: false });
+    const parts = [new THREE.CircleGeometry(0.3, 20)];
+    for (const [x, z] of [[-0.27, -0.3], [0, -0.42], [0.27, -0.3]]) parts.push(new THREE.CircleGeometry(0.11, 12).translate(x, -z, 0));
+    const print = new THREE.Mesh(mergeGeometries(parts), glow);
+    parts.forEach(geometry => geometry.dispose());
+    print.rotation.x = -Math.PI / 2;
+    paw.add(print);
+  }
+  paw.visible = false;
+  scene.add(paw);
+  let nibblerState = null;
+  function placeNibbler() {
+    const at = nibblerState ? pillars[nibblerState.slot] : null;
+    const to = nibblerState ? pillars[nibblerState.next] : null;
+    nibbler.visible = Boolean(at);
+    paw.visible = Boolean(to) && nibblerState.next !== nibblerState.slot;
+    if (at) nibbler.position.set(at.position.x, 0.62, at.position.z + 1.05);
+    if (to) paw.position.set(to.position.x, 0.46, to.position.z + 1.05);
+    host.dataset.nibblerSlot = nibblerState ? String(nibblerState.slot) : '';
+    host.dataset.nibblerNext = nibblerState ? String(nibblerState.next) : '';
+  }
+  function setNibbler(state) {
+    nibblerState = state && Number.isInteger(state.slot) ? { slot: state.slot, next: state.next } : null;
+    placeNibbler();
+    if (reducedMotion) renderFrame();
+  }
+
+  // ---- Boss phases (G5): a tentacle wraps one wrong pillar; ink hides the discs ----------
+  const coil = new THREE.Mesh(new THREE.TorusGeometry(0.72, 0.1, 10, 28), new THREE.MeshStandardMaterial({ color: 0x7c3aed, roughness: 0.5, emissive: 0x2e1065, emissiveIntensity: 0.4 }));
+  coil.name = 'tentacleCoil';
+  coil.visible = false;
+  scene.add(coil);
+  let bossState = null;
+  function applyBossState() {
+    const blocked = bossState?.blocked != null ? String(bossState.blocked) : null;
+    const blockedPillar = blocked ? pillars.find(p => String(p.userData.value) === blocked) : null;
+    coil.visible = Boolean(blockedPillar);
+    if (blockedPillar) coil.position.set(blockedPillar.position.x, DISC_Y, blockedPillar.position.z + 0.25);
+    if (bossState) for (const pillar of pillars) pillar.userData.label?.userData.setState?.(bossState.inked ? 'ink' : 'idle');
+    [...controls.children].forEach(button => {
+      const isBlocked = blocked !== null && button.dataset.value === blocked;
+      button.disabled = isBlocked;
+      button.setAttribute('aria-disabled', String(isBlocked));
+      button.title = isBlocked ? 'Wrapped in a tentacle' : '';
+    });
+    host.dataset.bossPhase = bossState?.phase || '';
+    host.dataset.inked = String(Boolean(bossState?.inked));
+  }
+  // Rescue pillar (G6.3): a golden disc marks a target from a skill that is due for review.
+  let rescueValue = null;
+  function applyRescue() {
+    for (const pillar of pillars) {
+      const disc = pillar.userData.label;
+      if (!disc) continue;
+      const on = rescueValue !== null && String(pillar.userData.value) === rescueValue;
+      disc.userData.rescue = on;
+      disc.userData.setState?.(on ? 'rescue' : 'idle');
+    }
+    host.dataset.rescue = rescueValue ?? '';
+  }
+  function setRescue(value) {
+    rescueValue = value === null || value === undefined ? null : String(value);
+    applyRescue();
+    if (reducedMotion) renderFrame();
+  }
+  function setBossState(state) {
+    bossState = state || null;
+    applyBossState();
     if (reducedMotion) renderFrame();
   }
 
   function setEncounter(next = {}) {
-    encounter = { boss: Boolean(next.boss), bossName: String(next.bossName || '') };
+    encounter = { boss: Boolean(next.boss), bossName: String(next.bossName || ''), world: String(next.world || '') };
     // Do not mislabel the legacy math/language bosses as Fraction Kraken.
     kraken.visible = encounter.boss && encounter.bossName === 'Fraction Kraken';
     host.dataset.encounter = kraken.visible ? 'fraction-kraken' : encounter.boss ? 'boss' : 'activity';
@@ -303,7 +469,138 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
     });
   }
 
+  // ---- Answer moments (UI Phase 2.2 + gameplay G2) -------------------------------------
+  // app.js decides correctness and dispatches `bb:answer` before it redraws; the scene only
+  // reacts. Correct: Bite hops to the pillar, chomps the disc (sparkles, small camera bump)
+  // and hops back. Wrong: the disc shakes and flashes red. Reduced motion: no hop or
+  // particles; the disc shows a green or red state for 600 ms instead.
+  const MASCOT_HOME = new THREE.Vector3(0, 0.42, 4.8);
+  const HOP_OUT_MS = 450;
+  const HOP_BACK_MS = 300;
+  const hop = { active: false, start: 0, from: MASCOT_HOME.clone(), to: MASCOT_HOME.clone(), offset: new THREE.Vector3() };
+  const effects = [];
+  let inputLockedUntil = 0;
+  let cameraBumpUntil = 0;
+
+  function pillarFor(value) {
+    return pillars.find(p => String(p.userData.value) === String(value)) || null;
+  }
+  function makeSparkles(origin) {
+    const count = 24;
+    const positions = new Float32Array(count * 3);
+    const velocities = [];
+    for (let i = 0; i < count; i += 1) {
+      positions.set([origin.x, origin.y, origin.z], i * 3);
+      const a = (i / count) * Math.PI * 2;
+      velocities.push(new THREE.Vector3(Math.cos(a) * (0.9 + (i % 3) * 0.35), 1.2 + (i % 4) * 0.45, Math.sin(a) * 0.6));
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const material = new THREE.PointsMaterial({ color: 0xfff27a, size: 0.16, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false });
+    const points = new THREE.Points(geometry, material);
+    points.name = 'sparkles';
+    scene.add(points);
+    const started = performanceClock.now();
+    effects.push(now => {
+      const t = (now - started) / 800;
+      if (t >= 1) { scene.remove(points); geometry.dispose(); material.dispose(); return false; }
+      const attr = geometry.getAttribute('position');
+      for (let i = 0; i < count; i += 1) {
+        const v = velocities[i];
+        attr.setXYZ(i, origin.x + v.x * t, origin.y + v.y * t - 2.2 * t * t, origin.z + v.z * t);
+      }
+      attr.needsUpdate = true;
+      material.opacity = 1 - t;
+      return true;
+    });
+  }
+  function detachDisc(pillar) {
+    const holder = pillar?.userData?.label;
+    if (!holder) return null;
+    scene.attach(holder);
+    pillar.userData.label = null;
+    return holder;
+  }
+  function removeDisc(holder) {
+    scene.remove(holder);
+    disposeObject(holder);
+  }
+  function onAnswer(event) {
+    if (disposed || webglContextLost) return;
+    const { value, correct } = event.detail || {};
+    const pillar = pillarFor(value);
+    host.dataset.lastAnswer = correct ? 'correct' : 'wrong';
+    if (!pillar) return;
+    const now = performanceClock.now();
+    if (correct) {
+      const holder = detachDisc(pillar);
+      holder?.userData.setState?.('correct');
+      if (reducedMotion) {
+        renderFrame();
+        setTimeout(() => { if (holder) removeDisc(holder); renderFrame(); }, 600);
+        return;
+      }
+      const target = pillar.getWorldPosition(new THREE.Vector3());
+      hop.active = true;
+      hop.start = now;
+      hop.to.set(target.x * 0.55, MASCOT_HOME.y, 2.1);
+      inputLockedUntil = now + HOP_OUT_MS + 150;
+      const chompAt = now + HOP_OUT_MS;
+      effects.push(t => {
+        if (t < chompAt || !holder) return true;
+        const k = Math.min(1, (t - chompAt) / 150);
+        holder.scale.setScalar(Math.max(0.001, 1 - k));
+        if (k >= 1) {
+          if (!holder.userData.sparkled) {
+            holder.userData.sparkled = true;
+            makeSparkles(holder.getWorldPosition(new THREE.Vector3()));
+            cameraBumpUntil = t + 120;
+          }
+          removeDisc(holder);
+          return false;
+        }
+        return true;
+      });
+    } else {
+      const holder = pillar.userData.label;
+      if (!holder) return;
+      holder.userData.setState?.('wrong');
+      if (reducedMotion) {
+        renderFrame();
+        setTimeout(() => { holder.userData.setState?.('idle'); renderFrame(); }, 600);
+        return;
+      }
+      const baseX = holder.position.x;
+      effects.push(t => {
+        const k = (t - now) / 300;
+        if (k >= 1 || !holder.parent) {
+          holder.position.x = baseX;
+          setTimeout(() => holder.userData?.setState?.('idle'), 300);
+          return false;
+        }
+        holder.position.x = baseX + Math.sin(k * Math.PI * 6) * 0.08;
+        return true;
+      });
+    }
+  }
+  window.addEventListener('bb:answer', onAnswer);
+  function hopOffset(now) {
+    if (!hop.active) return hop.offset.set(0, 0, 0);
+    const elapsed = now - hop.start;
+    const total = HOP_OUT_MS + 150 + HOP_BACK_MS;
+    if (elapsed >= total) { hop.active = false; return hop.offset.set(0, 0, 0); }
+    let k; let from; let to;
+    if (elapsed < HOP_OUT_MS) { k = elapsed / HOP_OUT_MS; from = MASCOT_HOME; to = hop.to; }
+    else if (elapsed < HOP_OUT_MS + 150) { k = 1; from = hop.to; to = hop.to; }
+    else { k = (elapsed - HOP_OUT_MS - 150) / HOP_BACK_MS; from = hop.to; to = MASCOT_HOME; }
+    const x = from.x + (to.x - from.x) * k;
+    const z = from.z + (to.z - from.z) * k;
+    const y = 4 * 0.9 * k * (1 - k);
+    return hop.offset.set(x - MASCOT_HOME.x, y, z - MASCOT_HOME.z);
+  }
+
   function onPointer(event) {
+    if (performanceClock.now() < inputLockedUntil) return;
     const rect = renderer.domElement.getBoundingClientRect();
     pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -401,9 +698,15 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
     });
   }
 
+  // Shadows (UI Phase 2.5): only Bite and the answer pillars cast, onto the pier and water,
+  // so the shadow pass stays inside the 200 draw-call budget. The quality controller turns
+  // the shadow map off on the performance and mobile tiers.
+  const castShadows = root => root.traverse(child => { if (child.isMesh) child.castShadow = true; });
+  castShadows(mascotFallback);
   installAsset('mascot', mascotFallback, {
     position: [0, 0.42, 4.8], rotation: [0, Math.PI, 0], scale: 0.52,
   }, root => {
+    castShadows(root);
     mascot = root;
     characterAnimation = createCharacterAnimation(root);
     host.dataset.characterAnimated = String(characterAnimation.animated);
@@ -422,7 +725,10 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
     position: [0, 0, 0.6], scale: 4 / 3,
   }, root => {
     pillarAsset = root;
+    root.userData.slotChildren = [];
     root.traverse(child => {
+      if ('ABCD'.includes(child.userData.answer_slot || '_')) root.userData.slotChildren.push(child);
+      if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
       if (child.userData.brainbite_kind === 'answer_pillar_label') child.visible = false;
       if (/pillar_(ring|shaft)/.test(child.userData.brainbite_kind || '') && child.material) {
         child.material = child.material.clone();
@@ -434,8 +740,10 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
     const w = Math.max(host.clientWidth || width, 1);
     const h = Math.max(host.clientHeight || height, 1);
     if (disposed || webglContextLost) return;
-    fitSceneCamera(camera, w / h, { span: 10.8, height: 6.5, target: [0, 1.2, 1], distance: 15.5 });
+    fitSceneCamera(camera, w / h, battleFraming(w / h));
+    cameraBaseY = camera.position.y;
     renderer.setSize(w, h);
+    layoutAnswerButtons();
     if (reducedMotion) renderFrame();
   };
   window.addEventListener('resize', onResize);
@@ -487,6 +795,29 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
     const bob = Math.sin(t * 2) * 0.03;
     if (characterAnimation) mascot.position.y += bob;
     else mascot.position.y = 0.42 + bob;
+    const offset = hopOffset(now);
+    mascot.position.x = MASCOT_HOME.x + offset.x;
+    mascot.position.z = MASCOT_HOME.z + offset.z;
+    mascot.position.y += offset.y;
+    for (let i = effects.length - 1; i >= 0; i -= 1) if (!effects[i](now)) effects.splice(i, 1);
+    // From the second world on the pillars drift slowly (G4.3). It is only visual: answers
+    // never expire, and reduced motion keeps them still.
+    const drifting = encounter.world === 'words' || encounter.world === 'spanish';
+    pillars.forEach((pillar, i) => {
+      const disc = pillar.userData.label;
+      if (disc) disc.position.y = DISC_Y + Math.sin((t / 2.4) * Math.PI * 2 + i * 0.9) * 0.04;
+      if (drifting && pillar.userData.baseX !== undefined) pillar.position.x = pillar.userData.baseX + Math.sin(t * 0.6 + i * 1.7) * 0.14;
+    });
+    if (drifting && pillarAsset) {
+      for (const child of pillarAsset.userData.slotChildren || []) {
+        const pillar = pillars['ABCD'.indexOf(child.userData.answer_slot)];
+        if (pillar) child.position.x = pillar.position.x / pillarAsset.scale.x;
+      }
+    }
+    if (drifting && frameCount % 20 === 0) { layoutAnswerButtons(); placeNibbler(); }
+    camera.position.y = cameraBaseY + (now < cameraBumpUntil ? 0.05 : 0);
+    if (nibbler.visible) nibbler.rotation.y = Math.sin(t * 3) * 0.35;
+    if (paw.visible) paw.children.forEach(child => { child.material.opacity = 0.7 + Math.sin(t * 4) * 0.25; });
     water.position.y = Math.sin(t * 1.2) * 0.015;
     water.material.map.offset.y = t * 0.008;
     renderFrame();
@@ -503,6 +834,9 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
     getPerformanceReport() { return performanceBudget.report(); },
     setChoices,
     setEncounter,
+    setNibbler,
+    setBossState,
+    setRescue,
     highlight,
     react(state) {
       if (characterAnimation) {
@@ -526,6 +860,8 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
       characterAnimation?.dispose();
       programmableBit.dispose();
       window.removeEventListener('bb:bit-event', onBitEvent);
+      window.removeEventListener('bb:answer', onAnswer);
+      effects.length = 0;
       clearPillars();
       window.removeEventListener('resize', onResize);
       motion.removeEventListener('change', onMotionChange);
@@ -537,7 +873,7 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
       clearTimeout(restoreTimer);
       controls.remove();
       delete host.dataset.encounter;
-      for (const key of ['characterAnimated', 'characterState', 'characterPoseY', 'graphicsTier', 'shadowSize', 'pixelRatio', 'programmableBit']) delete host.dataset[key];
+      for (const key of ['characterAnimated', 'characterState', 'characterPoseY', 'graphicsTier', 'shadowSize', 'pixelRatio', 'programmableBit', 'answerDiscs', 'lastAnswer', 'nibblerSlot', 'nibblerNext', 'bossPhase', 'inked', 'rescue']) delete host.dataset[key];
       disposeObject(scene);
       sun.shadow.dispose();
       renderer.dispose();

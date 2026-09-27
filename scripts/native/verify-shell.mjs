@@ -29,6 +29,15 @@ function walkFiles(directory) {
   return files;
 }
 
+function parseCsp(policy) {
+  const directives = {};
+  for (const part of policy.split(';')) {
+    const [name, ...values] = part.trim().split(/\s+/);
+    if (name) directives[name] = values.sort();
+  }
+  return directives;
+}
+
 export function verifyNativeShell() {
   const configPath = path.join(nativeRoot, 'tauri.conf.json');
   const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
@@ -41,6 +50,21 @@ export function verifyNativeShell() {
   if (config.app?.windows?.[0]?.useHttpsScheme !== true) failures.push('the packaged asset protocol must use its secure scheme');
   if (config.app?.security?.capabilities?.length !== 1 || config.app.security.capabilities[0] !== 'default') {
     failures.push('only the minimal default capability may be enabled');
+  }
+
+  // The native shells run the same staged index.html as the web build, so they must not
+  // loosen its Content-Security-Policy (M2.5). script/style/connect must match exactly.
+  const shellCsp = parseCsp(config.app?.security?.csp || '');
+  const indexHtml = fs.readFileSync(path.join(repoRoot, 'index.html'), 'utf8');
+  const pageCsp = parseCsp((indexHtml.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/) || [])[1] || '');
+  if (!Object.keys(pageCsp).length) failures.push('index.html has no Content-Security-Policy');
+  if (/unsafe-inline|unsafe-eval|wasm-unsafe-eval|fonts\.googleapis|fonts\.gstatic/.test(config.app?.security?.csp || '')) {
+    failures.push('native CSP must not allow inline/eval code or remote fonts');
+  }
+  for (const directive of ['script-src', 'style-src', 'connect-src', 'object-src', 'base-uri']) {
+    if ((shellCsp[directive] || []).join(' ') !== (pageCsp[directive] || []).join(' ')) {
+      failures.push(`native CSP ${directive} differs from index.html`);
+    }
   }
 
   const capability = JSON.parse(fs.readFileSync(path.join(nativeRoot, 'capabilities', 'default.json'), 'utf8'));

@@ -1072,6 +1072,7 @@ for (const lockMode of ['web-locks', 'indexed-db', 'local-storage']) {
     expect(ids.every(id => !id.includes(profileId))).toBe(true);
 
     await Promise.all([pageA.reload(), pageB.reload()]);
+    await Promise.all([pageA.evaluate(() => PERSISTENCE_CHAIN), pageB.evaluate(() => PERSISTENCE_CHAIN)]);
     const copies = await pageA.evaluate(id => {
       const summarize = store => {
         const skill = store.profiles.find(profile => profile.id === id).learningCore.skills['math-4-fractions'];
@@ -1132,6 +1133,7 @@ test('localStorage fallback keeps tombstones and queue IDs while defeating a sta
   await expect.poll(() => summarize(pageA, ids)).toEqual(expected);
   await expect.poll(() => summarize(pageB, ids)).toEqual(expected);
   await Promise.all([pageA.reload(), pageB.reload()]);
+  await Promise.all([pageA.evaluate(() => PERSISTENCE_CHAIN), pageB.evaluate(() => PERSISTENCE_CHAIN)]);
   const copies = await pageA.evaluate(({ deletedId, survivorId }) => Object.fromEntries(['bb-core-v3', 'bb-core-v3-back', 'bb-core-v3-recovery'].map(key => {
     const store = JSON.parse(localStorage.getItem(key));
     return [key, { present: store.profiles.some(profile => profile.id === deletedId), tombstones: store.deletedProfiles.filter(item => item.id === deletedId).length, laterAttempts: store.profiles.find(profile => profile.id === survivorId).learningCore.skills['math-4-fractions'].recentPerformance.filter(attempt => attempt.id === 'post-delete-survivor-attempt').length }];
@@ -1571,7 +1573,9 @@ test('low-end devices surface the reduced-cost mode hint and class', async ({ pa
   });
   await page.reload();
   await expect(page.locator('html')).toHaveClass(/low-end-device/);
-  await expect(page.locator('#launchHint')).toContainText('This device may feel smoother on Performance mode.');
+  // Device advice is for grown-ups: Parents → Advanced, never the child's home screen.
+  await expect(page.locator('#deviceHint')).toContainText('This device may feel smoother on Performance mode');
+  await expect(page.locator('#launchHint')).not.toContainText('Performance');
 });
 
 test('production fonts are self-hosted, precached, and the content security policy is restrictive', async ({ page }) => {
@@ -1581,6 +1585,10 @@ test('production fonts are self-hosted, precached, and the content security poli
     if (!['127.0.0.1', 'localhost', '::1'].includes(host)) externalHosts.push(host);
   });
   await page.reload();
+  // Nunito is only the fallback after Fredoka, so a page whose text Fredoka fully covers
+  // never needs it. It used to load only because double-encoded glyphs in styles.css fell
+  // through to it; load it explicitly so this test proves self-hosting, not that accident.
+  await page.evaluate(() => Promise.all([document.fonts.load('700 16px Fredoka'), document.fonts.load('800 16px Nunito')]));
   await page.evaluate(() => document.fonts.ready);
   const policy = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
   expect(policy).toContain("default-src 'self'");
@@ -1741,6 +1749,8 @@ test('non-localhost production host launches and completes a canonical registry 
     const mode = window.BrainBiteGame.getContentControl().mode;
     const launched = window.BrainBiteGame.startMission(1);
     for (let guard = 0; guard < 25 && G && !progression().completedMissionIds.includes(1); guard += 1) {
+      // An enemy collision can empty the hearts; Bite's snack pauses input until they refill.
+      for (let wait = 0; wait < 40 && G.paused; wait += 1) await new Promise(resolve => setTimeout(resolve, 100));
       const next = G.cells.find(cell => cell && !cell.eaten && cell.correct);
       if (!next) break;
       window.BrainBiteGame.tryAnswer(next.value);
@@ -1757,34 +1767,46 @@ test('non-localhost production host launches and completes a canonical registry 
 });
 
 test('cloud authorization retries once and then requires a fresh sign-in', async ({ page }) => {
-  let firestoreRequests = 0;
-  let refreshRequests = 0;
-  await page.route('https://firestore.googleapis.com/**', async route => {
-    firestoreRequests += 1;
-    await route.fulfill({ status: 401, json: { error: { message: 'expired' } } });
-  });
-  await page.route('https://securetoken.googleapis.com/**', async route => {
-    refreshRequests += 1;
-    await route.fulfill({ json: { id_token: 'refreshed-token', refresh_token: 'refresh-2', user_id: 'family-auth-cap' } });
-  });
   const result = await page.evaluate(async () => {
+    let firestoreRequests = 0;
+    let refreshRequests = 0;
     localStorage.setItem('bb-firebase-session', JSON.stringify({
       idToken: 'expired-token',
       refreshToken: 'refresh-1',
       localId: 'family-auth-cap',
       email: 'parent@example.com',
     }));
-    const client = new BrainBiteFirebaseREST('brainbite-test', 'AIza-test-public-web-key-123456789');
+    const originalFetch = window.fetch;
+    window.fetch = async url => {
+      const target = String(url);
+      if (target.includes('firestore.googleapis.com')) {
+        firestoreRequests += 1;
+        return new Response(JSON.stringify({ error: { message: 'expired' } }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (target.includes('securetoken.googleapis.com')) {
+        refreshRequests += 1;
+        return new Response(JSON.stringify({ id_token: 'refreshed-token', refresh_token: 'refresh-2', user_id: 'family-auth-cap' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      throw new Error(`Unexpected fetch in auth retry test: ${target}`);
+    };
     try {
-      await client.pullProfiles();
-      return { resolved: true, message: '' };
-    } catch (error) {
-      return { resolved: false, message: error.message };
+      const client = new BrainBiteFirebaseREST('brainbite-test', 'AIza-test-public-web-key-123456789');
+      try {
+        await client.pullProfiles();
+        return { resolved: true, message: '', firestoreRequests, refreshRequests };
+      } catch (error) {
+        return { resolved: false, message: error.message, firestoreRequests, refreshRequests };
+      }
+    } finally {
+      window.fetch = originalFetch;
     }
   });
-  expect(result).toEqual({ resolved: false, message: 'Cloud authorization expired. Sign in again.' });
-  expect(firestoreRequests).toBe(2);
-  expect(refreshRequests).toBe(1);
+  expect(result).toEqual({
+    resolved: false,
+    message: 'Cloud authorization expired. Sign in again.',
+    firestoreRequests: 2,
+    refreshRequests: 1,
+  });
 });
 
 test('Firestore size preflight rejects oversized profile and tombstone before any fetch', async ({ page }) => {
@@ -1891,10 +1913,14 @@ test('attempt events retain the active profile identity while excluding child or
 
 test('single-learner struggle records review telemetry without quarantine or retry lock', async ({ page }) => {
   await page.waitForFunction(() => !!window.BrainBiteGame && !!window.BrainBiteCore);
-  const result = await page.evaluate(() => {
+  const result = await page.evaluate(async () => {
     window.BrainBiteGame.startMission(1);
     const wrong = String(G.cells.find(cell => !cell.eaten && !cell.correct).value);
-    for (let count = 0; count < 3; count += 1) window.BrainBiteGame.tryAnswer(wrong);
+    // Zero hearts pauses for Bite's snack, then refills (decision D11). The enemy can also
+    // take a heart, so wait out any snack before each attempt rather than assuming counts.
+    const afterSnack = async () => { for (let i = 0; i < 40 && G.paused; i += 1) await new Promise(resolve => setTimeout(resolve, 100)); };
+    for (let count = 0; count < 3; count += 1) { await afterSnack(); window.BrainBiteGame.tryAnswer(wrong); }
+    await afterSnack();
     const before = { lives: G.lives, mastery: P().mastery.math, mistakes: P().mistakes.length, attempts: P().learningCore.skills[G.m.skill].evidence.attempts };
     window.BrainBiteGame.tryAnswer(wrong);
     const identity = G.contentControl.telemetry.contentIdentity;
@@ -2075,7 +2101,9 @@ test('Phase 3.1 Practice Lab locked missions complete as non-progression practic
   await page.locator('#playPractice').click();
   await expect(page.locator('#game.show')).toBeVisible();
   await page.evaluate(() => {
-    const correctCells = [...new Set(G.cells.filter(cell => !cell.eaten && cell.correct).map(cell => String(cell.value)))];
+    // In the Classic board, each tap consumes one cell; preserve duplicate answer values
+    // so repeated correct cells are consumed before the test reads the completion session.
+    const correctCells = G.cells.filter(cell => !cell.eaten && cell.correct).map(cell => String(cell.value));
     for (const value of correctCells) window.BrainBiteGame.tryAnswer(value);
   });
 

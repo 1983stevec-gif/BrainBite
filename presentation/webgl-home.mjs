@@ -2,7 +2,7 @@ import * as THREE from '../vendor/three/three.module.js';
 import { makeMascot, makeTreeGrove, makeRock, makeWorldSign, disposeObject } from './props.mjs';
 import { shouldReduceMotion } from './capability.mjs';
 import { loadGltfAsset, disposeGltfAsset } from './gltf-assets.mjs';
-import { addJungleBanks, makeWaterMaterial, fitSceneCamera, makeBiteHouse } from './jungle-environment.mjs';
+import { addJungleBanks, makeWaterMaterial, fitSceneCamera, makeBiteHouse, makeSkyDome } from './jungle-environment.mjs';
 import { createCharacterAnimation } from './character-animation.mjs';
 import { createQualityController } from './graphics-quality.mjs';
 import { makeTerrainMaterial, makePortalEnergyMaterial } from './surface-textures.mjs';
@@ -43,6 +43,7 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(worldProfile.palette.sky);
   scene.fog = new THREE.Fog(worldProfile.palette.fog, 15, 34);
+  scene.add(makeSkyDome({ top: 0x8fcff5, horizon: worldProfile.palette.fog }));
 
   const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 120);
   fitSceneCamera(camera, width / height, { span: 10.8, height: 4.6, target: [0, 1.25, 0], distance: 11.5 });

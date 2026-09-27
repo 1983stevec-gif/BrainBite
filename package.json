@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "private": true,
   "scripts": {
-    "test:unit": "node --test --test-concurrency=1 tests/core.test.mjs tests/presentation.test.mjs tests/world-profiles.test.mjs tests/world-gateway.test.mjs tests/bubble-reef-kit.test.mjs tests/bubble-reef-route-kit.test.mjs tests/bubble-reef-base-contribution.test.mjs tests/bubble-reef-content.test.mjs tests/bubble-reef-rewards.test.mjs tests/bubble-reef-app-integration.test.mjs tests/world-pipeline-audit.test.mjs tests/accessibility-contract.test.mjs tests/performance-budget.test.mjs tests/startup-performance.spec.mjs tests/glb-intake.test.mjs tests/experience-registry.test.mjs tests/content-review.test.mjs tests/typing-progression.test.mjs tests/code-bridge.test.mjs tests/code-bridge-curriculum.test.mjs tests/code-lab.test.mjs tests/programmable-bits.test.mjs tests/programmable-bit-curriculum.test.mjs tests/storage-copies.test.mjs tests/content-approval.test.mjs tests/package-manifest.test.mjs",
+    "test:unit": "node --test --test-concurrency=1 tests/core.test.mjs tests/presentation.test.mjs tests/capability.test.mjs tests/platform.test.mjs tests/world-profiles.test.mjs tests/world-gateway.test.mjs tests/bubble-reef-kit.test.mjs tests/bubble-reef-route-kit.test.mjs tests/bubble-reef-base-contribution.test.mjs tests/bubble-reef-content.test.mjs tests/bubble-reef-rewards.test.mjs tests/bubble-reef-app-integration.test.mjs tests/world-pipeline-audit.test.mjs tests/accessibility-contract.test.mjs tests/performance-budget.test.mjs tests/startup-performance.spec.mjs tests/glb-intake.test.mjs tests/experience-registry.test.mjs tests/content-review.test.mjs tests/typing-progression.test.mjs tests/code-bridge.test.mjs tests/code-bridge-curriculum.test.mjs tests/code-lab.test.mjs tests/programmable-bits.test.mjs tests/programmable-bit-curriculum.test.mjs tests/storage-copies.test.mjs tests/content-approval.test.mjs tests/package-manifest.test.mjs tests/explainers.test.mjs tests/run-builder.test.mjs",
     "test:content-review": "node --test tests/content-review.test.mjs",
     "test:e2e": "playwright test",
     "serve": "node scripts/serve.mjs",
@@ -31,7 +31,8 @@
     "review:reject": "node scripts/review-content.mjs --reject",
     "review:list": "node scripts/review-content.mjs --list",
     "smoke": "node scripts/smoke-runner.mjs",
-    "check:static": "npm run check:css && npm run check:element-ids && npm run check:test-selectors && npm run check:vacuous-assertions && npm run check:precache && npm run check:test-ports && npm run check:host-paths && npm run check:certification-coverage && npm run check:stage",
+    "check:encoding": "node scripts/check-encoding.mjs",
+    "check:static": "npm run check:encoding && npm run check:css && npm run check:element-ids && npm run check:test-selectors && npm run check:vacuous-assertions && npm run check:precache && npm run check:test-ports && npm run check:host-paths && npm run check:certification-coverage && npm run check:stage",
     "test:blender-normalize": "node --test tests/blender-normalize.integration.mjs",
     "check:content": "node scripts/validate-content.mjs",
     "check:content-review": "node scripts/validate-code-bridge-content.mjs && node scripts/validate-programmable-bit-content.mjs && node scripts/validate-content-review.mjs",
@@ -46,7 +47,9 @@
     "check:firebase:security": "node scripts/validate-firebase-security.mjs",
     "check:evidence": "node scripts/validate-evidence.mjs",
     "check:evidence:ci": "node scripts/validate-evidence.mjs --allow-foreign-checkout",
-    "certify:local": "node scripts/certify-local-release.mjs"
+    "certify:local": "node scripts/certify-local-release.mjs",
+    "evidence:refresh": "node scripts/smoke-runner.mjs --promote",
+    "capture:ui": "node scripts/capture-ui.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

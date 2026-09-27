@@ -3,7 +3,9 @@
 //
 // The smoke scripts each expected a server to already be listening, so they were never
 // exercised by any gate. This runner starts one server, executes each smoke against it,
-// records pass/fail with timing, and writes tracked evidence.
+// records pass/fail with timing, and writes a report. By default the report and every
+// screenshot go to the git-ignored .playwright-results/; `--promote` (used by
+// `npm run evidence:refresh` and certify:local) writes the tracked evidence instead.
 //
 // Usage:
 //   npm run smoke                      # every scripts/smoke-*.mjs
@@ -12,8 +14,12 @@
 import { execFile } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { readdirSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 import { createBrainBiteServer } from './serve.mjs';
+import { promoteEvidence, releaseEvidenceDir } from './lib/evidence-paths.mjs';
+
+// Child smokes read the same switch, so their screenshots follow the report.
+if (promoteEvidence) process.env.BRAINBITE_PROMOTE_EVIDENCE = '1';
 
 const repoRoot = resolve(import.meta.dirname, '..');
 const port = Number(process.env.BRAINBITE_TEST_PORT || 4318);
@@ -24,7 +30,11 @@ function argValue(name, fallback) {
   return index >= 0 && process.argv[index + 1] ? process.argv[index + 1] : fallback;
 }
 const only = argValue('only', '');
-const perScriptTimeout = Number(argValue('timeout', 120000));
+// Windows runs the Chrome+Edge smoke matrix; on the current workstation it can
+// legitimately take over two minutes. Keep Linux CI's tighter limit, but give
+// local Windows runs enough time to finish rather than killing a passing child.
+const defaultPerScriptTimeout = process.platform === 'win32' ? 300000 : 120000;
+const perScriptTimeout = Number(argValue('timeout', defaultPerScriptTimeout));
 
 const scripts = readdirSync(resolve(repoRoot, 'scripts'))
   .filter(name => /^smoke-.*\.mjs$/.test(name))
@@ -95,13 +105,13 @@ const report = {
   totals: { scripts: results.length, passed: results.length - failed.length, failed: failed.length },
   results,
 };
-const outputDir = resolve(repoRoot, 'release-evidence');
+const outputDir = releaseEvidenceDir;
 await mkdir(outputDir, { recursive: true });
 await writeFile(resolve(outputDir, 'smoke-report.json'), `${JSON.stringify(report, null, 2)}\n`);
 
 if (server) await new Promise(done => { server.close(done); server.closeAllConnections?.(); });
 
-console.log(`\n${report.totals.passed}/${report.totals.scripts} smoke checks passed; evidence in release-evidence/smoke-report.json`);
+console.log(`\n${report.totals.passed}/${report.totals.scripts} smoke checks passed; report in ${relative(repoRoot, resolve(outputDir, 'smoke-report.json'))}${promoteEvidence ? '' : ' (run npm run evidence:refresh to update release-evidence/)'}`);
 if (failed.length) {
   console.error(`Failed: ${failed.map(result => result.script).join(', ')}`);
   process.exitCode = 1;

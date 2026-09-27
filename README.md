@@ -1,8 +1,8 @@
 # BrainBite v2.0
 
-BrainBite is a local-first educational game packaged as an installed Windows app. Its current game runtime uses JavaScript and Three.js inside a locked-down Tauri/WebView2 shell; the PWA-compatible browser surface is retained only for development and automated testing. The game supports keyboard and touch play, profiles, progression, adaptive review, rewards, parent controls, save recovery, accessibility preferences, audio, offline play, and optional parent-authenticated Firebase sync.
+BrainBite is a local-first educational game for children. It ships first as an installable, offline-capable web app (PWA) on GitHub Pages for the closed beta (decision D1, 2026-09-25); the same verified runtime is also packaged as a locked-down Tauri/WebView2 Windows app, and later as iOS/Android store apps. The runtime uses JavaScript and Three.js. The game supports keyboard and touch play, profiles, progression, adaptive review, rewards, parent controls, save recovery, accessibility preferences, audio, offline play, and optional parent-authenticated Firebase sync.
 
-## Browser development only
+## Develop in the browser
 
 Requirements: Node.js 20 or newer.
 
@@ -11,7 +11,7 @@ npm install
 npm run serve
 ```
 
-Open `http://127.0.0.1:4317`. Run the complete release gate with:
+Open `http://127.0.0.1:4318`. Start with [`docs/HANDOFF.md`](docs/HANDOFF.md). Run the complete release gate with:
 
 ```powershell
 npm run release:check

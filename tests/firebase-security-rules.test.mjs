@@ -50,9 +50,9 @@ rejectsMutation(
 
 rejectsMutation(
   'secret fields remain explicitly rejected from cloud progress',
-  `&& !keys.hasAny([
-          'parentPin', 'parentAuth', 'pinHash', 'pinSalt', 'password',
-          'idToken', 'refreshToken'
+  `'programmableBitLessons', 'bubbleReefRewards'
+        ])`,
+  `'programmableBitLessons', 'bubbleReefRewards', 'parentPin'
         ])`,
 );
 
@@ -68,18 +68,20 @@ rejectsMutation(
 
 rejectsMutation(
   'owner ID remains immutable on profile updates',
-  `'displayName', 'progress', 'clientUpdatedAt'
-          ])`,
-  `'ownerId', 'displayName', 'progress', 'clientUpdatedAt'
-          ])`,
+  'next.ownerId == previous.ownerId',
 );
 
 rejectsMutation(
   'client profile ID remains immutable on profile updates',
-  `'displayName', 'progress', 'clientUpdatedAt'
-          ])`,
-  `'displayName', 'clientProfileId', 'progress', 'clientUpdatedAt'
-          ])`,
+  '&& next.clientProfileId == previous.clientProfileId',
+);
+
+rejectsMutation(
+  'profile update schema stays within the exact envelope allowlist',
+  `'ownerId', 'displayName', 'clientProfileId', 'progress', 'clientUpdatedAt'
+        ])`,
+  `'ownerId', 'displayName', 'clientProfileId', 'progress', 'clientUpdatedAt', 'unboundedExtension'
+        ])`,
 );
 
 rejectsMutation(
@@ -140,6 +142,12 @@ rejectsMutation(
 );
 
 const emulatorHost = process.env.FIRESTORE_EMULATOR_HOST;
+// CI sets REQUIRE_FIRESTORE_EMULATOR so a missing emulator fails instead of skipping silently.
+if (process.env.REQUIRE_FIRESTORE_EMULATOR === '1') {
+  test('the Firestore emulator is available when CI requires it', () => {
+    assert.ok(emulatorHost, 'FIRESTORE_EMULATOR_HOST must be set (run under firebase emulators:exec)');
+  });
+}
 
 function tokenFor(uid) {
   const now = Math.floor(Date.now() / 1000);
@@ -269,6 +277,14 @@ test('Firestore emulator enforces ownership, bounds, types, immutable IDs, and p
   const updated = structuredClone(live);
   updated.score = 1;
   assert.equal((await request('family-a', 'PATCH', profileEnvelope(updated))).status, 200, 'owner updates valid live profile');
+
+  const changedOwner = profileEnvelope(updated);
+  changedOwner.ownerId = 'family-b';
+  assert.equal((await request('family-a', 'PATCH', changedOwner)).status, 403, 'owner ID is immutable');
+
+  const changedClientProfileId = profileEnvelope(updated);
+  changedClientProfileId.clientProfileId = `${profileId}-other`;
+  assert.equal((await request('family-a', 'PATCH', changedClientProfileId)).status, 403, 'client profile ID is immutable');
 
   for (const omittedField of ['practice', 'offlineQueue', 'profileId']) {
     const localOnlyCore = structuredClone(live);

@@ -15,6 +15,8 @@ import {
   createApprovedCurriculumChallenge,
   createCurriculumTaxonomy,
   defaultLearner,
+  createSkillState,
+  scoreAttempt,
   curriculumSkillsForGrade,
   findCurriculumSkill,
   exportFoundationEnvelope,
@@ -1045,4 +1047,39 @@ test('canonical generated validation rejects reviewed-template content substitut
   const answerValidation = validateGeneratedChallenge(alteredAnswers, findCurriculumSkill('math-1-addition'));
   assert.equal(answerValidation.approved, false);
   assert.ok(answerValidation.errors.includes('Canonical generated answers do not match its reviewed template.'));
+});
+
+test('merging a skill state with itself leaves the mastery score unchanged', () => {
+  let state = createSkillState('fractions');
+  for (let index = 0; index < 4; index += 1) {
+    state = scoreAttempt({ id: `a-${index}`, correct: index !== 2, independent: true, responseTimeMs: 2000, originId: 'device-a', originSequence: index + 1 }, state);
+  }
+  const merged = mergeSkillStates(state, state);
+  assert.equal(merged.masteryScore, state.masteryScore);
+  assert.equal(merged.evidence.attempts, state.evidence.attempts);
+  const pulledNothingNew = mergeSkillStates(state, mergeSkillStates(state, state));
+  assert.equal(pulledNothingNew.masteryScore, state.masteryScore);
+});
+
+test('a replayed attempt with the same id is scored once', () => {
+  const attempt = { id: 'attempt-1', correct: true, independent: true, responseTimeMs: 1800 };
+  const once = scoreAttempt(attempt, createSkillState('fractions'));
+  const twice = scoreAttempt(attempt, once);
+  assert.equal(twice.evidence.attempts, 1);
+  assert.equal(twice.evidence.independentSuccesses, 1);
+  assert.equal(twice.masteryScore, once.masteryScore);
+  const other = scoreAttempt({ ...attempt, id: 'attempt-2' }, twice);
+  assert.equal(other.evidence.attempts, 2);
+});
+
+test('cloud scrubbing removes a whole-word child name but not fields that merely contain its letters', () => {
+  const event = () => ({ id: 'evt', type: 'ContentOutcomeObserved', createdAt: 1, payload: { skillId: 'place-value', family: 'target-smash', note: 'Great job Sam!' } });
+  const short = normalizeFoundationState({ learners: { 'p-1': { ...defaultLearner('e', 'p-1'), telemetry: [event()] } } }).learners['p-1'];
+  assert.equal(short.telemetry[0].payload.skillId, 'place-value');
+  assert.equal(short.telemetry[0].payload.family, 'target-smash');
+  const sam = normalizeFoundationState({ learners: { 'p-2': { ...defaultLearner('Sam', 'p-2'), telemetry: [event()] } } }).learners['p-2'];
+  assert.equal(sam.telemetry[0].payload.skillId, 'place-value');
+  assert.equal(sam.telemetry[0].payload.note, undefined);
+  const samuel = normalizeFoundationState({ learners: { 'p-3': { ...defaultLearner('Samuel', 'p-3'), telemetry: [event()] } } }).learners['p-3'];
+  assert.equal(samuel.telemetry[0].payload.note, 'Great job Sam!');
 });

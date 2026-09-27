@@ -6,6 +6,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
+import { evidenceCheckForBranch } from './lib/certification-policy.mjs';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const output = resolve(process.env.BB_CERT_OUTPUT || 'release-evidence/local-certification.json');
@@ -85,7 +86,7 @@ try {
     ['launch-structure', 'check:launch'],
     ['final-hardening', 'check:final'],
     ['firebase-security', 'check:firebase:security'],
-    ['release-evidence', 'check:evidence'],
+    ['release-evidence', evidenceCheckForBranch(git.branch)],
     ['unit-tests', 'test:unit'],
   ];
   for (const [label, script] of validators) await record(label, npmCommand, ['run', script]);
@@ -99,6 +100,7 @@ try {
     ['activity-browser', 'tests/activity-families.spec.js', 'tests/bubble-reef-preview.spec.js'],
     ['webgl-browser', 'tests/webgl.spec.js', 'tests/webgl-accessibility.spec.js', 'tests/webgl-assets.spec.js'],
     ['brainbase-match-browser', 'tests/brainbase.spec.js', 'tests/match.spec.js'],
+    ['native-shell-browser', 'tests/native-shell.spec.js'],
   ];
   for (const [label, ...specs] of browserGroups) {
     // One retry, matching CI. Under load a WebGL mount or a reload can exceed its timeout
@@ -126,7 +128,7 @@ try {
 
   // One reported smoke runner owns the smoke inventory; the performance probe stays
   // separate because it produces its own evidence pack.
-  await record('smoke-runner', nodeCommand, ['scripts/smoke-runner.mjs']);
+  await record('smoke-runner', nodeCommand, ['scripts/smoke-runner.mjs', '--promote']);
   {
     const entry = results.at(-1);
     try {

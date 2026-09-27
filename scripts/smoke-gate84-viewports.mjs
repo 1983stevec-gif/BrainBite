@@ -1,12 +1,13 @@
 /** Gate 8.4 agent-side viewport matrix (not a substitute for real devices) */
 import { chromium } from '@playwright/test';
 import { openWorld } from './lib/smoke-nav.mjs';
+import { referenceCaptureDir } from './lib/evidence-paths.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
-const outDir = path.join(root, '..', 'docs', 'references', 'spike');
+const outDir = referenceCaptureDir;
 const base = process.env.BB_BASE || process.env.PLAYWRIGHT_BASE_URL || `http://127.0.0.1:` + String(process.env.BRAINBITE_TEST_PORT || 4318);
 fs.mkdirSync(outDir, { recursive: true });
 
