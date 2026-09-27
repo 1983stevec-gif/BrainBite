@@ -30,7 +30,11 @@ function argValue(name, fallback) {
   return index >= 0 && process.argv[index + 1] ? process.argv[index + 1] : fallback;
 }
 const only = argValue('only', '');
-const perScriptTimeout = Number(argValue('timeout', 120000));
+// Windows runs the Chrome+Edge smoke matrix; on the current workstation it can
+// legitimately take over two minutes. Keep Linux CI's tighter limit, but give
+// local Windows runs enough time to finish rather than killing a passing child.
+const defaultPerScriptTimeout = process.platform === 'win32' ? 300000 : 120000;
+const perScriptTimeout = Number(argValue('timeout', defaultPerScriptTimeout));
 
 const scripts = readdirSync(resolve(repoRoot, 'scripts'))
   .filter(name => /^smoke-.*\.mjs$/.test(name))
