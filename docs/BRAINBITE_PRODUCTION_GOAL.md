@@ -18,14 +18,17 @@ gates and must not be reported as completed by repository work.
 
 ## Current Status (2026-09-27)
 
-The in-scope engineering work for the closed-beta candidate is implemented and verified
-on `mobile/runtime-readiness` at `36887b9de41cab1acad04be188dda4772af01ea4`. [PR #2](https://github.com/1983stevec-gif/BrainBite/pull/2)
-is open and mergeable to `main`; GitHub Actions run 36302425172 passed both the full test
+The in-scope engineering work for the closed-beta candidate is implemented on
+`mobile/runtime-readiness`; the verified code/evidence commit is
+`a6786aaa04ec09d1ffdda2420ffff30a59b07e4b`. [PR #2](https://github.com/1983stevec-gif/BrainBite/pull/2)
+is open and mergeable to `main`; GitHub Actions run 36307503774 passed both the full test
 job and Firestore emulator job. On Windows, `npm ci` succeeded and local certification
 passed 17/17 stages, including 210 browser cases, 11/11 smokes, and zero headless
-performance-budget violations. Two browser cases passed on retry; their complete groups
-were rerun without retries and passed 92/92 (`tests/release.spec.js`) and 14/14
-(`tests/brainbase.spec.js` plus `tests/match.spec.js`).
+performance-budget violations. The report snapshot was captured on `36887b9` with the
+final stylesheet/evidence changes in the worktree; those changes were committed in
+`a6786aa`. Two browser cases passed on retry; their full groups were rerun without retries
+and passed 92/92 (`tests/release.spec.js`) and 14/14 (`tests/brainbase.spec.js` plus
+`tests/match.spec.js`).
 
 Steve owns the PR merge under decision D6. Publication, physical-device testing, educator
 approval, accessibility/Spanish/legal review, and production setup remain external gates.
@@ -365,7 +368,7 @@ Repository work may prepare evidence for these gates but may not mark them compl
 - Current engine: static local-first JavaScript/Three.js runtime; its browser harness remains for development and tests.
 - Production shell decision (2026-09-19): Tauri 2 installed Windows app with bundled assets and no localhost listener.
 - Unity: absent; a full Unity rewrite remains a separate future engine migration, not a claim of this closed-beta build.
-- Branch: `mobile/runtime-readiness` at `36887b9de41cab1acad04be188dda4772af01ea4`; PR #2 is open to `main`.
+- Branch: `mobile/runtime-readiness`; verified code/evidence commit `a6786aaa04ec09d1ffdda2420ffff30a59b07e4b` is in open PR #2 to `main`.
 - Product state: closed-beta candidate with the implementation phases complete. It is not merged or published, and external gates remain open.
 - Verification: clean `npm ci`; local certification 17/17; 210 browser cases, 11/11 smokes, and zero headless performance-budget violations. Two retry-only cases were followed by full no-retry group passes (92/92 and 14/14).
 - Owner action: review and merge PR #2. Device, human-review, publication, and production-setup gates remain separately listed above.
@@ -597,7 +600,7 @@ Current focused evidence:
 
 Repository evidence (2026-09-27):
 
-- Branch: `mobile/runtime-readiness` at `36887b9de41cab1acad04be188dda4772af01ea4`.
+- Branch: `mobile/runtime-readiness`; code/evidence commit `a6786aaa04ec09d1ffdda2420ffff30a59b07e4b` is in PR #2.
 - Remote: `https://github.com/1983stevec-gif/BrainBite`; PR #2 is open, mergeable, and CI-green.
 - `npm ci` and Windows local certification completed. The CI job verifies that browser and smoke runs leave the tracked tree unchanged.
 - The local certification records a dirty initial working tree because it refreshed tracked screenshots and release evidence; generated emulator output stays local and must not enter the PR.

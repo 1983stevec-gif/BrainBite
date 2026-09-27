@@ -8,9 +8,9 @@ This document is the honest state of the closed-beta candidate. It separates wha
 verified locally from what is not, and it does not claim external gates.
 
 The current implementation is on `mobile/runtime-readiness` in [PR #2](https://github.com/1983stevec-gif/BrainBite/pull/2),
-open and mergeable to `main` at `36887b9de41cab1acad04be188dda4772af01ea4`. GitHub Actions
-run 36302425172 passes both the full test job and Firestore emulator job. Steve owns the
-merge under decision D6.
+open and mergeable to `main`. Its verified code/evidence commit is
+`a6786aaa04ec09d1ffdda2420ffff30a59b07e4b`; GitHub Actions run 36307503774 passes both
+the full test job and Firestore emulator job. Steve owns the merge under decision D6.
 
 ## 1. Runtime package
 
@@ -77,7 +77,7 @@ The installer is unsigned and is an internal closed-beta artifact.
 | `release-evidence/package-manifest.json` | `npm run package:manifest` | Current: 100 files, verified by `check:stage` |
 | `release-evidence/content-review-packet.{json,html}` | `npm run review:packet` | Current: 75 pending records, 0 digest mismatches |
 | `test-results/performance-evidence/{desktop,mobile}.json` | `npm run probe:performance` | Current: zero headless budget violations |
-| `release-evidence/local-certification.json` | `npm run certify:local` | Current: **17/17 stages**, 210 browser cases (2 passed on retry), 11/11 smokes, probe exit 0 with zero headless budget violations. No-retry follow-ups passed `tests/release.spec.js` 92/92 and BrainBase/MATCH 14/14 |
+| `release-evidence/local-certification.json` | `npm run certify:local` | Current: **17/17 stages**, 210 browser cases (2 passed on retry), 11/11 smokes, probe exit 0 with zero headless budget violations. The report was captured on `36887b9` with the final stylesheet/evidence changes in the worktree and records that initial tree as dirty; those changes are committed in `a6786aa`. No-retry follow-ups passed `tests/release.spec.js` 92/92 and BrainBase/MATCH 14/14 |
 
 ## 4. Defect ledger
 
@@ -178,8 +178,8 @@ Windows-only blind spots:
 | `check:static` failed on six package manifest digests (app.js, index.html, boot.mjs, capability.mjs, service-worker.js, three.module.js) | The manifest hashed raw working-copy bytes; the Windows copy had mixed CRLF/LF endings while CI checked out LF | `.gitattributes` normalizes text to LF in the repository and every checkout; text hashing is line-ending independent and binaries are still hashed byte for byte |
 | `smoke-pwa-installability` failed 10/11 | It hardcoded `D:/Codex/Brainbite` as the repository root, so every manifest icon lookup failed on Linux | The root is derived from the module location; `check:host-paths` joined `check:static` to prevent a recurrence |
 
-The current PR run is green: [GitHub Actions run 36302425172](https://github.com/1983stevec-gif/BrainBite/actions/runs/36302425172)
-passed the full test job and Firestore emulator job on `36887b9`.
+The current PR run is green: [GitHub Actions run 36307503774](https://github.com/1983stevec-gif/BrainBite/actions/runs/36307503774)
+passed the full test job and Firestore emulator job on `a6786aa`.
 
 ### Open, non-blocking
 

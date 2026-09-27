@@ -24,9 +24,9 @@ left, and the operational details that are easy to get wrong. The other document
 The earlier baseline is merged to `main` (PR #1, merge commit `6b43a59`). The current
 closed-beta implementation stack is on [`mobile/runtime-readiness`](https://github.com/1983stevec-gif/BrainBite/tree/mobile/runtime-readiness)
 in [PR #2](https://github.com/1983stevec-gif/BrainBite/pull/2), open and mergeable to
-`main`. Its latest head is `36887b9de41cab1acad04be188dda4772af01ea4`; GitHub Actions run
-36302425172 passes both the full test job and Firestore emulator job. Under decision D6,
-Steve performs the merge.
+`main`. The verified code/evidence commit is `a6786aaa04ec09d1ffdda2420ffff30a59b07e4b`;
+GitHub Actions run 36307503774 passed both the full test job and Firestore emulator job
+for that commit. Under decision D6, Steve performs the merge.
 
 Two things are deliberately **not** done:
 
@@ -52,12 +52,12 @@ Every row below is reproducible from this revision. Evidence files are committed
 | Browser suite | `npm run certify:local` | **210 cases, 0 failures**; two passed on retry. Follow-up no-retry runs passed `tests/release.spec.js` 92/92 and `tests/brainbase.spec.js` + `tests/match.spec.js` 14/14 | `release-evidence/local-certification.json`; focused reruns |
 | Smoke inventory | `npm run certify:local` | **11/11** | `release-evidence/smoke-report.json` |
 | Performance probe | `npm run certify:local` | exit 0, **0 headless budget violations**; device-only results remain unverified | `release-evidence/local-certification.json` |
-| Local certification | `npm run certify:local` | **17/17 stages passed** on Windows at `36887b9`; 210 browser cases, 11/11 smokes, and zero headless budget violations | `release-evidence/local-certification.json` |
-| Release evidence | `npm run check:evidence:ci` on the PR branch | PASS | GitHub Actions run 36302425172; local certification |
+| Local certification | `npm run certify:local` | **17/17 stages passed** on Windows; 210 browser cases, 11/11 smokes, and zero headless budget violations. The report snapshot is based on `36887b9` with the final stylesheet/evidence changes later committed in `a6786aa`; it records the initial tree as dirty | `release-evidence/local-certification.json` |
+| Release evidence | `npm run check:evidence:ci` on the PR branch | PASS | GitHub Actions run 36307503774; local certification |
 | Package integrity | `npm run check:stage` | 100 runtime files, no developer material | `release-evidence/package-manifest.json` |
 | Content review gate | `npm run check:content-review` | PASS, 0 digest mismatches | console |
 | Native shell | `npm run native:verify` | 100 runtime files; no loopback URL, dev URL, listener, or native permissions; shell CSP matches `index.html` | local certification |
-| Remote CI | GitHub Actions | **success** on PR #2; test and Firestore jobs pass | Actions run 36302425172 |
+| Remote CI | GitHub Actions | **success** on PR #2; test and Firestore jobs pass | Actions run 36307503774 |
 
 Measured budgets (headless-judgeable, all passing):
 
