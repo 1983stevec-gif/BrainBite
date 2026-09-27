@@ -1424,14 +1424,7 @@ html.presentation-match .match-caption-live{
   position:relative;min-height:140px;border-radius:16px;overflow:hidden;
   background:linear-gradient(160deg,#1d4d32,#123524 55%,#0d281c);
   border:1px solid rgba(255,255,255,.08);
-}.battle-target .mm-node{
-  position:absolute;left:var(--x);top:var(--y);transform:translate(-50%,-50%);
-  width:14px;height:14px;border-radius:50%;
-  background:#94a3b8;border:2px solid rgba(255,255,255,.35);
 }
-.battle-target .mm-node.done{background:#4ade80;box-shadow:0 0 0 3px rgba(74,222,128,.2)}
-.battle-target .mm-node.done::after{content:"\2713";font-size:.55rem;color:#064e3b;display:grid;place-items:center;height:100%}
-.battle-target .mm-node.here{background:#38bdf8;width:16px;height:16px;box-shadow:0 0 0 4px rgba(56,189,248,.25)}
 .battle-target .battle-bottom{
   display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;margin-top:8px;
 }

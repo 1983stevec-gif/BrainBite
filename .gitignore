@@ -5,6 +5,7 @@ test-results-*/
 playwright-report/
 playwright-output*/
 debug.log
+firestore-debug.log
 .codex-*-results-*/
 .codex-*/
 .tmp-*

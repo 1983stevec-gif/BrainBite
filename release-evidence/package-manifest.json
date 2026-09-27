@@ -1,6 +1,6 @@
 {
   "schema": "brainbite.package-manifest.v1",
-  "generatedAt": "2026-09-26T17:18:17.494Z",
+  "generatedAt": "2026-09-26T22:50:43.153Z",
   "files": {
     "app.js": {
       "sha256": "f0e89921de8505c777e8663f11687dba2dac8225c8a8299a801f6d96f82a20f9",
@@ -371,8 +371,8 @@
       "bytes": 4896
     },
     "styles.css": {
-      "sha256": "2dde7e8309a040a35311d099b53aba1008a3223f1bd82a16468e11667d486756",
-      "bytes": 123572
+      "sha256": "7c462a633872f1c4ec1a78b0f74ac6f6a67e2d26bfb2abf3a84ff38fce084910",
+      "bytes": 123030
     },
     "support.html": {
       "sha256": "571ca16966c4ab566b0a247045ba6ee47e7c667494ee3938d4d50df1dcbdbc83",

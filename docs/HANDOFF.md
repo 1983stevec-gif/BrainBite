@@ -3,7 +3,7 @@
 **Revision:** this file describes the commit that last changed it
 (`git log -1 --format=%h -- docs/HANDOFF.md`). A hard-coded hash here was always one commit
 behind, because committing the file changes HEAD.
-**Written:** 2026-09-22 · **Updated:** 2026-09-26 (M2 native-shell readiness, audit F10/F11/F13; earlier: hygiene H1–H6, decisions D1–D14).
+**Written:** 2026-09-22 · **Updated:** 2026-09-27 (Windows release certification, PR #2, final WebGL and evidence fixes; earlier: M2 native-shell readiness, audit F10/F11/F13, hygiene H1–H6, decisions D1–D14).
 
 This document is the entry point. It says what is verified, what is not, who owns what is
 left, and the operational details that are easy to get wrong. The other documents go deeper:
@@ -21,17 +21,23 @@ left, and the operational details that are easy to get wrong. The other document
 
 ## 1. Where the project stands
 
-The closed-beta candidate is **merged to `main`** (PR #1, merge commit `6b43a59`) and every
-gate that can be checked locally is green. CI passes on `main` for the first time; every
-earlier run on `main`, from 2026-09-02, had failed.
+The earlier baseline is merged to `main` (PR #1, merge commit `6b43a59`). The current
+closed-beta implementation stack is on [`mobile/runtime-readiness`](https://github.com/1983stevec-gif/BrainBite/tree/mobile/runtime-readiness)
+in [PR #2](https://github.com/1983stevec-gif/BrainBite/pull/2), open and mergeable to
+`main`. Its latest head is `36887b9de41cab1acad04be188dda4772af01ea4`; GitHub Actions run
+36302425172 passes both the full test job and Firestore emulator job. Under decision D6,
+Steve performs the merge.
 
 Two things are deliberately **not** done:
 
 - **Nothing is published.** GitHub Pages is not enabled, so the `pages` workflow fails with
-  `Get Pages site failed`. The code and CI are fine; this is a repository setting (§3).
+  `Get Pages site failed`. The PR must be merged and the repository setting enabled before
+  the app can be reached from Pages (§3).
 - **No content is approved.** The educator gate is external and 75 records are pending. The
   tooling to run that review is complete and hardened (§5), but approving content is not a
   step an automated agent can take on a reviewer's behalf.
+- **External certification remains open.** Real-device checks and human accessibility,
+  Spanish, legal/privacy, and screen-reader reviews are listed in §3 and remain owner work.
 
 ---
 
@@ -42,16 +48,16 @@ Every row below is reproducible from this revision. Evidence files are committed
 | Gate | Command | Result | Evidence |
 |---|---|---|---|
 | Static checks (10) | `npm run check:static` | PASS (includes `check:encoding`) | console |
-| Unit tests | `npm run test:unit` | **235/235** | console |
-| Browser suite | `npm run test:e2e` | **210/210** (2026-09-26, Linux sandbox, Playwright 1.56, 1 retry: the concurrent-tabs test, then 15/15 in isolation; re-run on Windows with the locked 1.62.1) | console |
-| Smoke inventory | `npm run smoke` | **11/11** | `.playwright-results/smoke-report.json`; tracked copy via `npm run evidence:refresh` |
-| Performance probe | `npm run probe:performance` | exit 0, **0 headless budget violations** | `test-results/performance-evidence/summary.json` |
-| Local certification | `npm run certify:local` | **Not re-run** since the 2026-09-25/26 branches (last: 16/16 stages, 161 browser tests). Run on Windows before merging | `release-evidence/local-certification.json` |
-| Release evidence | `npm run check:evidence` | PASS | `release/v14-evidence.json` |
-| Package integrity | `npm run check:stage` | 100 files, no developer material | `release-evidence/package-manifest.json` |
+| Unit tests | `npm run test:unit` | **236/236** (Windows, Node 24.19.0) | local-certification report |
+| Browser suite | `npm run certify:local` | **210 cases, 0 failures**; two passed on retry. Follow-up no-retry runs passed `tests/release.spec.js` 92/92 and `tests/brainbase.spec.js` + `tests/match.spec.js` 14/14 | `release-evidence/local-certification.json`; focused reruns |
+| Smoke inventory | `npm run certify:local` | **11/11** | `release-evidence/smoke-report.json` |
+| Performance probe | `npm run certify:local` | exit 0, **0 headless budget violations**; device-only results remain unverified | `release-evidence/local-certification.json` |
+| Local certification | `npm run certify:local` | **17/17 stages passed** on Windows at `36887b9`; 210 browser cases, 11/11 smokes, and zero headless budget violations | `release-evidence/local-certification.json` |
+| Release evidence | `npm run check:evidence:ci` on the PR branch | PASS | GitHub Actions run 36302425172; local certification |
+| Package integrity | `npm run check:stage` | 100 runtime files, no developer material | `release-evidence/package-manifest.json` |
 | Content review gate | `npm run check:content-review` | PASS, 0 digest mismatches | console |
-| Native shell | `npm run native:verify` | 100 runtime files; no loopback URL, dev URL, listener, or native permissions; shell CSP matches `index.html` | console |
-| Remote CI | GitHub Actions | **success** on `main` | Actions run 35798993052 |
+| Native shell | `npm run native:verify` | 100 runtime files; no loopback URL, dev URL, listener, or native permissions; shell CSP matches `index.html` | local certification |
+| Remote CI | GitHub Actions | **success** on PR #2; test and Firestore jobs pass | Actions run 36302425172 |
 
 Measured budgets (headless-judgeable, all passing):
 
@@ -241,12 +247,11 @@ Two things were measured and deliberately **rejected**:
 
 ## 9. Next moves, in order
 
-0. **Push the local stack and open one PR** (Steve). As of 2026-09-26 the branches
-   `mobile/blockers` → `chore/hygiene-2026-09` → `gameplay/kind-failure` → `ui/match-targets`
-   → `gameplay/fun-pass` → `fix/core-audit-f10-f13` → `mobile/runtime-readiness` form one
-   linear stack on top of `main` and none is on GitHub. Pushing the tip and opening a PR
-   `mobile/runtime-readiness` → `main` lets CI run the whole stack. Run `npm ci`,
-   `npm run release:check` and `npm run certify:local` on Windows first.
+0. **Review and merge [PR #2](https://github.com/1983stevec-gif/BrainBite/pull/2)** (Steve,
+   per D6). The branch is pushed, mergeable, and its full CI plus Firestore rules jobs pass.
+   Windows verification completed with `npm ci` and `npm run certify:local`; the latter is
+   the branch-safe local release gate. `npm run release:check` invokes the main-only,
+   clean-tree evidence check, so use `npm run check:evidence:ci` on a feature branch.
 1. **Enable GitHub Pages** (Steve, one setting). Then confirm the `pages` workflow goes green
    on `main` and the app is reachable.
 2. **Circulate the review packet** and run `review:approve` / `review:reject` for the 75

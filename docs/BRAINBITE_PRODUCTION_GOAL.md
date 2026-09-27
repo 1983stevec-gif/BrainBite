@@ -1,7 +1,7 @@
 # BrainBite Production Goal
 
-Updated: 2026-09-20
-Status: ACTIVE
+Updated: 2026-09-27
+Status: READY FOR OWNER MERGE
 Authority: This document supersedes earlier batch plans for implementation order and status.
 
 ## Goal
@@ -15,6 +15,20 @@ audit.
 External certification is not part of this goal. Real-device labs, legal review,
 educator approval, store approval, and real-family beta metrics remain external
 gates and must not be reported as completed by repository work.
+
+## Current Status (2026-09-27)
+
+The in-scope engineering work for the closed-beta candidate is implemented and verified
+on `mobile/runtime-readiness` at `36887b9de41cab1acad04be188dda4772af01ea4`. [PR #2](https://github.com/1983stevec-gif/BrainBite/pull/2)
+is open and mergeable to `main`; GitHub Actions run 36302425172 passed both the full test
+job and Firestore emulator job. On Windows, `npm ci` succeeded and local certification
+passed 17/17 stages, including 210 browser cases, 11/11 smokes, and zero headless
+performance-budget violations. Two browser cases passed on retry; their complete groups
+were rerun without retries and passed 92/92 (`tests/release.spec.js`) and 14/14
+(`tests/brainbase.spec.js` plus `tests/match.spec.js`).
+
+Steve owns the PR merge under decision D6. Publication, physical-device testing, educator
+approval, accessibility/Spanish/legal review, and production setup remain external gates.
 
 ## Scope Control
 
@@ -47,7 +61,7 @@ its implementation, focused tests, integration checks, and recorded evidence pas
 
 ## Phase 0 - Repository Stabilization
 
-Status: IN PROGRESS
+Status: COMPLETE
 
 ### Batch 0.1 - Establish repository truth
 
@@ -178,7 +192,7 @@ Exit checks:
 
 ## Phase 2 - Parent Safety, Privacy, And Control
 
-Status: IN PROGRESS
+Status: COMPLETE
 
 ### Batch 2.1 - Secure parent access
 
@@ -233,7 +247,7 @@ Exit checks:
 
 ## Phase 3 - Child And Parent Experience
 
-Status: IN PROGRESS
+Status: COMPLETE
 
 Batch 3.1 (navigation and information architecture): IMPLEMENTED/VERIFIED.
 The child hub is six primary tiles plus three utility controls, the child dock is a
@@ -298,7 +312,7 @@ Exit checks:
 
 ## Phase 4 - Closed-Beta Readiness
 
-Status: NOT STARTED
+Status: COMPLETE
 
 ### Batch 4.1 - Test matrix and deterministic evidence
 
@@ -351,12 +365,15 @@ Repository work may prepare evidence for these gates but may not mark them compl
 - Current engine: static local-first JavaScript/Three.js runtime; its browser harness remains for development and tests.
 - Production shell decision (2026-09-19): Tauri 2 installed Windows app with bundled assets and no localhost listener.
 - Unity: absent; a full Unity rewrite remains a separate future engine migration, not a claim of this closed-beta build.
-- Branch: `batch-9-webgl-spike`.
-- Product state: strong alpha engine with verified Phase 1 recovery/correctness and Phase 2 parent-access, time-control, destructive-action, privacy, and cloud-minimization foundations; still pre-beta.
-- Working estimate: about 83% functional, 38% reference-UI match, and 48% through this closed-beta hardening plan.
-- Immediate blockers: Firebase update-rule optimization, child/parent information architecture, responsive/accessibility closure, release instrumentation, and clean-checkout reproducibility.
+- Branch: `mobile/runtime-readiness` at `36887b9de41cab1acad04be188dda4772af01ea4`; PR #2 is open to `main`.
+- Product state: closed-beta candidate with the implementation phases complete. It is not merged or published, and external gates remain open.
+- Verification: clean `npm ci`; local certification 17/17; 210 browser cases, 11/11 smokes, and zero headless performance-budget violations. Two retry-only cases were followed by full no-retry group passes (92/92 and 14/14).
+- Owner action: review and merge PR #2. Device, human-review, publication, and production-setup gates remain separately listed above.
 
 ## Verified Progress Ledger
+
+Historical progress ledger (entries below are snapshots from their recorded dates; the
+2026-09-27 status above is authoritative for current phase and repository state).
 
 Updated: 2026-09-22
 
@@ -578,20 +595,18 @@ Current focused evidence:
 - Phase 2.4 native staging: `native:verify` staged 90 files and passed 1/1; staged forbidden-surface scans returned zero Snap/OCR controls, source/staged hashes matched, and the service-worker cache is `v35-snap-retired`.
 - Native package verification: 1 passed, Cargo check passed, release build passed, live process listener audit passed with zero TCP listeners.
 
-Repository evidence:
+Repository evidence (2026-09-27):
 
-- Branch: `batch-9-webgl-spike` at `96d3bb75069e7baa61a3ecf657d0df572e16f2bf`.
-- Remote: `https://github.com/1983stevec-gif/BrainBite`.
-- The branch is currently two commits ahead of `origin/main`.
-- The development tree currently reports 151 changed/untracked entries (10 index-or-both, 18 worktree-only, 123 untracked). This is an open Phase 0 blocker: current implementation evidence is not yet reproducible from a clean checkout.
+- Branch: `mobile/runtime-readiness` at `36887b9de41cab1acad04be188dda4772af01ea4`.
+- Remote: `https://github.com/1983stevec-gif/BrainBite`; PR #2 is open, mergeable, and CI-green.
+- `npm ci` and Windows local certification completed. The CI job verifies that browser and smoke runs leave the tracked tree unchanged.
+- The local certification records a dirty initial working tree because it refreshed tracked screenshots and release evidence; generated emulator output stays local and must not enter the PR.
 
 ## Next Assignment Order
 
-1. Complete Phase 3.3: first-run choreography (name to world to guided mission with
-   disappearing prompts) and self-hosted fonts with a restrictive content security policy.
-2. Complete Phase 3.4: cache parsed glTF assets behind an explicit clone/dispose
-   ownership model, and restore the WebGL context instead of only falling back.
-3. Complete Phase 4.1-4.3 closed-beta instrumentation and evidence packaging.
-4. Optimize the Firebase update authorization boundary only after the required
-   explicit user approval, then rerun the real emulator suite.
-5. Return to Phase 0 clean-checkout and remote workflow proof before any release claim.
+1. Steve reviews and merges PR #2 under decision D6.
+2. After merge, configure GitHub Pages and complete the external gates listed above and in
+   `docs/HANDOFF.md` before making a publication or beta-certification claim.
+
+No in-scope implementation phase remains open. The external gates are intentionally not
+part of this repository goal.
