@@ -1132,6 +1132,7 @@ test('localStorage fallback keeps tombstones and queue IDs while defeating a sta
   await expect.poll(() => summarize(pageA, ids)).toEqual(expected);
   await expect.poll(() => summarize(pageB, ids)).toEqual(expected);
   await Promise.all([pageA.reload(), pageB.reload()]);
+  await Promise.all([pageA.evaluate(() => PERSISTENCE_CHAIN), pageB.evaluate(() => PERSISTENCE_CHAIN)]);
   const copies = await pageA.evaluate(({ deletedId, survivorId }) => Object.fromEntries(['bb-core-v3', 'bb-core-v3-back', 'bb-core-v3-recovery'].map(key => {
     const store = JSON.parse(localStorage.getItem(key));
     return [key, { present: store.profiles.some(profile => profile.id === deletedId), tombstones: store.deletedProfiles.filter(item => item.id === deletedId).length, laterAttempts: store.profiles.find(profile => profile.id === survivorId).learningCore.skills['math-4-fractions'].recentPerformance.filter(attempt => attempt.id === 'post-delete-survivor-attempt').length }];

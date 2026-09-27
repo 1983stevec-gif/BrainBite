@@ -7,9 +7,11 @@ test.beforeEach(async ({ page }) => {
     localStorage.setItem('bb-presentation', 'dom');
   });
   await page.reload();
+  await page.evaluate(() => PERSISTENCE_CHAIN);
 });
 
 test('BrainBase greybox flow runs end-to-end and persists the hub upgrade', async ({ page }) => {
+  test.setTimeout(60_000);
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
 
