@@ -3,7 +3,7 @@
 **Revision:** this file describes the commit that last changed it
 (`git log -1 --format=%h -- docs/HANDOFF.md`). A hard-coded hash here was always one commit
 behind, because committing the file changes HEAD.
-**Written:** 2026-09-22 · **Updated:** 2026-09-27 (PR #2 CI run 40, stabilized browser readiness, fresh Windows installer and no-port verification; earlier: M2 native-shell readiness, audit F10/F11/F13, hygiene H1–H6, decisions D1–D14).
+**Written:** 2026-09-22 · **Updated:** 2026-09-27 (PR #2 CI runs 43–44, stable 211-case browser suite, fresh Windows installer and no-port verification; earlier: M2 native-shell readiness, audit F10/F11/F13, hygiene H1–H6, decisions D1–D14).
 
 This document is the entry point. It says what is verified, what is not, who owns what is
 left, and the operational details that are easy to get wrong. The other documents go deeper:
@@ -24,10 +24,12 @@ left, and the operational details that are easy to get wrong. The other document
 The earlier baseline is merged to `main` (PR #1, merge commit `6b43a59`). The current
 closed-beta implementation stack is on [`mobile/runtime-readiness`](https://github.com/1983stevec-gif/BrainBite/tree/mobile/runtime-readiness)
 in [PR #2](https://github.com/1983stevec-gif/BrainBite/pull/2), open and mergeable to
-`main`. Runtime/evidence implementation is based on `a6786aaa04ec09d1ffdda2420ffff30a59b07e4b`;
-browser-readiness changes are in `2cf4de6367d7d9cc90fb8549ef687013b5809331`. GitHub Actions
-run [36313046058](https://github.com/1983stevec-gif/BrainBite/actions/runs/36313046058)
-passed the validators, native package check, 236 unit tests, all 210 browser tests with zero
+`main`. Latest fully tested gameplay commit is `3ebcf35d8bc7ea18d7c69b64b9015cdedd7201e6`; runtime/evidence
+implementation is based on `a6786aaa04ec09d1ffdda2420ffff30a59b07e4b` and browser-readiness
+changes are in `2cf4de6367d7d9cc90fb8549ef687013b5809331`. GitHub Actions runs
+[36316190009](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316190009) and
+[36316192782](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316192782) each
+passed the validators, native package check, 236 unit tests, all 211 browser tests with zero
 retries, 11/11 smoke checks, clean-tree guard, and Firestore emulator job. A fresh
 `npm run native:build` produced the unsigned internal installer at
 `src-tauri/target/release/bundle/nsis/BrainBite_2.0.0_x64-setup.exe`; the rebuilt executable
@@ -55,15 +57,15 @@ Every row below is reproducible from this revision. Evidence files are committed
 |---|---|---|---|
 | Static checks (10) | `npm run check:static` | PASS (includes `check:encoding`) | console |
 | Unit tests | `npm run test:unit` | **236/236** (Windows, Node 24.19.0) | local-certification report |
-| Browser suite | CI run 36313046058 | **210 passed, zero retries**. The short-landscape rotation prompt is covered by this run. A focused Windows Playwright rerun for direct pointer-to-answer parity passed 1/1; the updated PR CI will run the new check. The earlier Windows certification recorded two retry-only cases; their groups were rerun without retries at 92/92 and 14/14. The latest targeted reload-sensitive rerun passed 2/2 | Playwright CI artifact; `release-evidence/local-certification.json`; focused reruns |
+| Browser suite | CI runs 36316190009 and 36316192782 | **211 passed, zero retries** in each run. Both include the short-landscape prompt and direct 3D pointer-to-answer parity. The earlier Windows certification recorded two retry-only cases; their groups were rerun without retries at 92/92 and 14/14. The latest targeted reload-sensitive rerun passed 2/2 | Playwright CI artifacts; `release-evidence/local-certification.json`; focused reruns |
 | Smoke inventory | `npm run certify:local` | **11/11** | `release-evidence/smoke-report.json` |
 | Performance probe | `npm run certify:local` | exit 0, **0 headless budget violations**; device-only results remain unverified | `release-evidence/local-certification.json` |
 | Local certification | `npm run certify:local` | **17/17 stages passed** on Windows; 210 browser cases, 11/11 smokes, and zero headless budget violations. The report snapshot is based on `36887b9` with the final stylesheet/evidence changes later committed in `a6786aa`; it records the initial tree as dirty | `release-evidence/local-certification.json` |
-| Release evidence | `npm run check:evidence:ci` on the PR branch | PASS | GitHub Actions run 36313046058; local certification |
+| Release evidence | `npm run check:evidence:ci` on the PR branch | PASS | GitHub Actions runs 36316190009 and 36316192782; local certification |
 | Package integrity | `npm run check:stage` | 100 runtime files, no developer material | `release-evidence/package-manifest.json` |
 | Content review gate | `npm run check:content-review` | PASS, 0 digest mismatches | console |
-| Native shell | `npm run native:verify` and `npm run native:verify:runtime` | 100 runtime files; rebuilt native window and child processes open with zero TCP listeners; shell CSP matches `index.html` | CI run 36313046058 and Windows console |
-| Remote CI | GitHub Actions | **success** on PR #2; 210 browser tests with zero retries, 11/11 smokes, clean tree, and Firestore job pass | Actions run 36313046058 |
+| Native shell | `npm run native:verify` and `npm run native:verify:runtime` | 100 runtime files; rebuilt native window and child processes open with zero TCP listeners; shell CSP matches `index.html` | CI runs 36316190009 and 36316192782 and Windows console |
+| Remote CI | GitHub Actions | **success** on PR #2; 211 browser tests with zero retries, 11/11 smokes, clean tree, and Firestore job pass | Actions runs 36316190009 and 36316192782 |
 
 Measured budgets (headless-judgeable, all passing):
 

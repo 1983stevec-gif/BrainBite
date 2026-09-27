@@ -21,11 +21,12 @@ gates and must not be reported as completed by repository work.
 The in-scope engineering work for the closed-beta candidate is implemented on
 `mobile/runtime-readiness`. Runtime/evidence baseline `a6786aaa04ec09d1ffdda2420ffff30a59b07e4b`
 and browser-readiness commit `2cf4de6367d7d9cc90fb8549ef687013b5809331` are in open,
-mergeable [PR #2](https://github.com/1983stevec-gif/BrainBite/pull/2). The tested PR head
-`fbe58337f066a167c9215eb9bc01cfce3d36fb0c` passed GitHub Actions
-[run 36313046058](https://github.com/1983stevec-gif/BrainBite/actions/runs/36313046058),
-passed all validators, native package verification, 236 unit tests, 210 browser tests with
-zero retries, 11/11 smoke checks, the clean-tree guard, and the Firestore emulator job.
+mergeable [PR #2](https://github.com/1983stevec-gif/BrainBite/pull/2). The latest fully
+tested gameplay commit `3ebcf35d8bc7ea18d7c69b64b9015cdedd7201e6` passed GitHub Actions
+[run 36316190009](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316190009) and
+[run 36316192782](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316192782).
+Both runs passed all validators, native package verification, 236 unit tests, 211 browser
+tests with zero retries, 11/11 smoke checks, the clean-tree guard, and the Firestore emulator job.
 The historical Windows certification passed 17/17 stages; its two retry-only browser
 attempts were followed by no-retry group passes at 92/92 and 14/14. The latest focused
 reload-sensitive rerun passed 2/2. A fresh Windows `native:build` produced the unsigned
@@ -264,10 +265,9 @@ news/promo/energy/reward-hat cards, duplicate dock CSS, and debug badge are remo
 Batch 3.2 (battle composition): IMPLEMENTED/VERIFIED. The DOM board and the 3D answer
 controls are mutually exclusive per active challenge, 3D pillar taps are live, and the
 battle fits one viewport at 390x844, 768x1024, and 1280x800 in both DOM and live-3D
-presentation. The dismissible short-landscape rotation prompt passed in CI run
-36313046058. A focused Windows Playwright rerun dispatching pointer input to each of the
-four aligned 3D answer targets passed 1/1; the full PR CI will exercise this regression
-with the updated suite.
+presentation. The dismissible short-landscape rotation prompt and the direct pointer-to-answer
+regression passed in both CI runs 36316190009 and 36316192782. Each full run passed all 211
+browser tests with zero retries.
 
 ### Batch 3.1 - Navigation and information architecture
 
@@ -373,9 +373,9 @@ Repository work may prepare evidence for these gates but may not mark them compl
 - Current engine: static local-first JavaScript/Three.js runtime; its browser harness remains for development and tests.
 - Production shell decision (2026-09-19): Tauri 2 installed Windows app with bundled assets and no localhost listener.
 - Unity: absent; a full Unity rewrite remains a separate future engine migration, not a claim of this closed-beta build.
-- Branch: `mobile/runtime-readiness`; runtime/evidence baseline `a6786aaa04ec09d1ffdda2420ffff30a59b07e4b` and browser-readiness commit `2cf4de6367d7d9cc90fb8549ef687013b5809331` are in open PR #2 to `main`.
+- Branch: `mobile/runtime-readiness`; latest fully tested gameplay commit `3ebcf35d8bc7ea18d7c69b64b9015cdedd7201e6`, including runtime/evidence baseline `a6786aaa04ec09d1ffdda2420ffff30a59b07e4b` and browser-readiness commit `2cf4de6367d7d9cc90fb8549ef687013b5809331`, is in open PR #2 to `main`.
 - Product state: closed-beta candidate with the implementation phases complete. It is not merged or published, and external gates remain open.
-- Verification: Windows local certification 17/17; CI run 36313046058 passed 236 unit tests, 210 browser tests with zero retries, 11/11 smokes, validators, native packaging, clean tree, and Firestore emulator. Focused reload-sensitive rerun passed 2/2; the new direct WebGL pointer-parity check passed 1/1 locally; fresh native build and zero-listener runtime audit passed.
+- Verification: Windows local certification 17/17; CI runs 36316190009 and 36316192782 each passed 236 unit tests, 211 browser tests with zero retries, 11/11 smokes, validators, native packaging, clean tree, and Firestore emulator. The direct WebGL pointer-parity check passed in both full runs; the focused reload-sensitive rerun passed 2/2; fresh native build and zero-listener runtime audit passed.
 - Owner action: review and merge PR #2. Device, human-review, publication, and production-setup gates remain separately listed above.
 
 ## Verified Progress Ledger
@@ -605,9 +605,9 @@ Current focused evidence:
 
 Repository evidence (2026-09-27):
 
-- Branch: `mobile/runtime-readiness`; runtime/evidence baseline `a6786aaa04ec09d1ffdda2420ffff30a59b07e4b` and browser-readiness commit `2cf4de6367d7d9cc90fb8549ef687013b5809331` are in PR #2.
+- Branch: `mobile/runtime-readiness`; latest fully tested gameplay commit `3ebcf35d8bc7ea18d7c69b64b9015cdedd7201e6` includes runtime/evidence baseline `a6786aaa04ec09d1ffdda2420ffff30a59b07e4b` and browser-readiness commit `2cf4de6367d7d9cc90fb8549ef687013b5809331` in PR #2.
 - Remote: `https://github.com/1983stevec-gif/BrainBite`; PR #2 is open, mergeable, and CI-green.
-- `npm ci` and Windows local certification completed. CI run 36313046058 verifies 210 browser tests with zero retries, 11/11 smokes, and a clean tracked tree; Firestore emulator checks also pass. A fresh native installer build and live no-listener verification passed.
+- `npm ci` and Windows local certification completed. CI runs 36316190009 and 36316192782 each verify 211 browser tests with zero retries, 11/11 smokes, and a clean tracked tree; Firestore emulator checks also pass. A fresh native installer build and live no-listener verification passed.
 - The local certification records a dirty initial working tree because it refreshed tracked screenshots and release evidence; generated emulator output stays local and must not enter the PR.
 
 ## Next Assignment Order

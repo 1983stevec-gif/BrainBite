@@ -8,10 +8,15 @@ This document is the honest state of the closed-beta candidate. It separates wha
 verified locally from what is not, and it does not claim external gates.
 
 The current implementation is on `mobile/runtime-readiness` in [PR #2](https://github.com/1983stevec-gif/BrainBite/pull/2),
-open and mergeable to `main`. Runtime/evidence baseline `a6786aaa04ec09d1ffdda2420ffff30a59b07e4b`
-and browser-readiness commit `2cf4de6367d7d9cc90fb8549ef687013b5809331` are in the PR.
-GitHub Actions [run 36313046058](https://github.com/1983stevec-gif/BrainBite/actions/runs/36313046058)
-passed the full test job and Firestore emulator job. Steve owns the merge under decision D6.
+open and mergeable to `main`. Latest fully tested gameplay commit
+`3ebcf35d8bc7ea18d7c69b64b9015cdedd7201e6` includes runtime/evidence baseline
+`a6786aaa04ec09d1ffdda2420ffff30a59b07e4b` and
+browser-readiness commit `2cf4de6367d7d9cc90fb8549ef687013b5809331`. GitHub Actions runs
+[36316190009](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316190009) and
+[36316192782](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316192782) each
+passed all validators, native package verification, 236 unit tests, 211 browser tests with
+zero retries, 11/11 smoke checks, the clean-tree guard, and the Firestore emulator job. Steve
+owns the merge under decision D6.
 
 ## 1. Runtime package
 
@@ -61,7 +66,7 @@ The installer is unsigned and is an internal closed-beta artifact.
 | Area | Evidence |
 |---|---|
 | Unit tests | `236/236` on Windows with the locked install |
-| Browser suite | Latest CI: 210 passed with zero retries. Earlier Windows certification recorded two retry-only attempts; group reruns passed `tests/release.spec.js` `92/92` and BrainBase/MATCH `14/14`; latest reload-sensitive rerun passed `2/2` |
+| Browser suite | Latest CI runs 43 and 44: **211 passed with zero retries**. These runs include the landscape rotation prompt and direct 3D pointer-to-answer regression. Earlier Windows certification recorded two retry-only attempts; group reruns passed `tests/release.spec.js` `92/92` and BrainBase/MATCH `14/14`; latest reload-sensitive rerun passed `2/2` |
 | Smoke checks | `11/11` via local certification, evidence in `release-evidence/smoke-report.json` |
 | Repository validators | content, content-review, static (10 checks), runtime, release, Firebase, launch, final, Firebase security, native package, and release evidence — all PASS |
 | Performance budgets (headless-judgeable) | 0 headless budget violations; 26 device-only measurements remain unverified |
@@ -180,9 +185,7 @@ Windows-only blind spots:
 | `check:static` failed on six package manifest digests (app.js, index.html, boot.mjs, capability.mjs, service-worker.js, three.module.js) | The manifest hashed raw working-copy bytes; the Windows copy had mixed CRLF/LF endings while CI checked out LF | `.gitattributes` normalizes text to LF in the repository and every checkout; text hashing is line-ending independent and binaries are still hashed byte for byte |
 | `smoke-pwa-installability` failed 10/11 | It hardcoded `D:/Codex/Brainbite` as the repository root, so every manifest icon lookup failed on Linux | The root is derived from the module location; `check:host-paths` joined `check:static` to prevent a recurrence |
 
-The tested PR head `fbe58337f066a167c9215eb9bc01cfce3d36fb0c` is green: [GitHub Actions run 36313046058](https://github.com/1983stevec-gif/BrainBite/actions/runs/36313046058)
-passed all validators, native package verification, 236 unit tests, 210 browser tests with zero retries,
-11/11 smoke checks, the clean-tree guard, and the Firestore emulator job. The short-landscape prompt passed in that browser suite. A new focused Windows Playwright rerun dispatched pointer input to each aligned 3D answer target and passed 1/1; CI will run the added regression on the updated PR head.
+The fully tested gameplay commit `3ebcf35d8bc7ea18d7c69b64b9015cdedd7201e6` is green: [CI run 43](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316190009) and [CI run 44](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316192782) each passed all validators, native package verification, 236 unit tests, 211 browser tests with zero retries, 11/11 smoke checks, the clean-tree guard, and the Firestore emulator job. The 3D pointer regression is exercised in the full suite. Runs 41/42 exposed two test races: the local-storage tab check read rotating snapshots before persistence reconciliation, and the Classic Practice Lab test deduplicated repeated correct cells. Both were fixed; runs 43/44 pass without retries.
 
 ### Open, non-blocking
 
