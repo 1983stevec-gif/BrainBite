@@ -74,6 +74,9 @@ test('3D Bite reacts to correct and incorrect answer evidence',async({page})=>{
 test('reduced-motion Bite reactions apply a visible deterministic pose',async({page})=>{
   await page.emulateMedia({reducedMotion:'reduce'});
   await page.goto('/?presentation=webgl');
+  // The home scene and battle share the parsed mascot GLB. Wait for it before
+  // switching scenes so this test measures reduced-motion reactions, not startup loading.
+  await expect(page.locator('#home .home-stage')).toHaveAttribute('data-character-animated','true');
   await page.evaluate(()=>window.BrainBiteGame.startMission(1));
   await expect(page.locator('#game .battle-frame')).toHaveAttribute('data-character-animated','true');
   const correct=await page.evaluate(()=>String(window.BrainBiteGame.getState().m.correct[0]));
@@ -182,13 +185,17 @@ test('a restored WebGL context keeps the live 3D scene and the active mission',a
 });
 
 test('repeated screen transitions dispose stale 3D canvases',async({page},testInfo)=>{
+  // Three software-WebGL mount/dispose cycles can exceed Playwright's 30s default on Windows.
+  test.setTimeout(120000);
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/?presentation=webgl');
   await expect(page.locator('#home canvas.webgl-canvas')).toHaveCount(1);
   for(let i=0;i<3;i++){
     await page.evaluate(()=>window.BrainBiteGame.startMission(1));
+    await page.evaluate(()=>window.BrainBitePresentation.syncFromScreen());
     await expect(page.locator('#game canvas.webgl-canvas')).toHaveCount(1);
     await page.evaluate(()=>document.querySelector('nav button[data-screen="home"]')?.click());
+    await page.evaluate(()=>window.BrainBitePresentation.syncFromScreen());
     await expect(page.locator('#home canvas.webgl-canvas')).toHaveCount(1);
     await expect(page.locator('#game canvas.webgl-canvas')).toHaveCount(0);
   }
