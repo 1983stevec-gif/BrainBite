@@ -659,6 +659,47 @@ for(const [width,height] of [[1024,682],[1280,800],[1920,1080]]){
   });
 }
 
+test('3D pointer taps resolve to the same answer as each aligned control',async({page})=>{
+  await page.setViewportSize({width:1280,height:800});
+  await page.goto('/?presentation=webgl');
+  await page.evaluate(()=>window.BrainBiteGame.startPracticeMission(8));
+  await expect(page.locator('#game .battle-frame')).toHaveAttribute('data-answer-discs','4');
+
+  for(let slot=0;slot<4;slot++){
+    await page.waitForTimeout(750);
+    await page.evaluate(()=>window.BrainBiteGame.startPracticeMission(8));
+    const target=await page.evaluate(index=>{
+      const buttons=[...document.querySelectorAll('.webgl-answer-controls button')];
+      const button=buttons[index];
+      const rect=button.getBoundingClientRect();
+      const canvas=document.querySelector('#game canvas.webgl-canvas');
+      const bounds=canvas.getBoundingClientRect();
+      const value=button.dataset.value;
+      return {
+        value,
+        correct:window.BrainBiteGame.getState().webglRemaining.includes(value),
+        x:rect.left+rect.width/2,
+        y:rect.top+rect.height/2,
+        insideCanvas:rect.left+rect.width/2>=bounds.left&&rect.left+rect.width/2<=bounds.right&&rect.top+rect.height/2>=bounds.top&&rect.top+rect.height/2<=bounds.bottom
+      };
+    },slot);
+    expect(target.value).toBeTruthy();
+    expect(target.insideCanvas).toBe(true);
+
+    await page.evaluate(({x,y})=>{
+      document.querySelector('#game canvas.webgl-canvas').dispatchEvent(new PointerEvent('pointerdown',{
+        bubbles:true,cancelable:true,clientX:x,clientY:y,pointerType:'touch',isPrimary:true
+      }));
+    },target);
+
+    await expect.poll(()=>page.evaluate(()=>{
+      const state=window.BrainBiteGame.getState();
+      return state.correct+state.wrong;
+    })).toBe(1);
+    await expect(page.locator('#game .battle-frame')).toHaveAttribute('data-last-answer',target.correct?'correct':'wrong');
+  }
+});
+
 // ---- UI Phase 3 ----------------------------------------------------------------------
 test('the route map is an illustrated path with a pin, checks, a boss badge and a chest',async({page})=>{
   await page.goto('/?presentation=webgl');
