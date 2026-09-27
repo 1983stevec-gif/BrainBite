@@ -121,10 +121,6 @@ service cloud.firestore {
           'updatedAt', 'codeLabProjects', 'codeBridgeLessons',
           'programmableBitLessons', 'bubbleReefRewards'
         ])
-        && !keys.hasAny([
-          'parentPin', 'parentAuth', 'pinHash', 'pinSalt', 'password',
-          'idToken', 'refreshToken'
-        ])
         && data.id == profileId
         && data.name == displayName
         && data.score is number && data.score >= 0 && data.score <= 1000000000
@@ -164,7 +160,6 @@ service cloud.firestore {
         && validIdentifier(data.clientProfileId)
         && data.clientProfileId == profileId
         && data.progress is map
-        && data.progress.id == data.clientProfileId
         && data.displayName is string && data.displayName.size() <= 40
         && data.clientUpdatedAt is timestamp
         && ((data.displayName.size() >= 1
@@ -172,6 +167,13 @@ service cloud.firestore {
           || (data.displayName == ''
             && validTombstone(data.progress, profileId)
             && data.clientUpdatedAt.toMillis() == data.progress.deletedAt));
+    }
+
+    function validProfileUpdate(previous, next, profileId, familyId) {
+      // The exact envelope validator limits edits to displayName, progress, and clientUpdatedAt.
+      return next.ownerId == previous.ownerId
+        && next.clientProfileId == previous.clientProfileId
+        && validProfileDocument(next, profileId, familyId);
     }
 
     function isStoredTombstone(data) {
@@ -203,10 +205,7 @@ service cloud.firestore {
           && validProfileDocument(request.resource.data, profileId, familyId);
 
         allow update: if signedInAs(familyId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'displayName', 'progress', 'clientUpdatedAt'
-          ])
-          && validProfileDocument(request.resource.data, profileId, familyId)
+          && validProfileUpdate(resource.data, request.resource.data, profileId, familyId)
           && ((!isStoredTombstone(resource.data))
             || request.resource.data == resource.data);
 

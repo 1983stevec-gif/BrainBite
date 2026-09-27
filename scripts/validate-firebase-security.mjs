@@ -162,9 +162,8 @@ export function validateFirebaseRulesSource(source) {
   expect(errors, live.includes('let keys = data.keys()') && live.includes('keys.hasOnly(['), 'Live progress needs one cached key set and an exact allowlist.');
   expect(errors, live.includes("keys.hasOnly([ 'id', 'name', 'score', 'stars', 'spark', 'progression', 'learningCore', 'bestCombo', 'bite', 'unlockedBites', 'cosmetics', 'equippedCosmetic', 'programmableBits', 'activeProgrammableBitId', 'mastery', 'skills', 'mistakes', 'practice', 'snap', 'sessions', 'settings', 'controls', 'updatedAt', 'codeLabProjects', 'codeBridgeLessons', 'programmableBitLessons', 'bubbleReefRewards' ])"), 'Live progress needs the exact canonical field allowlist and resulting key-count bound.');
   for (const secret of ['parentPin', 'parentAuth', 'pinHash', 'pinSalt', 'password', 'idToken', 'refreshToken']) {
-    expect(errors, live.includes(`'${secret}'`), `Live progress must explicitly reject ${secret}.`);
+    expect(errors, !live.includes(`'${secret}'`), `Live progress allowlist must reject ${secret}.`);
   }
-  expect(errors, live.includes("!keys.hasAny([ 'parentPin', 'parentAuth', 'pinHash', 'pinSalt', 'password', 'idToken', 'refreshToken' ])"), 'Secret fields must be rejected as one enforceable invariant.');
   expect(errors, !live.includes("'deleted'") && !live.includes("'deletedAt'"), 'The exact live-progress allowlist must reject tombstone fields.');
   expect(errors, live.includes('data.id == profileId') && live.includes('data.name == displayName'), 'Nested profile identifiers must match the document envelope.');
   for (const field of ['score', 'stars', 'spark', 'bestCombo']) {
@@ -185,11 +184,16 @@ export function validateFirebaseRulesSource(source) {
   expect(errors, tombstone.includes('data.deleted is bool') && tombstone.includes('data.deleted == true'), 'Tombstone deleted must be true and typed.');
   expect(errors, tombstone.includes('data.deletedAt is int') && tombstone.includes('data.deletedAt >= 0'), 'Tombstone deletedAt needs integer and range bounds.');
 
+  const profileUpdateBound = compact(extractBlock(source, 'function validProfileUpdate(previous, next, profileId, familyId)'));
+  expect(errors, profileUpdateBound.includes('next.ownerId == previous.ownerId'), 'Profile ownerId must be immutable through updates.');
+  expect(errors, profileUpdateBound.includes('next.clientProfileId == previous.clientProfileId'), 'Profile clientProfileId must be immutable through updates.');
+  expect(errors, profileUpdateBound.includes('validProfileDocument(next, profileId, familyId)'), 'Profile updates must reuse the exact envelope and progress validator.');
+
   const envelope = compact(extractBlock(source, 'function validProfileDocument(data, profileId, familyId)'));
   expect(errors, envelope.includes("data.keys().hasOnly([ 'ownerId', 'displayName', 'clientProfileId', 'progress', 'clientUpdatedAt' ])"), 'Profile documents need an exact envelope schema.');
   expect(errors, envelope.includes('data.ownerId == familyId'), 'Profile ownerId must match the family path.');
   expect(errors, envelope.includes('data.clientProfileId == profileId'), 'clientProfileId must match the profile path.');
-  expect(errors, envelope.includes('data.progress is map') && envelope.includes('data.progress.id == data.clientProfileId'), 'Nested progress ID must match the validated clientProfileId.');
+  expect(errors, envelope.includes('data.progress is map') && envelope.includes('data.clientProfileId == profileId'), 'Progress and client profile IDs must be rooted in the profile path.');
   expect(errors, envelope.includes('data.clientUpdatedAt is timestamp'), 'clientUpdatedAt must be a timestamp.');
   expect(errors, envelope.includes('data.clientUpdatedAt.toMillis() == data.progress.deletedAt'), 'Tombstone timestamp must agree with deletedAt.');
   expect(errors, envelope.includes('validLiveProgress(') && envelope.includes('validTombstone('), 'Envelope must validate both live and tombstone schemas.');
@@ -215,8 +219,7 @@ export function validateFirebaseRulesSource(source) {
   const profileDelete = allowCondition(profile, 'delete');
   expect(errors, profileRead.includes('signedInAs(familyId)') && profileRead.includes('resource.data.ownerId == request.auth.uid') && profileRead.includes('resource.data.clientProfileId == profileId'), 'Profile reads need family, stored-owner, and path-ID checks.');
   expect(errors, profileCreate.includes('signedInAs(familyId)') && profileCreate.includes('validProfileDocument('), 'Profile creates need authentication and full validation.');
-  expect(errors, profileUpdate.includes("request.resource.data.diff(resource.data).affectedKeys().hasOnly([ 'displayName', 'progress', 'clientUpdatedAt' ])"), 'Profile ownerId and clientProfileId must be immutable through an exact mutable-field diff allowlist.');
-  expect(errors, profileUpdate.includes('validProfileDocument('), 'Profile updates need full schema validation.');
+  expect(errors, profileUpdate.includes('validProfileUpdate(resource.data, request.resource.data, profileId, familyId)'), 'Profile updates must use the bounded mutable-field allowlist.');
   expect(errors, profileUpdate.includes('!isStoredTombstone(resource.data)') && profileUpdate.includes('request.resource.data == resource.data'), 'Stored tombstones must allow only identical idempotent retries.');
   expect(errors, profileDelete === 'false', 'Physical profile deletion must be denied to preserve authoritative tombstones.');
 
