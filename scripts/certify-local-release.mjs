@@ -6,6 +6,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
+import { evidenceCheckForBranch } from './lib/certification-policy.mjs';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const output = resolve(process.env.BB_CERT_OUTPUT || 'release-evidence/local-certification.json');
@@ -85,7 +86,7 @@ try {
     ['launch-structure', 'check:launch'],
     ['final-hardening', 'check:final'],
     ['firebase-security', 'check:firebase:security'],
-    ['release-evidence', 'check:evidence'],
+    ['release-evidence', evidenceCheckForBranch(git.branch)],
     ['unit-tests', 'test:unit'],
   ];
   for (const [label, script] of validators) await record(label, npmCommand, ['run', script]);

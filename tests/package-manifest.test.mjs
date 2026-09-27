@@ -4,12 +4,19 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildManifest, hashFile } from '../scripts/package-manifest.mjs';
+import { evidenceCheckForBranch } from '../scripts/lib/certification-policy.mjs';
 
 // The package manifest passed on the Windows workstation and failed in Linux CI on six
 // files, because the Windows working copy had mixed CRLF/LF endings while CI checked out
 // LF. Text hashing is now line-ending independent; these tests keep it that way.
 const dir = await mkdtemp(join(tmpdir(), 'brainbite-manifest-'));
 test.after(async () => { await rm(dir, { recursive: true, force: true }); });
+
+test('local certification uses strict provenance on main and branch-safe evidence elsewhere', () => {
+  assert.equal(evidenceCheckForBranch('main'), 'check:evidence');
+  assert.equal(evidenceCheckForBranch('mobile/runtime-readiness'), 'check:evidence:ci');
+  assert.equal(evidenceCheckForBranch(''), 'check:evidence:ci');
+});
 
 test('text hashing ignores CRLF versus LF so the manifest is platform independent', async () => {
   const lf = join(dir, 'sample.js');
