@@ -10,41 +10,54 @@ const base = process.env.BB_BASE || process.env.PLAYWRIGHT_BASE_URL || `http://1
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 async function run(channel) {
-  const browser = await chromium.launch({ headless: true, ...(channel ? { channel } : {}) });
-  const page = await browser.newPage();
-  const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true, ...(channel ? { channel } : {}) });
+  } catch (e) {
+    const error = String(e.message || e);
+    // A skip is only possible here, before a browser exists. Navigation, runtime,
+    // and other launch failures must fail even when Edge is optional on this host.
+    const missingExecutable = /^(?:browserType\.launch: )?(?:Chromium distribution 'msedge' is not found at [^\r\n]*[\\/]msedge(?:\.exe)?|Executable doesn't exist at [^\r\n]*[\\/]msedge(?:\.exe)?)(?:\r?\n|$)/i.test(error);
+    if (channel === 'msedge' && missingExecutable) return { channel, skipped: true, reason: error };
+    throw e;
+  }
+  try {
+    const page = await browser.newPage();
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
 
-  await page.goto(`${base}/?match=0&webgl=0&bust=${Date.now()}`, { waitUntil: 'load', timeout: 45000 });
-  await page.evaluate(async () => {
-    for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
-    for (const k of await caches.keys()) await caches.delete(k);
-  });
-  await page.reload({ waitUntil: 'load', timeout: 45000 });
+    await page.goto(`${base}/?match=0&webgl=0&bust=${Date.now()}`, { waitUntil: 'load', timeout: 45000 });
+    await page.evaluate(async () => {
+      for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+      for (const k of await caches.keys()) await caches.delete(k);
+    });
+    await page.reload({ waitUntil: 'load', timeout: 45000 });
 
-  const manifestRes = await page.request.get(`${base}/manifest.webmanifest`);
-  const manifest = await manifestRes.json();
-  const iconsOk = (manifest.icons || []).every((icon) => fs.existsSync(path.join(root, icon.src)));
-  const sw = await page.evaluate(async () => {
-    await navigator.serviceWorker.ready;
-    const reg = await navigator.serviceWorker.getRegistration();
-    return { ready: !!reg, controlling: !!navigator.serviceWorker.controller };
-  });
-  const hasInstallBtn = await page.evaluate(() => !!document.getElementById('installBtn'));
+    const manifestRes = await page.request.get(`${base}/manifest.webmanifest`);
+    const manifest = await manifestRes.json();
+    const iconsOk = (manifest.icons || []).every((icon) => fs.existsSync(path.join(root, icon.src)));
+    const sw = await page.evaluate(async () => {
+      await navigator.serviceWorker.ready;
+      const reg = await navigator.serviceWorker.getRegistration();
+      return { ready: !!reg, controlling: !!navigator.serviceWorker.controller };
+    });
+    const hasInstallBtn = await page.evaluate(() => !!document.getElementById('installBtn'));
 
-  await browser.close();
-  return {
-    channel: channel || 'chromium',
-    manifestOk: manifestRes.ok(),
-    name: manifest.name || manifest.short_name,
-    display: manifest.display,
-    startUrl: manifest.start_url,
-    iconsOk,
-    iconCount: (manifest.icons || []).length,
-    sw,
-    hasInstallBtn,
-    errors: errors.slice(0, 3),
-  };
+    return {
+      channel: channel || 'chromium',
+      manifestOk: manifestRes.ok(),
+      name: manifest.name || manifest.short_name,
+      display: manifest.display,
+      startUrl: manifest.start_url,
+      iconsOk,
+      iconCount: (manifest.icons || []).length,
+      sw,
+      hasInstallBtn,
+      errors: errors.slice(0, 3),
+    };
+  } finally {
+    await browser.close();
+  }
 }
 
 const chrome = await run(undefined);
@@ -72,4 +85,8 @@ if (!ok(chrome)) {
   console.error('PWA INSTALLABILITY CHROME FAIL');
   process.exit(1);
 }
-console.log(ok(edge) ? 'PWA INSTALLABILITY CHROME+EDGE PASS' : 'PWA INSTALLABILITY CHROME PASS (Edge not available on this host)');
+if (!ok(edge) && !edge.skipped) {
+  console.error('PWA INSTALLABILITY EDGE FAIL');
+  process.exit(1);
+}
+console.log(ok(edge) ? 'PWA INSTALLABILITY CHROME+EDGE PASS' : 'PWA INSTALLABILITY CHROME PASS (Edge executable unavailable: SKIPPED)');

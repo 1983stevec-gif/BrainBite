@@ -1,6 +1,6 @@
 {
   "schema": "brainbite.package-manifest.v1",
-  "generatedAt": "2026-09-26T22:50:43.153Z",
+  "generatedAt": "2026-09-28T02:54:53.193Z",
   "files": {
     "app.js": {
       "sha256": "f0e89921de8505c777e8663f11687dba2dac8225c8a8299a801f6d96f82a20f9",
@@ -119,8 +119,8 @@
       "bytes": 834
     },
     "content/content-review-manifest.js": {
-      "sha256": "af5d798c72fe746dbb78140da7a6017f7b9bd096adb35b0ab859c7c9b909b794",
-      "bytes": 89432
+      "sha256": "694f6d1b08a459dbab1d7099c2838d297a0c984d00529d712671181a905039fc",
+      "bytes": 89980
     },
     "content/curriculum-map-v1.4.json": {
       "sha256": "04a5eeec06d68d4a8a49f138d68be380ecbc8796080f34f0decfbcf0143c0990",
@@ -367,8 +367,8 @@
       "bytes": 3059
     },
     "service-worker.js": {
-      "sha256": "162081ebbb1ee71250ed80422d279ccdd4b05f3704bed336ed7e66d54b2a5e7e",
-      "bytes": 4896
+      "sha256": "b76ced20c100f754fb07f7915b56ec93392a6eed288978d9768c34f45d4b8726",
+      "bytes": 4898
     },
     "styles.css": {
       "sha256": "7c462a633872f1c4ec1a78b0f74ac6f6a67e2d26bfb2abf3a84ff38fce084910",

@@ -54,6 +54,47 @@ test('production gate rejects educator approval without reviewer metadata', () =
   assert.ok(result.reasons.includes('educator-review-metadata-invalid'));
 });
 
+test('production gate rejects educator approval without a reviewed digest', () => {
+  const record = clone(getReviewRecord('generated-template:math-1-addition'));
+  record.educatorReview = {
+    status: 'approved',
+    reviewer: { id: 'educator-001', role: 'licensed-educator' },
+    reviewedAt: '2026-09-12T20:00:00.000Z',
+  };
+
+  const result = evaluateProductionGate(record, { currentDigest: record.digest.value });
+  assert.equal(result.eligible, false);
+  assert.ok(result.reasons.includes('educator-review-digest-invalid'));
+});
+
+test('production gate rejects malformed educator reviewed digests', () => {
+  const record = clone(getReviewRecord('generated-template:math-1-addition'));
+  record.educatorReview = {
+    status: 'approved',
+    reviewer: { id: 'educator-001', role: 'licensed-educator' },
+    reviewedAt: '2026-09-12T20:00:00.000Z',
+    reviewedDigest: 'not-a-sha256',
+  };
+
+  const result = evaluateProductionGate(record, { currentDigest: record.digest.value });
+  assert.equal(result.eligible, false);
+  assert.ok(result.reasons.includes('educator-review-digest-invalid'));
+});
+
+test('production gate rejects an educator reviewed digest for another source snapshot', () => {
+  const record = clone(getReviewRecord('generated-template:math-1-addition'));
+  record.educatorReview = {
+    status: 'approved',
+    reviewer: { id: 'educator-001', role: 'licensed-educator' },
+    reviewedAt: '2026-09-12T20:00:00.000Z',
+    reviewedDigest: '0'.repeat(64),
+  };
+
+  const result = evaluateProductionGate(record, { currentDigest: record.digest.value });
+  assert.equal(result.eligible, false);
+  assert.ok(result.reasons.includes('educator-review-digest-mismatch'));
+});
+
 test('quarantined JSON pack items cannot enter internal review', () => {
   const record = getReviewRecord('json-pack-item:math-question-bank-v1.7.json::$.sets[2]');
   const result = evaluateInternalReviewGate(record, { currentDigest: record.digest.value });
@@ -84,6 +125,7 @@ test('synthetic fully reviewed record can pass the production gate', () => {
       reviewedAt: '2026-09-12T20:00:00.000Z',
     },
     reviewedAt: '2026-09-12T20:00:00.000Z',
+    reviewedDigest: record.digest.value,
   };
 
   const result = evaluateProductionGate(record, { currentDigest: record.digest.value });

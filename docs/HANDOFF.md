@@ -3,7 +3,7 @@
 **Revision:** this file describes the commit that last changed it
 (`git log -1 --format=%h -- docs/HANDOFF.md`). A hard-coded hash here was always one commit
 behind, because committing the file changes HEAD.
-**Written:** 2026-09-22 · **Updated:** 2026-09-27 (PR #2 CI runs 43–44, stable 211-case browser suite, fresh Windows installer and no-port verification; earlier: M2 native-shell readiness, audit F10/F11/F13, hygiene H1–H6, decisions D1–D14).
+**Written:** 2026-09-22 · **Updated:** 2026-09-27 (historical PR #2 CI runs 43–44, historical Windows/native evidence, and the Cycle 2 local audit; earlier: M2 native-shell readiness, audit F10/F11/F13, hygiene H1–H6, decisions D1–D14).
 
 This document is the entry point. It says what is verified, what is not, who owns what is
 left, and the operational details that are easy to get wrong. The other documents go deeper:
@@ -17,24 +17,29 @@ left, and the operational details that are easy to get wrong. The other document
 
 `AGENTS.md` points here and nowhere else.
 
+**Independent follow-up (2026-09-27):** see
+[`AUDIT_BUILD_PLAN_2026_09_27.md`](AUDIT_BUILD_PLAN_2026_09_27.md). The review CLI
+still had mixed-batch partial writes and no rollback after validator failure;
+the manifest returned by `getReviewManifest()` still omitted approvals/findings
+despite the earlier description below. The follow-up fixes those issues, validates
+reviewer metadata and repairs Windows smoke readiness/cleanup. Independent
+subagent reviews then exposed linked-JSON rejection and harness synchronization
+gaps, also fixed. Final local verification records **255/255 unit, 211/211 browser (zero
+retries), 15/15 repeated targeted cases, and 11/11 smoke checks pass** after the final
+digest-gate acceptance fix. The current scoped recheck passes
+`node --test tests/content-review.test.mjs` (**25/25**) and
+`npm run check:content-review`; the full suite was not rerun in this pass. Earlier
+failed full runs remain recorded in the audit. No remote CI, native, device, educator, or
+external certification is claimed here.
+
 ---
 
 ## 1. Where the project stands
 
-The earlier baseline is merged to `main` (PR #1, merge commit `6b43a59`). The current
-closed-beta implementation stack is on [`mobile/runtime-readiness`](https://github.com/1983stevec-gif/BrainBite/tree/mobile/runtime-readiness)
-in [PR #2](https://github.com/1983stevec-gif/BrainBite/pull/2), open and mergeable to
-`main`. Latest fully tested gameplay commit is `3ebcf35d8bc7ea18d7c69b64b9015cdedd7201e6`; runtime/evidence
-implementation is based on `a6786aaa04ec09d1ffdda2420ffff30a59b07e4b` and browser-readiness
-changes are in `2cf4de6367d7d9cc90fb8549ef687013b5809331`. GitHub Actions runs
-[36316190009](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316190009) and
-[36316192782](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316192782) each
-passed the validators, native package check, 236 unit tests, all 211 browser tests with zero
-retries, 11/11 smoke checks, clean-tree guard, and Firestore emulator job. A fresh
-`npm run native:build` produced the unsigned internal installer at
-`src-tauri/target/release/bundle/nsis/BrainBite_2.0.0_x64-setup.exe`; the rebuilt executable
-passed `npm run native:verify:runtime` with no TCP listeners. Under decision D6, Steve
-performs the merge.
+The earlier baseline is merged to `main` (PR #1, merge commit `6b43a59`). The PR #2 branch
+and its CI/native results are historical evidence, retained below with that label; they are
+not current Cycle 2 verification. The current scoped result is the local content-review
+recheck recorded above. Under decision D6, Steve performs the eventual merge.
 
 Three items are deliberately **not** done:
 
@@ -51,21 +56,20 @@ Three items are deliberately **not** done:
 
 ## 2. Verified now
 
-Every row below is reproducible from this revision. Evidence files are committed.
+Rows labelled current are local audit results after the final digest-gate fix. Historical PR #2 rows are not current
+verification, and no remote CI, native, device, educator, or external certification is
+claimed.
 
 | Gate | Command | Result | Evidence |
 |---|---|---|---|
-| Static checks (10) | `npm run check:static` | PASS (includes `check:encoding`) | console |
-| Unit tests | `npm run test:unit` | **236/236** (Windows, Node 24.19.0) | local-certification report |
-| Browser suite | CI runs 36316190009 and 36316192782 | **211 passed, zero retries** in each run. Both include the short-landscape prompt and direct 3D pointer-to-answer parity. The earlier Windows certification recorded two retry-only cases; their groups were rerun without retries at 92/92 and 14/14. The latest targeted reload-sensitive rerun passed 2/2 | Playwright CI artifacts; `release-evidence/local-certification.json`; focused reruns |
-| Smoke inventory | `npm run certify:local` | **11/11** | `release-evidence/smoke-report.json` |
-| Performance probe | `npm run certify:local` | exit 0, **0 headless budget violations**; device-only results remain unverified | `release-evidence/local-certification.json` |
-| Local certification | `npm run certify:local` | **17/17 stages passed** on Windows; 210 browser cases, 11/11 smokes, and zero headless budget violations. The report snapshot is based on `36887b9` with the final stylesheet/evidence changes later committed in `a6786aa`; it records the initial tree as dirty | `release-evidence/local-certification.json` |
-| Release evidence | `npm run check:evidence:ci` on the PR branch | PASS | GitHub Actions runs 36316190009 and 36316192782; local certification |
-| Package integrity | `npm run check:stage` | 100 runtime files, no developer material | `release-evidence/package-manifest.json` |
-| Content review gate | `npm run check:content-review` | PASS, 0 digest mismatches | console |
-| Native shell | `npm run native:verify` and `npm run native:verify:runtime` | 100 runtime files; rebuilt native window and child processes open with zero TCP listeners; shell CSP matches `index.html` | CI runs 36316190009 and 36316192782 and Windows console |
-| Remote CI | GitHub Actions | **success** on PR #2; 211 browser tests with zero retries, 11/11 smokes, clean tree, and Firestore job pass | Actions runs 36316190009 and 36316192782 |
+| Focused content-review tests | `node --test tests/content-review.test.mjs` | **25/25** in the current scoped recheck | local console |
+| Content review gate | `npm run check:content-review` | PASS, 105 records and 0 digest mismatches | local console |
+| Current integrated unit run | `npm run test:unit` | **255/255**, zero failed/skipped | final local audit |
+| Current smoke inventory | `npm run smoke` | **11/11**, including Chrome+Edge Windows matrix | final local audit |
+| Current browser suite | Local audit run | **211/211, zero retries** | final local audit |
+| Historical local certification | `npm run certify:local` | **17/17 stages**, 210 browser cases, 11/11 smokes | historical `release-evidence/local-certification.json` |
+| Historical PR #2 remote CI | GitHub Actions | **211 browser tests, zero retries**, 11/11 smokes, clean tree, and Firestore job pass; historical only | Actions runs 36316190009 and 36316192782 |
+| Historical PR #2 native shell | `npm run native:verify` and `npm run native:verify:runtime` | 100 runtime files and zero TCP listeners; historical only | PR #2 records |
 
 Measured budgets (headless-judgeable, all passing):
 
@@ -180,7 +184,7 @@ approved, 0 rejected** (0 digest mismatches).
   web build is unchanged. `tests/native-shell.spec.js` covers it.
 - **The service worker precache is a fixed list.** Adding a runtime asset means updating
   `service-worker.js` *and* the stage allowlist, then bumping the cache name
-  (`brainbite-v2.0-shell-v44-native-ready`) so clients re-precache.
+  (the current versioned cache name is defined in `service-worker.js`) so clients re-precache.
 - **Fonts are self-hosted and the CSP is strict** (`script-src 'self'`, `worker-src 'self'`,
   no `unsafe-eval`, no wasm compilation). Any new dependency must fit inside that; Draco did
   not (§7).
@@ -255,11 +259,10 @@ Two things were measured and deliberately **rejected**:
 
 ## 9. Next moves, in order
 
-0. **Review and merge [PR #2](https://github.com/1983stevec-gif/BrainBite/pull/2)** (Steve,
-   per D6). The branch is pushed, mergeable, and its full CI plus Firestore rules jobs pass.
-   Windows verification completed with `npm ci` and `npm run certify:local`; the latter is
-   the branch-safe local release gate. `npm run release:check` invokes the main-only,
-   clean-tree evidence check, so use `npm run check:evidence:ci` on a feature branch.
+0. **Review and merge the implementation** (Steve, per D6). PR #2's pushed/mergeable state
+   and its CI, Firestore, and Windows certification results are historical records, not
+   current verification. `npm run release:check` invokes the main-only, clean-tree evidence
+   check, so use `npm run check:evidence:ci` on a feature branch.
 1. **Enable GitHub Pages** (Steve, one setting). Then confirm the `pages` workflow goes green
    on `main` and the app is reachable.
 2. **Circulate the review packet** and run `review:approve` / `review:reject` for the 75

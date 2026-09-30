@@ -1,4 +1,4 @@
-const CACHE = 'brainbite-v2.0-shell-v45-battle-draws';
+const CACHE = 'brainbite-v2.0-shell-v46-review-contract';
 const FALLBACK = './index.html';
 const CORE = [
   './',
@@ -134,4 +134,3 @@ self.addEventListener('fetch', event => {
     return response;
   })));
 });
-

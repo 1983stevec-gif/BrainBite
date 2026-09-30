@@ -25,6 +25,7 @@ async function unlockViaGate(page) {
   await page.locator('#parentPinInput').fill('654321');
   if (await page.locator('#confirmParentPin').isVisible()) await page.locator('#confirmParentPin').fill('654321');
   await page.locator('#unlockParent').click();
+  await expect(page.locator('#parentContent')).toBeVisible();
 }
 
 // Parent destinations live in the parent shell, which is only present in parent context.
@@ -1242,6 +1243,14 @@ test('accessibility settings persist and expose captions and repeat prompt contr
   await page.locator('#dyslexicFont').check();
   await page.locator('#textScale').selectOption('1.25');
   await page.locator('#qualityTier').selectOption('performance');
+  // DOM updates precede queued storage writes; reload only after a successful save.
+  const persistence = await page.evaluate(async () => {
+    await PERSISTENCE_CHAIN;
+    const stored = JSON.parse(localStorage.getItem('bb-core-v3'));
+    return { error: window.__BRAINBITE_PERSISTENCE_ERROR__ ?? null, settings: stored.profiles[stored.active].settings };
+  });
+  expect(persistence.error).toBeNull();
+  expect(persistence.settings).toMatchObject({ cameraMotionReduction: true, captions: true, dyslexicFont: true, textScale: '1.25', qualityTier: 'performance' });
   await page.reload();
   await page.getByRole('button', { name: 'Settings' }).click();
   await expect(page.locator('#cameraMotionReduction')).toBeChecked();
@@ -1640,14 +1649,25 @@ test('automated WCAG scan has no serious or critical violations on primary scree
 });
 
 test('PWA manifest, service worker, cache boundary, and offline reload work', async ({ page, context }) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
   const manifest = await page.request.get('/manifest.webmanifest'); expect(manifest.ok()).toBeTruthy();
   const sw = await page.request.get('/service-worker.js'); const source = await sw.text();
   expect(source).toContain("url.origin !== self.location.origin");
   await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.waitForFunction(async () => Boolean(navigator.serviceWorker.controller)
+    && Boolean(await caches.match(new URL('./index.html', location.href).href)));
   await context.setOffline(true);
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: 'BrainBite' })).toBeVisible();
-  await context.setOffline(false);
+  try {
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    // A cached heading alone does not prove the JavaScript runtime booted.
+    await page.waitForFunction(() => typeof window.BrainBiteGame?.getState === 'function');
+    await expect(page.locator('#home.show')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'BrainBite' })).toBeVisible();
+    expect(errors).toEqual([]);
+  } finally {
+    await context.setOffline(false);
+  }
 });
 
 test('content review gate launches exact-digest registry missions and internal-review curriculum', async ({ page }) => {
