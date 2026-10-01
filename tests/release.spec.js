@@ -1036,9 +1036,13 @@ test('same-installation tabs use distinct bounded provenance writers', async ({ 
   await pageA.waitForFunction(()=>!!window.BrainBiteCore);
   const reloaded=await recordAttempt(pageA,'same-installation-tab-a-reload');
   expect(reloaded.attempt.originId.startsWith(`${installationA}:`)).toBe(true);
-  expect(reloaded.attempt.originId).toBe(left.attempt.originId);
+  expect(reloaded.attempt.originId).not.toBe(left.attempt.originId);
   expect(reloaded.attempt.originId).not.toBe(right.attempt.originId);
-  expect(reloaded.attempt.originSequence).toBeGreaterThan(left.attempt.originSequence);
+  expect(reloaded.attempt.originSequence).toBeGreaterThan(Math.max(left.attempt.originSequence,right.attempt.originSequence));
+  const reloadedSources=await pageA.evaluate(skill=>window.BrainBiteCore.evidenceProvenanceSources(skill),reloaded.skill);
+  expect(reloadedSources).toHaveLength(3);
+  expect(reloadedSources.map(source=>source.id).sort()).toEqual([left.attempt.originId,right.attempt.originId,reloaded.attempt.originId].sort());
+  expect(reloadedSources.find(source=>source.id===reloaded.attempt.originId)).toMatchObject({sequence:reloaded.attempt.originSequence,attempts:1,independentSuccesses:1});
   await context.close();
 });
 
@@ -3135,23 +3139,24 @@ test('Phase 2.3 Lab queue discard requires exact confirmation and a fresh PIN', 
   }
 });
 
-test('Phase 2.3 cloud deletion reports a partial remote outcome and defers local cleanup until retry succeeds', async ({ page }) => {
+test('Phase 2.3 cloud deletion reports unavailability and leaves data, queue, and session unchanged', async ({ page }) => {
   await page.evaluate(() => {
     INTEGRATIONS.cloud = { provider: 'firebase', url: 'phase23-project', key: 'x'.repeat(24) };
     localStorage.setItem('bb-firebase-session', JSON.stringify({ idToken: 'token', refreshToken: 'refresh', localId: 'family-phase23', email: 'parent@example.com' }));
     queueSyncEvent({ type: 'store-update', profileId: P().id, payload: { phase: 23 }, schemaVersion: STORE.schemaVersion });
-    BrainBiteFirebaseREST.prototype.deleteFamily = async () => ({ profilesDeleted: 1 });
-    BrainBiteFirebaseREST.prototype.deleteAuthAccount = async () => { throw new Error('AUTH_DELETE_RETRY'); };
+    globalThis.__phase23DeleteCalls = { family: 0, auth: 0 };
+    BrainBiteFirebaseREST.prototype.deleteFamily = async () => { globalThis.__phase23DeleteCalls.family++; return { profilesDeleted: 1 }; };
+    BrainBiteFirebaseREST.prototype.deleteAuthAccount = async () => { globalThis.__phase23DeleteCalls.auth++; return true; };
     render();
   });
   await parentDestination(page, 'Account & Sync');
-  await page.getByRole('button', { name: 'Delete Cloud Data & Account' }).click(); await approveSensitiveAction(page);
-  await expect(page.locator('#mergeResult')).toContainText('family data was deleted, but Firebase account deletion failed');
-  const partial = await page.evaluate(() => ({ queue: SYNC.queue.length, session: !!localStorage.getItem('bb-firebase-session') }));
-  expect(partial.queue).toBeGreaterThan(0); expect(partial.session).toBe(true);
-
-  await page.evaluate(() => { BrainBiteFirebaseREST.prototype.deleteAuthAccount = async function phase23DeleteAccount() { this.saveSession(null); return true; }; });
-  await page.getByRole('button', { name: 'Delete Cloud Data & Account' }).click(); await approveSensitiveAction(page);
-  await expect(page.locator('#mergeResult')).toContainText('Cloud family data and Firebase account were deleted');
-  expect(await page.evaluate(() => ({ queue: SYNC.queue.length, session: localStorage.getItem('bb-firebase-session') }))).toEqual({ queue: 0, session: null });
+  const before = await page.evaluate(() => ({ store: JSON.stringify(STORE), copies: Object.fromEntries([KEY, BACK, RECOVERY_KEY].map(key => [key, localStorage.getItem(key)])), queue: JSON.stringify(SYNC.queue), session: localStorage.getItem('bb-firebase-session') }));
+  expect(JSON.parse(before.queue)).not.toHaveLength(0); expect(before.session).not.toBeNull();
+  await page.getByRole('button', { name: 'Check Cloud Deletion Status' }).click();
+  await expect(page.locator('#sensitiveActionTitle')).toHaveText('Check cloud deletion availability?');
+  await expect(page.locator('#sensitiveActionDescription')).toHaveText('This client cannot delete cloud family documents or the Firebase authentication account. Confirm to view the current status. No local or cloud data will change.');
+  await approveSensitiveAction(page);
+  await expect(page.locator('#mergeResult')).toHaveText('No cloud data or Firebase account was deleted. This build does not yet have the privileged deletion service required for that action. Local progress, cloud documents, the account, the signed-in session, and pending sync changes remain unchanged.');
+  const after = await page.evaluate(() => ({ store: JSON.stringify(STORE), copies: Object.fromEntries([KEY, BACK, RECOVERY_KEY].map(key => [key, localStorage.getItem(key)])), queue: JSON.stringify(SYNC.queue), session: localStorage.getItem('bb-firebase-session'), deleteCalls: globalThis.__phase23DeleteCalls }));
+  expect(after).toEqual({ ...before, deleteCalls: { family: 0, auth: 0 } });
 });
