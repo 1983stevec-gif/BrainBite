@@ -260,6 +260,7 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
     const list = [...new Set(choices.map(String))].slice(0, 4);
     const key = JSON.stringify(list);
     if (!force && key === choicesKey) return;
+    const focusedIndex = [...controls.children].indexOf(document.activeElement);
     choicesKey = key;
     currentChoices = list;
     clearPillars();
@@ -309,6 +310,17 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
     applyRescue();
     applyBossState();
     layoutAnswerButtons();
+    if (focusedIndex >= 0) {
+      const buttons = [...controls.children];
+      const next = !buttons[focusedIndex]?.disabled ? buttons[focusedIndex] : null;
+      const focusTarget = next || buttons.slice(focusedIndex + 1).find(button => !button.disabled) || buttons.find(button => !button.disabled);
+      if (focusTarget) focusTarget.focus({ preventScroll: true });
+      else {
+        const fallback = document.getElementById('feedback') || host;
+        fallback.tabIndex = -1;
+        fallback.focus({ preventScroll: true });
+      }
+    }
     if (reducedMotion) renderFrame();
   }
 

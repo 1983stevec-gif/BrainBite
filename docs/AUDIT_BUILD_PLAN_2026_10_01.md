@@ -77,8 +77,76 @@ is reserved for the orchestrator and is regenerated only after every worker stop
 Deferred with reasons: the two owner decisions (12, 13), the privileged erasure backend
 (Phase 1, its own build plan), and the broader rollback/update-lifecycle redesign.
 
+## Round 2 — audit of 2026-10-01 (later in the day)
+
+Three further read-only assignments on ground the first round did not cover: mastery
+integrity, untrusted input and secret handling, and the accessibility surface. Findings and
+the improvements selected from them.
+
+### R1 — the mastery invariant is only partially enforced
+
+The project rule is that assisted work must never count as independent mastery. Verified
+against the real modules: assisted attempts do not increment `independentSuccesses` and
+assisted-only work cannot reach the literal `Mastered` state. But assisted work **does raise
+`masteryScore`**, which is the scalar the parent screen renders as "mastery". Reproduced:
+
+| Evidence | Parent mastery | State |
+|---|---:|---|
+| 20 assisted successes, 0 independent | **100%** | Strong |
+| 10 assisted + 2 independent | **100%** | Mastered |
+| the same 2 independent, assisted removed | 36% | Practicing |
+
+No test enforces the invariant. `tests/core.test.mjs:919-925` currently *requires* assisted
+homework to increase `masteryScore`. A merged cloud state is also trusted: a payload with
+valid evidence but a forged `masteryScore` of 100 merges as 100 and renders as `Strong`.
+Unprotected paths by reasoning: restart-after-explanation loses the assist flag, ordinary
+read-aloud sets no support state, and the first-run guided mission is unassisted.
+
+### R2 — one real injection sink and a credentials decision
+
+- **Imported `activeActivity` reaches `innerHTML` unescaped.** Reproduced with the real
+  renderer: a hostile profile *name* is correctly escaped, while `<img src=x onerror=…>` in
+  `activeActivity.prompt` appears verbatim in BrainBase markup. The CSP blocks script
+  execution, so this is persistent DOM injection and spoofing, not code execution — but the
+  sink should be closed anyway.
+- Firebase refresh and ID tokens persist in `localStorage` on a shared family device. Inherent
+  to the current architecture; needs an owner decision.
+- The bounded diagnostic log does not redact credential-shaped text before export.
+
+### R3 — accessibility defects in the shipped experience
+
+- **MATCH mode exposes an invisible duplicate interface**: the underlying shell is hidden with
+  clipping and `pointer-events:none` rather than `hidden`/`inert`, so Tab and a screen reader
+  reach invisible controls, and a screen change focuses an invisible heading.
+- **Focus is lost after WebGL answers** (answer buttons are replaced) and after several
+  message/dialog dismiss paths.
+- MATCH can produce duplicate and flooding live announcements; repeated identical feedback is
+  suppressed by screen readers; animated counters sit inside a live region.
+- The in-app reduced-motion setting disables animations but not CSS transitions.
+- Several phone targets are below the project's own 44px convention.
+
+## Round 2 improvements selected
+
+| # | Improvement | Files | Acceptance |
+|---|---|---|---|
+| 1 | Recompute mastery score, confidence and state from evidence on merge instead of trusting a supplied scalar | `brainbite-core.mjs` + core tests | A forged score cannot survive a merge |
+| 2 | Escape every `activityMarkup()` interpolation | `brainbite-core.mjs` + core tests | The hostile payload renders as text |
+| 3 | Assist flags survive a mission restart after the explanation | `app.js` | Restart-then-answer cannot count as independent |
+| 4 | Parent screen discloses the assisted/independent split rather than labelling the combined score as mastery | `app.js` | No parent-visible label calls the combined score independent |
+| 5 | Redact credential-shaped text from the diagnostic log and its export | `app.js` | A token-shaped message is redacted |
+| 6 | Validate and drop imported `activeActivity`/`stage` before persistence | `app.js` | The import path cannot persist arbitrary activity markup |
+| 7 | MATCH hides the underlying shell from focus and assistive technology, and announces once | `presentation/match-plates.mjs`, `presentation/match-fx.mjs`, `presentation/presentation-adapter.mjs`, `styles.css` | Tab reaches only visible controls |
+| 8 | Focus survives WebGL answer replacement | `presentation/webgl-battle.mjs` | Focus lands on a visible answer |
+| 9 | Reduced motion disables transitions; phone targets meet 44px | `styles.css` | Declared sizes and the transition rule |
+
+Deferred to the owner: the mastery *formula* decision, whether read-aloud and first-run
+guidance are assistance, token storage strategy, an allowlisted export schema, and the
+screen-reader model for the DOM movement board.
+
 ## Not claimed
 
 Device, screen-reader, Spanish, legal, production Firebase, publishing, signing, and educator
 review remain open and are owned by people, not by this plan. No approval or finding was
-fabricated, and no live review data was touched.
+fabricated, and no live review data was touched. Every audit finding above is a source trace, a
+reproduction against the real modules, or an explicitly labelled "reasoned, not reproduced"
+item; none of them is a device, screen-reader, or production certification.

@@ -31,11 +31,13 @@ import {
   mergeSkillStates,
   evidenceProvenanceSources,
   normalizeFoundationState,
+  normalizeSkillState,
   persistFoundationState,
   recordHomeworkAttempt,
   queueOfflineEvent,
   recordBossVictory,
   recordLearnerAttempt,
+  renderBrainBaseShell,
   remediateChallenge,
   replayOfflineQueue,
   resolveKnowledgePlatformChoice,
@@ -1129,6 +1131,56 @@ test('merging a skill state with itself leaves the mastery score unchanged', () 
   assert.equal(merged.evidence.attempts, state.evidence.attempts);
   const pulledNothingNew = mergeSkillStates(state, mergeSkillStates(state, state));
   assert.equal(pulledNothingNew.masteryScore, state.masteryScore);
+});
+
+test('a forged mastery scalar cannot survive a merge with its own evidence', () => {
+  const legitimate = scoreAttempt({
+    id: 'assisted-attempt',
+    correct: true,
+    assisted: true,
+    responseTimeMs: 1800,
+  }, createSkillState('fractions'));
+  const forged = {
+    ...structuredClone(legitimate),
+    masteryScore: 100,
+    confidence: 1,
+    masteryState: 'Strong',
+  };
+
+  const merged = mergeSkillStates(legitimate, forged, { preferRight: true });
+  const ingested = normalizeSkillState(forged);
+  assert.equal(ingested.masteryScore, legitimate.masteryScore);
+  assert.equal(ingested.confidence, legitimate.confidence);
+  assert.equal(ingested.masteryState, legitimate.masteryState);
+  assert.equal(merged.masteryScore, legitimate.masteryScore);
+  assert.equal(merged.confidence, legitimate.confidence);
+  assert.equal(merged.masteryState, legitimate.masteryState);
+  assert.notEqual(merged.masteryScore, 100);
+});
+
+test('BrainBase activity markup escapes a hostile imported prompt', () => {
+  const hostilePrompt = '<img src=x onerror=alert(1)>';
+  const learner = defaultLearner('Markup', 'profile-markup');
+  learner.stage = 'brainbase';
+  learner.activeActivity = { family: 'BrainBase', prompt: hostilePrompt };
+  const activitySlot = {
+    innerHTML: '',
+    querySelectorAll() { return []; },
+    querySelector() { return null; },
+  };
+  const root = {
+    innerHTML: '',
+    querySelector(selector) { return selector === '#bbf-activity' ? activitySlot : null; },
+    querySelectorAll() { return []; },
+  };
+
+  renderBrainBaseShell(root, {
+    learners: { [learner.profileId]: learner },
+    activeLearnerId: learner.profileId,
+  }, { storage: makeStorage() });
+
+  assert.doesNotMatch(activitySlot.innerHTML, /<img/);
+  assert.match(activitySlot.innerHTML, /&lt;img src=x onerror=alert\(1\)&gt;/);
 });
 
 test('a replayed attempt with the same id is scored once', () => {

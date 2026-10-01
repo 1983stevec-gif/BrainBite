@@ -1,10 +1,10 @@
 {
   "schema": "brainbite.package-manifest.v1",
-  "generatedAt": "2026-10-01T14:56:23.393Z",
+  "generatedAt": "2026-10-01T17:22:04.773Z",
   "files": {
     "app.js": {
-      "sha256": "5c3e9d8ae936f1be4f713e5c92c99f9893fd4aee75ce8c832d810a9504d246cf",
-      "bytes": 281410
+      "sha256": "ecdd168d795ef898913ebeb7ecdbb0ccbbc91ca6a9a0aef55d53f3b430fe8fb7",
+      "bytes": 288845
     },
     "assets/art/bite-village.svg": {
       "sha256": "10de1eed7772e502d1ac29f41c00e7b51b9dbea230312ece358a0184ebb2e49a",
@@ -79,8 +79,8 @@
       "bytes": 991
     },
     "brainbite-core.mjs": {
-      "sha256": "1b4c39d9baa226a63542bad590203fd3dcd5a5bb2f6336f8c40b3abdf1149e98",
-      "bytes": 161736
+      "sha256": "e69cb68913f1f20535950bd675fa90fd43a2ab6d157f4b64748878800cf5538d",
+      "bytes": 160593
     },
     "content/boss-phases.js": {
       "sha256": "e559b3d11dc605c5f489b68a07b2f13736c031f7cd99f35c724473a27666abe8",
@@ -319,12 +319,12 @@
       "bytes": 11793
     },
     "presentation/match-fx.mjs": {
-      "sha256": "985af83d6dfededf7b2797d94a6aeadf6db56ba3b7f3dd95324b3d0911707366",
-      "bytes": 9054
+      "sha256": "ebd0331643d0ae913db3a58445e09a0376b5ba74f3c741e38bf391acd736a215",
+      "bytes": 9378
     },
     "presentation/match-plates.mjs": {
-      "sha256": "7d7898c1f9a4148ed3f3dbd09f2929c7d3ea255284d13b3e8488f21471fac638",
-      "bytes": 11069
+      "sha256": "4d200fd6ca6d64c34bd1389a1143173e9fa64350c1230b082e5faff5e037150b",
+      "bytes": 12231
     },
     "presentation/performance-budget.mjs": {
       "sha256": "ce32cceb767fda914a6903ff28ae1efc794e7e7a741f9ce0cfd4aee90257a9c4",
@@ -335,8 +335,8 @@
       "bytes": 4808
     },
     "presentation/presentation-adapter.mjs": {
-      "sha256": "d592e44b491222c13307237dbe7f56eec64422930f4544c11105e78d360a45e8",
-      "bytes": 11975
+      "sha256": "79fbfdea0b3891f0c7b0131b56278d3153f8811eca33d39eb0b2f72e633e78bd",
+      "bytes": 12035
     },
     "presentation/programmable-bit.mjs": {
       "sha256": "259d8b3299b51183b79c28b8db334e1bb210006af36f7798d1a34a0f9fc253b1",
@@ -351,8 +351,8 @@
       "bytes": 2255
     },
     "presentation/webgl-battle.mjs": {
-      "sha256": "294b21374733e057999c2aee914b967f2c44a5f95c68e814a4146f62d4bde5da",
-      "bytes": 38277
+      "sha256": "5cdc4fd187d69124a507a40c9f21310146e09c5d1e17e765d53f6de156f88514",
+      "bytes": 38906
     },
     "presentation/webgl-home.mjs": {
       "sha256": "55ca50ef0c5d8f653288aaa3ac0c9a9046d0eac44bb79d995e4fc49beacb74a8",
@@ -367,12 +367,12 @@
       "bytes": 3059
     },
     "service-worker.js": {
-      "sha256": "bd05a782d3af321fb073839ae8de85b789d9ac1e792721d3c5a8f4e0b4c0af86",
+      "sha256": "5d75f34fba34b22ed5e2d5af80c9d779cd0988ace847e28a95ec31a62c137cbc",
       "bytes": 4951
     },
     "styles.css": {
-      "sha256": "7c462a633872f1c4ec1a78b0f74ac6f6a67e2d26bfb2abf3a84ff38fce084910",
-      "bytes": 123030
+      "sha256": "d1e3cb7b40523687b2c56271eaf9ffc0a8d17ea7dd28da82ee5d17353d2bcb3c",
+      "bytes": 123103
     },
     "support.html": {
       "sha256": "571ca16966c4ab566b0a247045ba6ee47e7c667494ee3938d4d50df1dcbdbc83",

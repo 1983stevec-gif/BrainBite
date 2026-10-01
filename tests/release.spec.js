@@ -2407,7 +2407,7 @@ test('Phase 3.1 parent weekly and priority UI uses canonical LearningCore eviden
   await page.evaluate(() => renderParent());
   await expect(page.locator('#weeklySummary')).toContainText('Sessions this week: 1');
   await expect(page.locator('#weeklySummary')).toContainText('Practice items: 1');
-  await expect(page.locator('#skillPriority')).toContainText('Fractions · mastery 0%');
+  await expect(page.locator('#skillPriority')).toContainText('Fractions · learning score 0% · independent 0 · assisted 0');
   await expect(page.locator('#skillPriority')).not.toContainText('99%');
 });
 
@@ -2436,7 +2436,7 @@ test('P1 parent Words mastery card projects canonical reading evidence', async (
   expect(projection).toEqual({ words: 0, reading: 0 });
   await expect(page.locator('#parentWords')).toHaveText('0%');
   await expect(page.locator('#parentWords')).not.toHaveText('99%');
-  await expect(page.locator('#skillPriority')).toContainText('Inference · mastery 0%');
+  await expect(page.locator('#skillPriority')).toContainText('Inference · learning score 0% · independent 0 · assisted 0');
   await expect(page.locator('#skillPriority')).not.toContainText('99%');
 });
 

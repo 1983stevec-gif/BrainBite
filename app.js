@@ -640,10 +640,11 @@ function mergeSyncStates(localValue,persistedValue){
 const DIAGNOSTIC_KEY='bb-diagnostics-v1';
 const DIAGNOSTIC_LIMIT=50;
 let DIAGNOSTICS=[];
-try{const stored=JSON.parse(localStorage.getItem(DIAGNOSTIC_KEY)||'[]');if(Array.isArray(stored))DIAGNOSTICS=stored.slice(-DIAGNOSTIC_LIMIT)}catch{DIAGNOSTICS=[]}
+function redactDiagnosticText(value,limit){return String(value||'').replace(/\b(authorization|proxy-authorization)\s*:\s*(?:(?:Basic|Bearer)\s+)?[A-Za-z0-9._~+\/=\-]+/gi,'$1: [REDACTED]').replace(/\bBearer\s+[A-Za-z0-9._~+\/=\-]+/gi,'Bearer [REDACTED]').replace(/(["']?)(authorization|proxy-authorization|password|passwd|passcode|pin|(?:[a-z0-9_-]*(?:token|secret|credential))|api[_-]?key|client[_-]?secret)\1\s*([:=])\s*(?:"[^"]*"|'[^']*'|[^\s,;&}]+)/gi,(_,quote,key,separator)=>`${quote}${key}${quote}${separator} [REDACTED]`).replace(/(?:[A-Za-z0-9_-]{8,}\.){2}[A-Za-z0-9_-]{8,}|[A-Za-z0-9_~+\/=\-]{32,}/g,'[REDACTED]').slice(0,limit)}
+try{const stored=JSON.parse(localStorage.getItem(DIAGNOSTIC_KEY)||'[]');if(Array.isArray(stored))DIAGNOSTICS=stored.slice(-DIAGNOSTIC_LIMIT).map(entry=>({...entry,type:redactDiagnosticText(entry?.type,40),message:redactDiagnosticText(entry?.message,240),context:redactDiagnosticText(entry?.context,120)}))}catch{DIAGNOSTICS=[]}
 function recordDiagnostic(type,message,context=''){
  try{
-  const entry={type:String(type||'issue').slice(0,40),message:String(message||'').slice(0,240),context:String(context||'').slice(0,120),ts:Date.now()};
+  const entry={type:redactDiagnosticText(type||'issue',40),message:redactDiagnosticText(message,240),context:redactDiagnosticText(context,120),ts:Date.now()};
   DIAGNOSTICS.push(entry);
   if(DIAGNOSTICS.length>DIAGNOSTIC_LIMIT)DIAGNOSTICS=DIAGNOSTICS.slice(-DIAGNOSTIC_LIMIT);
   localStorage.setItem(DIAGNOSTIC_KEY,JSON.stringify(DIAGNOSTICS));
@@ -888,6 +889,35 @@ async function replaceCanonicalStateSafely(operation,replacementFactory){
  }
 }
 
+const IMPORTED_STAGE_FAMILIES={'child-profile':'Child Profile',brainbase:'BrainBase','play-portal':'Play Portal','jungle-circuit':'Jungle Circuit','target-smash':'Target Smash','letter-trail':'Letter Trail','knowledge-platforms':'Knowledge Platforms','secret-reward':'Reward Chest','fraction-kraken':'Fraction Kraken','brainbase-upgrade':'BrainBase Upgrade',save:'Save',exit:'Exit',reopen:'Reopen',continue:'Continue'};
+function validImportedActivityText(value,max=160){return typeof value==='string'&&value.length>0&&value.length<=max&&!/[<>\u0000-\u001f\u007f]/.test(value)}
+function validateImportedActivityArray(value,name,{objects=false,max=64}={}){if(!Array.isArray(value)||value.length>max)throw new Error(`The selected file has an invalid activity ${name}.`);if(!objects&&value.some(item=>!validImportedActivityText(item)))throw new Error(`The selected file has an invalid activity ${name}.`)}
+function validateImportedActivity(activity,stage){
+ if(activity==null)return;
+ if(!activity||typeof activity!=='object'||Array.isArray(activity))throw new Error('The selected file has an invalid active activity.');
+ const family=IMPORTED_STAGE_FAMILIES[stage],common=['family','prompt'],familyFields={
+  'Target Smash':['id','skillId','subject','grade','domain','source','answerType','difficulty','allowMovement','timed','supportLevel','answers','distractors','choices','attempts','selected','completed'],
+  'Letter Trail':['id','skillId','subject','grade','domain','source','difficulty','targetSequence','distractors','choices','revealed','completed','hintsUsed','errors'],
+  'Knowledge Platforms':['id','skillId','subject','grade','domain','source','difficulty','platformOrder','distractors','platforms','visited','completed'],
+  'Reward Chest':['open'],'Fraction Kraken':['phase','health','choices','rewards'],
+ };
+ const allowed=new Set([...common,...(familyFields[family]||[])]);if(!family||activity.family!==family||Object.keys(activity).some(key=>!allowed.has(key))||!validImportedActivityText(activity.prompt,500))throw new Error('The selected file has an invalid active activity.');
+ for(const key of ['family','id','skillId','subject','domain','source','answerType','difficulty'])if(Object.hasOwn(activity,key)&&!validImportedActivityText(activity[key],key==='family'?40:160))throw new Error(`The selected file has an invalid activity ${key}.`);
+ if(Object.hasOwn(activity,'grade')&&!(validImportedActivityText(activity.grade,16)||Number.isFinite(activity.grade)))throw new Error('The selected file has an invalid activity grade.');
+ for(const key of ['allowMovement','timed','completed','open'])if(Object.hasOwn(activity,key)&&typeof activity[key]!=='boolean')throw new Error(`The selected file has an invalid activity ${key}.`);
+ for(const key of ['supportLevel','phase','health','hintsUsed','errors'])if(Object.hasOwn(activity,key)&&(!Number.isFinite(activity[key])||activity[key]<0||activity[key]>100))throw new Error(`The selected file has an invalid activity ${key}.`);
+ for(const key of ['answers','distractors','selected','targetSequence','choices','revealed','platformOrder','platforms','visited','rewards'])if(Object.hasOwn(activity,key)&&!(family==='Target Smash'&&key==='choices'))validateImportedActivityArray(activity[key],key);
+ if(family==='Target Smash'){
+  for(const key of ['answers','distractors','choices','attempts','selected'])if(!Object.hasOwn(activity,key))throw new Error('The selected file has an incomplete active activity.');
+  validateImportedActivityArray(activity.choices,'choices',{objects:true});for(const choice of activity.choices){if(!choice||typeof choice!=='object'||Array.isArray(choice)||Object.keys(choice).some(key=>!['id','value','correct','x','y'].includes(key))||!validImportedActivityText(choice.id,64)||!(validImportedActivityText(choice.value,160)||Number.isFinite(choice.value))||typeof choice.correct!=='boolean'||!Number.isInteger(choice.x)||choice.x<0||choice.x>5||!Number.isInteger(choice.y)||choice.y<0||choice.y>5)throw new Error('The selected file has an invalid activity choice.');}
+  validateImportedActivityArray(activity.attempts,'attempts',{objects:true});for(const attempt of activity.attempts){if(!attempt||typeof attempt!=='object'||Array.isArray(attempt)||Object.keys(attempt).some(key=>!['correct','assisted','hintsUsed','responseTimeMs','independent','randomLike'].includes(key))||['correct','assisted','independent','randomLike'].some(key=>typeof attempt[key]!=='boolean')||!Number.isFinite(attempt.hintsUsed)||attempt.hintsUsed<0||attempt.hintsUsed>100||!Number.isFinite(attempt.responseTimeMs)||attempt.responseTimeMs<0||attempt.responseTimeMs>86400000)throw new Error('The selected file has an invalid activity attempt.');}
+ }
+ if(family==='Letter Trail')for(const key of ['targetSequence','distractors','choices','revealed'])if(!Object.hasOwn(activity,key))throw new Error('The selected file has an incomplete active activity.');
+ if(family==='Knowledge Platforms')for(const key of ['platformOrder','distractors','platforms','visited'])if(!Object.hasOwn(activity,key))throw new Error('The selected file has an incomplete active activity.');
+ if(family==='Reward Chest'&&typeof activity.open!=='boolean')throw new Error('The selected file has an incomplete active activity.');
+ if(family==='Fraction Kraken'&&(!Number.isInteger(activity.phase)||!Number.isInteger(activity.health)||!Array.isArray(activity.choices)||!Array.isArray(activity.rewards)))throw new Error('The selected file has an incomplete active activity.');
+}
+function validateImportedLearningState(profile){const learner=profile.learningCore;if(learner==null)return;if(!learner||typeof learner!=='object'||Array.isArray(learner))throw new Error('The selected file has an invalid learning state.');if(!validImportedActivityText(learner.stage,32)||!Object.hasOwn(IMPORTED_STAGE_FAMILIES,learner.stage))throw new Error('The selected file has an invalid learning stage.');validateImportedActivity(learner.activeActivity,learner.stage)}
 function validateImportedStoreIdentity(raw){
  if(!raw||typeof raw!=='object'||Array.isArray(raw)||!Array.isArray(raw.profiles)||raw.profiles.length===0)throw new Error('The selected file does not contain learner profiles.');
  if(Object.hasOwn(raw,'schemaVersion')&&(!Number.isInteger(raw.schemaVersion)||raw.schemaVersion<1||raw.schemaVersion>9))throw new Error('The selected file has an unsupported schema version.');
@@ -904,6 +934,7 @@ function validateImportedStoreIdentity(raw){
  const profileIds=new Set();
  for(const profile of raw.profiles){
   if(!profile||typeof profile!=='object'||Array.isArray(profile))throw new Error('The selected file has an invalid learner profile.');
+  validateImportedLearningState(profile);
   const hasId=Object.hasOwn(profile,'id')&&profile.id!==null&&profile.id!==undefined&&profile.id!=='';
   if(!hasId){if(modern)throw new Error('The selected file has a missing profile ID.');continue}
   if(typeof profile.id!=='string'||!idPattern.test(profile.id))throw new Error('The selected file has an unsafe profile ID.');
@@ -2000,12 +2031,12 @@ function parentDashboardSummary(){
   const homework=(learner.practice||[]).filter(item=>item.homework||item.type==='homework');
   return {
    weekly:{sessions:insights.weeklySummary.sessions,avgAccuracy:insights.weeklySummary.avgAccuracy,practice:insights.weeklySummary.practiceItems,homework:insights.weeklySummary.homework,improvements:insights.improving.length},
-   priority:insights.priority.map(item=>({skill:item.name||item.skillId,skillId:item.skillId,mastery:item.masteryScore,streak:projectedStreak(learner.skills?.[item.skillId]),nextReview:learner.skills?.[item.skillId]?.nextReviewAt||null,reason:item.reason,confidence:item.confidence})),
+   priority:insights.priority.map(item=>({skill:item.name||item.skillId,skillId:item.skillId,mastery:item.masteryScore,independentSuccesses:Number(learner.skills?.[item.skillId]?.evidence?.independentSuccesses)||0,assistedSuccesses:Number(learner.skills?.[item.skillId]?.evidence?.assistedSuccesses)||0,streak:projectedStreak(learner.skills?.[item.skillId]),nextReview:learner.skills?.[item.skillId]?.nextReviewAt||null,reason:item.reason,confidence:item.confidence})),
    homework,
    insights,
   };
  }
- const skills=Object.entries(P().skills||{}).map(([skill,meta])=>({skill,mastery:meta.mastery||0,streak:meta.streak||0,nextReview:meta.nextReview||null,lastSeen:meta.lastSeen||0}));
+ const skills=Object.entries(P().skills||{}).map(([skill,meta])=>({skill,mastery:meta.mastery||0,independentSuccesses:0,assistedSuccesses:0,streak:meta.streak||0,nextReview:meta.nextReview||null,lastSeen:meta.lastSeen||0}));
  const weekAgo=Date.now()-7*24*60*60*1000;
  const weeklySessions=(P().sessions||[]).filter(s=>s.ts>=weekAgo);
  const weeklyPractice=(P().practice||[]).filter(p=>p.ts>=weekAgo);
@@ -2024,7 +2055,7 @@ function renderParent(){
  const due=dueSkills(),memoryDue=$('memoryDue');memoryDue.replaceChildren();if(due.length)due.forEach(x=>{const chip=document.createElement('span');chip.className='memory-chip';chip.textContent=String(x.skill||'skill');memoryDue.appendChild(chip)});else memoryDue.textContent='No Memory Drops due right now.';
  const summary=parentDashboardSummary();
  $('weeklySummary').innerHTML=`<div>Sessions this week: <b>${summary.weekly.sessions}</b></div><div>Avg accuracy: <b>${summary.weekly.avgAccuracy==null?'n/a':summary.weekly.avgAccuracy+'%'}</b></div><div>Practice items: <b>${summary.weekly.practice}</b></div><div>Homework items: <b>${summary.weekly.homework}</b></div><div>Recent skills touched: <b>${summary.weekly.improvements}</b></div>`;
- const priority=$('skillPriority');priority.replaceChildren();if(summary.priority.length)summary.priority.forEach(x=>{const row=document.createElement('div');row.textContent=`${String(x.skill||'skill')} · mastery ${Math.round(x.mastery)}%${x.nextReview&&x.nextReview<=Date.now()?' · due':''}`;priority.appendChild(row)});else priority.textContent='No skill priority yet.';
+ const priority=$('skillPriority');priority.replaceChildren();if(summary.priority.length)summary.priority.forEach(x=>{const row=document.createElement('div');row.textContent=`${String(x.skill||'skill')} · learning score ${Math.round(x.mastery)}% · independent ${x.independentSuccesses} · assisted ${x.assistedSuccesses}${x.nextReview&&x.nextReview<=Date.now()?' · due':''}`;priority.appendChild(row)});else priority.textContent='No skill priority yet.';
  const homeworkSummary=$('homeworkSummary');homeworkSummary.replaceChildren();
  if(summary.homework.length)summary.homework.slice(-5).reverse().forEach(x=>{const row=document.createElement('div');row.textContent=`${x.subject}${x.grade?` grade ${x.grade}`:''} · ${x.topic||'practice'}${x.homework?' · homework':''}`;homeworkSummary.appendChild(row)});
  else homeworkSummary.textContent='No homework practice recorded yet.';
@@ -2681,7 +2712,7 @@ function announceBossPhase(first){
  fileCue('boss');
 }
 // Peeking shows the hidden answers for 2 s. It is help, so the next answer counts as assisted.
-function peekBossAnswers(){if(!G?.bossRun)return;const BP=window.BrainBiteBossPhases;if(BP.currentPhase(G.bossRun).id!=='ink-cloud')return;G.retryAssist=true;G.peekUntil=Date.now()+BP.PHASES[1].peekMs;$('feedback').textContent='Peeking! Your next answer counts as a helped answer.';draw();scheduleBossRedraw(BP.PHASES[1].peekMs)}
+function peekBossAnswers(){if(!G?.bossRun)return;const BP=window.BrainBiteBossPhases;if(BP.currentPhase(G.bossRun).id!=='ink-cloud')return;G.retryAssist=true;G.supportUsed=true;G.peekUntil=Date.now()+BP.PHASES[1].peekMs;$('feedback').textContent='Peeking! Your next answer counts as a helped answer.';draw();scheduleBossRedraw(BP.PHASES[1].peekMs)}
 // ---- Answer event contract (G2.1) -----------------------------------------------------------
 // Fired once per attempt, after the learning update and before the redraw, so presentation
 // can animate the disc that was chosen. Presentation never decides correctness.
@@ -2720,18 +2751,18 @@ function continueAsPractice(){if(!G)return;G.progressionEligible=false;G.practic
 // evidence, because the child has just been shown the reasoning; it can never raise
 // independent mastery.
 let explainerTimer=null;
-function attemptSupport(){const assisted=!!(G?.assisted||G?.retryAssist);if(assisted&&G)G.assistedAttempts=(Number(G.assistedAttempts)||0)+1;return {assisted,independent:!assisted,hintsUsed:assisted?1:0}}
+function attemptSupport(){const assisted=!!(G?.assisted||G?.retryAssist);if(assisted&&G){G.supportUsed=true;G.assistedAttempts=(Number(G.assistedAttempts)||0)+1}return {assisted,independent:!assisted,hintsUsed:assisted?1:0}}
 function wrongAnswerFeedback(value){
  const message=incorrectAttemptMessage(value);
  if(!G)return message;
- G.retryAssist=true;
+ G.retryAssist=true;G.supportUsed=true;
  const visual=window.BrainBiteExplainers?.explain?.({prompt:G.m?.prompt,skill:G.m?.skill,chosen:value});
  if(visual)showExplainer(visual);
  return visual&&!explanationForCurrentChallenge()&&!G.guidedHint?`Not ${value}. ${visual.text}`:message;
 }
 function showExplainer(visual){const box=$('explainer');if(!box)return;box.innerHTML=visual.svg||'';box.hidden=!visual.svg;clearTimeout(explainerTimer);explainerTimer=setTimeout(hideExplainer,3500)}
 function hideExplainer(){clearTimeout(explainerTimer);explainerTimer=null;const box=$('explainer');if(box){box.hidden=true;box.innerHTML=''}}
-function restartCurrentMission(){const mission=G?.m?structuredClone(G.m):null,options={...(G?.launchOptions||{})},typingMode=G?.typingMode?structuredClone(G.typingMode):null;if(!mission||G?.contentQuarantined)return;setTimeout(()=>{if(G?.contentQuarantined)return;launchMission(mission,options);if(typingMode){G.typingMode={...typingMode,targetIndex:0,target:typingMode.targets?.[0]||typingMode.target,startedAt:Date.now(),attempts:[],completed:false};draw()}},500)}
+function restartCurrentMission(){const mission=G?.m?structuredClone(G.m):null,options={...(G?.launchOptions||{})},typingMode=G?.typingMode?structuredClone(G.typingMode):null,retryAssist=!!(G?.supportUsed||G?.retryAssist||(Number(G?.assistedAttempts)||0)>0),assistedAttempts=Number(G?.assistedAttempts)||0;if(!mission||G?.contentQuarantined)return;setTimeout(()=>{if(G?.contentQuarantined)return;launchMission(mission,options);if(retryAssist){G.retryAssist=true;G.supportUsed=true;G.assistedAttempts=Math.max(1,assistedAttempts)}if(typingMode){G.typingMode={...typingMode,targetIndex:0,target:typingMode.targets?.[0]||typingMode.target,startedAt:Date.now(),attempts:[],completed:false};draw()}},500)}
 function explanationForCurrentChallenge(){
  for(const candidate of [G?.m?.curriculumChallenge,G?.activity?.challenge,G?.m]){
   const text=String(candidate?.explanation||'').trim();
