@@ -853,9 +853,18 @@ function replaceStoreCopiesUnlocked(store){
  return replacement;
 }
 
+function preserveCurrentProfileDeletions(store){
+ const replacement=migrateStore(structuredClone(store)),activeId=replacement.profiles[replacement.active]?.id,tombstones=new Map();
+ for(const item of [...(replacement.deletedProfiles||[]),...(STORE.deletedProfiles||[])])if(item?.id)tombstones.set(String(item.id),Math.max(tombstones.get(String(item.id))||0,Number(item.deletedAt)||0));
+ replacement.deletedProfiles=[...tombstones].map(([id,deletedAt])=>({id,deletedAt}));
+ replacement.profiles=replacement.profiles.filter(profile=>!tombstones.has(String(profile?.id)));
+ replacement.active=Math.max(0,replacement.profiles.findIndex(profile=>profile.id===activeId));
+ return migrateStore(replacement)
+}
+
 function replaceCanonicalState(store,{renderAfter=true}={}){
  PERSISTENCE_CHAIN=PERSISTENCE_CHAIN.catch(()=>{}).then(()=>withPersistenceLock(()=>{
-  STORE=replaceStoreCopiesUnlocked(store);
+  STORE=replaceStoreCopiesUnlocked(preserveCurrentProfileDeletions(store));
   SYNC=mergeSyncStates(SYNC,readStoredSync());
   localStorage.setItem(SYNC_KEY,JSON.stringify(SYNC));
   LOADED_STORE_RAW=localStorage.getItem(KEY);
@@ -1470,7 +1479,7 @@ const SHOP=[
  {id:'boss_crown',name:'Boss Crown',cost:36}
 ];
 const REVIEW_MS={first:10*60*1000,second:24*60*60*1000,mastered:3*24*60*60*1000};
-let parentUnlocked=false,parentUnlockedUntil=0,deferredPrompt=null;
+let parentUnlocked=false,parentUnlockedUntil=0,parentAccessExpiryTimer=null,parentUnlockInFlight=false,deferredPrompt=null;
 function bytesToB64(bytes){let binary='';for(const byte of bytes)binary+=String.fromCharCode(byte);return btoa(binary)}
 function b64ToBytes(value){const binary=atob(String(value||''));return Uint8Array.from(binary,character=>character.charCodeAt(0))}
 function readParentAuth(){
@@ -1484,16 +1493,33 @@ async function deriveParentVerifier(pin,salt,iterations=PARENT_AUTH_ITERATIONS){
 function sameBytes(left,right){if(left.length!==right.length)return false;let difference=0;for(let index=0;index<left.length;index++)difference|=left[index]^right[index];return difference===0}
 async function createParentAuth(pin){if(!/^\d{6,10}$/.test(pin))throw new Error('PIN must be 6-10 digits.');const salt=crypto.getRandomValues(new Uint8Array(16)),verifier=await deriveParentVerifier(pin,salt);const auth={version:1,algorithm:'PBKDF2-SHA-256',iterations:PARENT_AUTH_ITERATIONS,saltB64:bytesToB64(salt),verifierB64:bytesToB64(verifier),failedAttempts:0,lockedUntil:0,updatedAt:Date.now()};writeParentAuth(auth);return auth}
 async function verifyParentPin(pin){
- const auth=readParentAuth();if(!auth)return {ok:false,setup:true};
- const now=Date.now();if(auth.lockedUntil>now)return {ok:false,locked:true,lockedUntil:auth.lockedUntil};
- if(auth.lockedUntil){auth.failedAttempts=0;auth.lockedUntil=0}
- const actual=await deriveParentVerifier(pin,b64ToBytes(auth.saltB64),auth.iterations),ok=sameBytes(actual,b64ToBytes(auth.verifierB64));
- if(ok){auth.failedAttempts=0;auth.lockedUntil=0;auth.updatedAt=now;writeParentAuth(auth);return {ok:true}}
- auth.failedAttempts+=1;if(auth.failedAttempts>=5)auth.lockedUntil=now+PARENT_LOCK_MS;auth.updatedAt=now;writeParentAuth(auth);return {ok:false,locked:auth.lockedUntil>now,lockedUntil:auth.lockedUntil,remaining:Math.max(0,5-auth.failedAttempts)}
+ const initial=readParentAuth();if(!initial)return {ok:false,setup:true};
+ const startedAt=Date.now();if(initial.lockedUntil>startedAt)return {ok:false,locked:true,lockedUntil:initial.lockedUntil};
+ const actual=await deriveParentVerifier(pin,b64ToBytes(initial.saltB64),initial.iterations),ok=sameBytes(actual,b64ToBytes(initial.verifierB64));
+ return withPersistenceLock(()=>{
+  const auth=readParentAuth();if(!auth)return {ok:false,setup:true};
+  if(auth.saltB64!==initial.saltB64||auth.verifierB64!==initial.verifierB64)return {ok:false,changed:true,remaining:Math.max(0,5-auth.failedAttempts)};
+  const now=Date.now();if(auth.lockedUntil>now)return {ok:false,locked:true,lockedUntil:auth.lockedUntil};
+  if(auth.lockedUntil){auth.failedAttempts=0;auth.lockedUntil=0}
+  if(ok){auth.failedAttempts=0;auth.lockedUntil=0;auth.updatedAt=now;writeParentAuth(auth);return {ok:true}}
+  auth.failedAttempts+=1;if(auth.failedAttempts>=5)auth.lockedUntil=now+PARENT_LOCK_MS;auth.updatedAt=now;writeParentAuth(auth);return {ok:false,locked:auth.lockedUntil>now,lockedUntil:auth.lockedUntil,remaining:Math.max(0,5-auth.failedAttempts)}
+ })
 }
 function hasParentAccess(){if(parentUnlocked&&Date.now()>=parentUnlockedUntil)lockParentAccess();return parentUnlocked}
-function lockParentAccess(){parentUnlocked=false;parentUnlockedUntil=0;for(const id of ['parentPinInput','confirmParentPin','changeCurrentParentPin','newParentPin','changeConfirmParentPin','parentPassword'])if($(id))$(id).value=''}
-function unlockParentAccess(){parentUnlocked=true;parentUnlockedUntil=Date.now()+15*60*1000}
+function lockParentAccess(){if(parentAccessExpiryTimer!==null){clearTimeout(parentAccessExpiryTimer);parentAccessExpiryTimer=null}parentUnlocked=false;parentUnlockedUntil=0;if(SENSITIVE_ACTION)closeSensitiveAction(false);for(const id of ['parentPinInput','confirmParentPin','changeCurrentParentPin','newParentPin','changeConfirmParentPin','parentPassword'])if($(id))$(id).value=''}
+function scheduleParentAccessExpiry(){
+ if(parentAccessExpiryTimer!==null)clearTimeout(parentAccessExpiryTimer);
+ const expectedUntil=parentUnlockedUntil;
+ parentAccessExpiryTimer=setTimeout(()=>{
+  parentAccessExpiryTimer=null;
+  if(!parentUnlocked||parentUnlockedUntil!==expectedUntil)return;
+  if(Date.now()<expectedUntil){scheduleParentAccessExpiry();return}
+  const screen=document.querySelector('.screen.show')?.id;
+  lockParentAccess();
+  if(screen==='parent'||PARENT_ONLY_SCREENS.has(screen))show('parent')
+ },Math.max(0,expectedUntil-Date.now()))
+}
+function unlockParentAccess(){lockParentAccess();parentUnlocked=true;parentUnlockedUntil=Date.now()+15*60*1000;scheduleParentAccessExpiry()}
 async function requireParentAuthorization({inputId='timeUpParentPin',statusId='timeUpStatus'}={}){
  const status=$(statusId),input=$(inputId);
  const auth=readParentAuth();
@@ -1700,6 +1726,7 @@ function renderFirstRun() {
 function parentShellRequired(statusId){
  if(hasParentAccess())return true;
  const status=statusId?$(statusId):null;if(status)status.textContent='Parent areas are locked. Unlock them before using this action.';
+ const screen=document.querySelector('.screen.show')?.id;if(screen==='parent'||PARENT_ONLY_SCREENS.has(screen))show('parent');
  return false
 }
 function show(id){
@@ -2379,9 +2406,10 @@ function renderLabDeveloperTools(){
  const actions=document.createElement('div');actions.className='cloud-actions';
  const status=document.createElement('p');status.id='labDeveloperStatus';status.setAttribute('role','status');status.setAttribute('aria-live','polite');
  const add=(id,label,handler,className='')=>{const button=document.createElement('button');button.id=id;button.type='button';button.textContent=label;if(className)button.className=className;button.onclick=handler;actions.appendChild(button);return button};
- add('labSimulateSync','Run Local Sync Simulation',async()=>{await simulateLocalSync();status.textContent='Local sync simulation completed.'});
- add('labTestConflictMerge','Test Conflict Merge',()=>{status.textContent=testConflictMerge()?'Conflict merge test passed.':'Conflict merge test failed.'});
+ add('labSimulateSync','Run Local Sync Simulation',async()=>{if(!parentShellRequired('labDeveloperStatus'))return;await simulateLocalSync();status.textContent='Local sync simulation completed.'});
+ add('labTestConflictMerge','Test Conflict Merge',()=>{if(!parentShellRequired('labDeveloperStatus'))return;status.textContent=testConflictMerge()?'Conflict merge test passed.':'Conflict merge test failed.'});
  add('labDiscardSyncQueue','Discard Pending Sync Queue',async event=>{
+   if(!parentShellRequired('labDeveloperStatus'))return;
   if(!SYNC.queue.length){status.textContent='The pending sync queue is already empty.';return}
   const approved=await requestSensitiveAction({title:'Discard pending sync changes?',description:`This removes ${SYNC.queue.length} pending local sync event(s). It does not delete learner progress.`,confirmText:'Discard pending changes',confirmationValue:'DISCARD',confirmationPrompt:'Type DISCARD exactly',invoker:event.currentTarget,statusId:'labDeveloperStatus'});
   if(!approved){status.textContent='Queue discard cancelled. Pending changes were kept.';return}
@@ -2597,7 +2625,7 @@ function resolveLiveActivity(value,meta={}){
  // was a distractor; WebGL keeps its historical false return for misses.
  return currentCorrect||!document.documentElement.classList.contains('presentation-webgl')
 }
-function renderProfiles(){const l=$('profileList');l.replaceChildren();STORE.profiles.forEach((p,i)=>{const d=document.createElement('div'),details=document.createElement('div'),name=document.createElement('b'),stars=document.createElement('div'),button=document.createElement('button');d.className='profile-row';name.textContent=p.name;stars.textContent=`${p.stars} stars`;button.textContent=i===STORE.active?'Active':'Switch';button.disabled=i===STORE.active;details.append(name,stars);d.append(details,button);button.onclick=()=>{if(i===STORE.active)return;STORE.active=i;invalidateStaleGame();lockParentAccess();save();show('home')};l.appendChild(d)})}
+function renderProfiles(){const l=$('profileList');l.replaceChildren();STORE.profiles.forEach((p,i)=>{const d=document.createElement('div'),details=document.createElement('div'),name=document.createElement('b'),stars=document.createElement('div'),button=document.createElement('button');d.className='profile-row';name.textContent=p.name;stars.textContent=`${p.stars} stars`;button.textContent=i===STORE.active?'Active':'Switch';button.disabled=i===STORE.active;details.append(name,stars);d.append(details,button);button.onclick=()=>{if(i===STORE.active||!parentShellRequired('profileActionStatus'))return;STORE.active=i;invalidateStaleGame();lockParentAccess();save();show('home')};l.appendChild(d)})}
 function renderChildProfiles(){
  const active=$('childActiveProfile'),list=$('childProfileList');if(!active||!list)return;active.textContent=P().name;list.replaceChildren();
  STORE.profiles.forEach((profile,index)=>{const row=document.createElement('div'),label=document.createElement('span'),button=document.createElement('button'),current=index===STORE.active;row.className='profile-row child-profile-row';label.textContent=`${profile.name} · ${profile.stars} stars`;button.textContent=current?'Active learner':'Switch learner';button.disabled=current;button.setAttribute('aria-label',current?`${profile.name}, active learner`:`Switch to ${profile.name}`);button.onclick=()=>{if(current)return;STORE.active=index;invalidateStaleGame();lockParentAccess();void save();show('home')};row.append(label,button);list.appendChild(row)});
@@ -2844,10 +2872,10 @@ function hit(){if(G.e.x===G.p.x&&G.e.y===G.p.y){G.lives--;G.combo=0;G.e={x:0,y:0
 function complete(){if(!checkpointGameplayActivity({reason:'complete'}))return false;const session={mission:G.m.id,world:G.m.world,skillId:G.m.skill,combo:G.max,accuracy:G.correct?Math.round(100*G.correct/Math.max(1,G.correct+G.wrong)):null,moves:G.moves,durationSec:Math.max(1,Math.round((Date.now()-(G.startedAt||Date.now()))/1000)),practice:G.progressionEligible===false,homework:!!G.homeworkMode,source:G.source||'mission',ts:Date.now()};if(G.progressionEligible===false){recordLearningSession(session);save();fileCue('clear');$('feedback').textContent='Practice complete!';setCaption('Practice complete.');setTimeout(()=>{show('home');render()},600);return true}const profile=P(),before=progression(),wasComplete=before.completedMissionIds.includes(G.m.id),next=REGISTRY.completeMission(before,G.m.id);if(!wasComplete&&!next.completedMissionIds.includes(G.m.id)){$('feedback').textContent='This mission is still locked.';return false}profile.progression=next;if(!wasComplete){profile.stars+=3;profile.spark+=(G.m.boss?10:3)}profile.bestCombo=Math.max(profile.bestCombo,G.max);const missionStars=missionStarRating(G);profile.missionStars={...(profile.missionStars||{})};profile.missionStars[G.m.id]=Math.max(Number(profile.missionStars[G.m.id])||0,missionStars);fileCue(G.m.boss?'boss':'clear');recordLearningSession(session);save();if(G.internalBubbleReefPreview)void grantBubbleReefPreviewReward({profileId:profile.id,missionId:G.m.id,progression:next,awardedAt:session.ts,canonicalRewardGranted:!wasComplete});$('feedback').textContent=G.m.boss?`${G.m.bossName} defeated!`:'Mission complete!';setCaption(G.m.boss?`${G.m.bossName} defeated.`:'Mission complete.');const clear={missionId:G.m.id,world:G.m.world,title:G.m.boss?`${G.m.bossName} defeated!`:'Mission complete!',stars:missionStars,earned:Number(G.earned)||0};setTimeout(()=>{const match=document.documentElement.classList.contains('presentation-match');const target=match?'home':G.m.world;show(target);render();showClearBanner(target,clear)},600);return true}
 function applySettings(){let s=P().settings;$('reducedMotion').checked=s.reducedMotion;$('cameraMotionReduction').checked=s.cameraMotionReduction;$('largeTargets').checked=s.largeTargets;$('highContrast').checked=s.highContrast;$('captions').checked=s.captions;$('dyslexicFont').checked=s.dyslexicFont;$('textScale').value=s.textScale||'1';$('qualityTier').value=s.qualityTier||'balanced';$('enemySpeed').value=s.enemySpeed;$('soundOn').checked=s.soundOn;$('musicOn').checked=s.musicOn;if($('vibrationOn'))$('vibrationOn').checked=s.vibrationOn!==false;if($('vibrationRow'))$('vibrationRow').hidden=!window.BrainBitePlatform?.isNativeShell?.();$('volume').value=String(Number.isFinite(Number(s.volume))?s.volume:80);$('volumeValue').textContent=`${$('volume').value}%`;syncMusic();const root=document.documentElement;root.classList.toggle('reduced-motion',s.reducedMotion);root.classList.toggle('camera-motion-reduction',s.cameraMotionReduction);root.classList.toggle('large-targets',s.largeTargets);root.classList.toggle('high-contrast',s.highContrast);root.classList.toggle('captions-on',s.captions);root.classList.toggle('dyslexic-font',s.dyslexicFont);root.classList.toggle('quality-ultra',s.qualityTier==='ultra');root.classList.toggle('quality-high',s.qualityTier==='high');root.classList.toggle('quality-balanced',!s.qualityTier||s.qualityTier==='balanced');root.classList.toggle('quality-performance',s.qualityTier==='performance');root.classList.toggle('quality-mobile',s.qualityTier==='mobile');root.classList.toggle('low-end-device',lowEndDevice());root.style.setProperty('--bb-text-scale',String(Number(s.textScale)||1))}
 document.querySelectorAll('[data-screen]').forEach(button=>button.addEventListener('click',()=>show(button.dataset.screen)));
-$('unlockParent').onclick=async()=>{const pin=$('parentPinInput').value,confirmPin=$('confirmParentPin').value;try{if(!readParentAuth()){if(pin!==confirmPin)throw new Error('PIN confirmation does not match.');await createParentAuth(pin);unlockParentAccess();$('parentGateMsg').textContent='Family PIN set. Parent areas are unlocked.'}else{const result=await verifyParentPin(pin);if(result.locked)throw new Error(`Too many attempts. Try again after ${new Date(result.lockedUntil).toLocaleTimeString()}.`);if(!result.ok)throw new Error(`Incorrect PIN. ${result.remaining} attempt(s) remaining.`);unlockParentAccess();$('parentGateMsg').textContent='Parent areas unlocked.'}$('parentGate').hidden=true;$('parentContent').hidden=false;syncNavigationState('parent')}catch(error){$('parentGateMsg').textContent=error.message}finally{$('parentPinInput').value='';$('confirmParentPin').value='';renderParentGate()}};
-$('saveParentPin').onclick=async()=>{const current=$('changeCurrentParentPin').value,next=$('newParentPin').value,confirmPin=$('changeConfirmParentPin').value;try{const verified=await verifyParentPin(current);if(verified.locked)throw new Error(`Too many attempts. Try again after ${new Date(verified.lockedUntil).toLocaleTimeString()}.`);if(!verified.ok)throw new Error('Current PIN is incorrect.');if(next!==confirmPin)throw new Error('New PIN confirmation does not match.');await createParentAuth(next);unlockParentAccess();$('parentPinStatus').textContent='Family PIN changed.'}catch(error){$('parentPinStatus').textContent=error.message}finally{for(const id of ['changeCurrentParentPin','newParentPin','changeConfirmParentPin'])$(id).value=''}};
+$('unlockParent').onclick=async()=>{if(parentUnlockInFlight)return;const pin=$('parentPinInput').value,confirmPin=$('confirmParentPin').value;parentUnlockInFlight=true;$('unlockParent').disabled=true;try{if(!readParentAuth()){if(pin!==confirmPin)throw new Error('PIN confirmation does not match.');await createParentAuth(pin);unlockParentAccess();$('parentGateMsg').textContent='Family PIN set. Parent areas are unlocked.'}else{const result=await verifyParentPin(pin);if(result.locked)throw new Error(`Too many attempts. Try again after ${new Date(result.lockedUntil).toLocaleTimeString()}.`);if(!result.ok)throw new Error(`Incorrect PIN. ${result.remaining} attempt(s) remaining.`);unlockParentAccess();$('parentGateMsg').textContent='Parent areas unlocked.'}$('parentGate').hidden=true;$('parentContent').hidden=false;syncNavigationState('parent')}catch(error){$('parentGateMsg').textContent=error.message}finally{parentUnlockInFlight=false;$('unlockParent').disabled=false;$('parentPinInput').value='';$('confirmParentPin').value='';renderParentGate()}};
+$('saveParentPin').onclick=async()=>{if(!parentShellRequired('parentPinStatus'))return;const current=$('changeCurrentParentPin').value,next=$('newParentPin').value,confirmPin=$('changeConfirmParentPin').value;try{const verified=await verifyParentPin(current);if(verified.locked)throw new Error(`Too many attempts. Try again after ${new Date(verified.lockedUntil).toLocaleTimeString()}.`);if(!verified.ok)throw new Error('Current PIN is incorrect.');if(next!==confirmPin)throw new Error('New PIN confirmation does not match.');await createParentAuth(next);unlockParentAccess();$('parentPinStatus').textContent='Family PIN changed.'}catch(error){$('parentPinStatus').textContent=error.message}finally{for(const id of ['changeCurrentParentPin','newParentPin','changeConfirmParentPin'])$(id).value=''}};
 $('lockParent').onclick=()=>{lockParentAccess();$('parentContent').hidden=true;$('parentGate').hidden=false;renderParentGate();syncNavigationState('parent');$('parentGateMsg').textContent='Parent areas locked.'};
-const parentExitToChild=$('parentExitToChild');if(parentExitToChild)parentExitToChild.onclick=()=>{show('home');render()};
+const parentExitToChild=$('parentExitToChild');if(parentExitToChild)parentExitToChild.onclick=()=>{lockParentAccess();show('home');render()};
 // Explicit readiness: reconcile saved generations as soon as LearningCore exists instead
 // of relying on the first render happening to be late enough.
 window.addEventListener('bb:core-ready',()=>{
@@ -3032,26 +3060,29 @@ if(installBtn)installBtn.onclick=async()=>{if(!deferredPrompt)return;deferredPro
 
 
 
-$('saveControls').onclick=()=>{const d=Math.max(5,Math.min(180,Number($('dailyMinutes').value)||30)),requested=Math.max(5,Math.min(120,Number($('maxSessionMinutes').value)||20)),m=Math.min(d,requested),corrected=m!==requested;P().controls={dailyMinutes:d,maxSessionMinutes:m,requireParentForPractice:$('requireParentForPractice').checked};$('dailyMinutes').value=d;$('maxSessionMinutes').value=m;$('controlsStatus').textContent=corrected?`Parent controls saved. Session limit corrected to ${m} minutes so it does not exceed the daily limit.`:'Parent controls saved.';clearTimeUsageWarning();save()};
+$('saveControls').onclick=()=>{if(!parentShellRequired('controlsStatus'))return;const d=Math.max(5,Math.min(180,Number($('dailyMinutes').value)||30)),requested=Math.max(5,Math.min(120,Number($('maxSessionMinutes').value)||20)),m=Math.min(d,requested),corrected=m!==requested;P().controls={dailyMinutes:d,maxSessionMinutes:m,requireParentForPractice:$('requireParentForPractice').checked};$('dailyMinutes').value=d;$('maxSessionMinutes').value=m;$('controlsStatus').textContent=corrected?`Parent controls saved. Session limit corrected to ${m} minutes so it does not exceed the daily limit.`:'Parent controls saved.';clearTimeUsageWarning();save()};
 $('timeUpParentOverride').onclick=async()=>{if(!await requireParentAuthorization())return;const profileId=P().id;queueTimeUsageMutation(profileId,(entry,now)=>({...entry,extensionGrantedMs:TIME_EXTENSION_MS,updatedAt:now,lastSeenWallClock:Math.max(entry.lastSeenWallClock,now)}));const state=timeLimitState();if(state.extensionRemainingMs<=0){$('timeUpStatus').textContent='The 15-minute extension for today has already been used.';return}const pending=TIME_PENDING_LAUNCH;G&&(G.timeExpired=false);TIME_RUNTIME={profileId,sessionId:TIME_USAGE.profiles[profileId]?.sessionId||null,lastTickAt:Date.now(),lifecycleCaptured:false};$('timeUpStatus').textContent='15 active minutes added.';if(G)show('game');else if(pending){TIME_PENDING_LAUNCH=null;launchMission(pending.mission,pending.options)}else show('home')};
 $('timeUpReturnHome').onclick=()=>{G=null;TIME_PENDING_LAUNCH=null;TIME_RUNTIME={profileId:null,sessionId:null,lastTickAt:0,lifecycleCaptured:false};applyWorldTheme('');show('home');render()};
 
 
 $('createCloudAccount').onclick=async()=>{
+ if(!parentShellRequired('localAccountStatus'))return;
  try{const c=cloudClient();if(!c||!c.configured())throw new Error('Configure Firebase first');const email=$('localAccountEmail').value.trim(),password=$('parentPassword').value;if(password.length<8)throw new Error('Password must be at least 8 characters');await c.signUp(email,password);renderCloudAuth();$('localAccountStatus').textContent=c.session?'Account created and signed in.':'Account created. Check email if confirmation is required.'}
  catch(e){$('localAccountStatus').textContent=e.message}finally{$('parentPassword').value=''}
 };
 $('signInCloud').onclick=async()=>{
+ if(!parentShellRequired('localAccountStatus'))return;
  try{const c=cloudClient();if(!c||!c.configured())throw new Error('Configure Firebase first');await c.signIn($('localAccountEmail').value.trim(),$('parentPassword').value);renderCloudAuth()}
  catch(e){$('localAccountStatus').textContent=e.message}finally{$('parentPassword').value=''}
 };
-$('signOutCloud').onclick=async()=>{try{const c=cloudClient();if(c)await c.signOut();renderCloudAuth()}catch(e){$('localAccountStatus').textContent=e.message}finally{$('parentPassword').value=''}};
-$('pushCloudSync').onclick=async()=>{try{await pushAllToFirebase();$('mergeResult').textContent='Cloud upload complete.'}catch(e){$('mergeResult').textContent=e.message}};
-$('pullCloudSync').onclick=async()=>{try{await pullAllFromFirebase();$('mergeResult').textContent='Cloud download and merge complete.'}catch(e){$('mergeResult').textContent=e.message}};
+$('signOutCloud').onclick=async()=>{if(!parentShellRequired('localAccountStatus'))return;try{const c=cloudClient();if(c)await c.signOut();renderCloudAuth()}catch(e){$('localAccountStatus').textContent=e.message}finally{$('parentPassword').value=''}};
+$('pushCloudSync').onclick=async()=>{if(!parentShellRequired('mergeResult'))return;try{await pushAllToFirebase();$('mergeResult').textContent='Cloud upload complete.'}catch(e){$('mergeResult').textContent=e.message}};
+$('pullCloudSync').onclick=async()=>{if(!parentShellRequired('mergeResult'))return;try{await pullAllFromFirebase();$('mergeResult').textContent='Cloud download and merge complete.'}catch(e){$('mergeResult').textContent=e.message}};
 
 
 
 $('copyFirebaseChecklist').onclick=async()=>{
+ if(!parentShellRequired('copySetupMsg'))return;
  const text=`BrainBite Firebase Setup
 1. Create Firebase project
 2. Enable Email/Password Authentication
@@ -3061,12 +3092,12 @@ $('copyFirebaseChecklist').onclick=async()=>{
  try{await navigator.clipboard.writeText(text);$('copySetupMsg').textContent='Copied.'}catch{$('copySetupMsg').textContent='Copy unavailable.'}
 };
 
-$('saveCloudConfig').onclick=()=>{const provider=$('cloudProvider').value,url=$('cloudUrl').value.trim(),key=$('cloudKey').value.trim();if(provider!=='none'&&(!/^[a-z0-9-]{6,}$/.test(url)||key.length<20)){$('cloudConfigMsg').textContent='Add a valid Firebase Project ID and Web API key.';return}INTEGRATIONS.cloud={provider,url,key};saveIntegrations();$('cloudConfigMsg').textContent='Firebase configuration saved locally.'};
-$('runIntegrationCheck').onclick=async()=>{const rows=await integrationCheck();$('integrationCheckResult').innerHTML=rows.map(([n,ok])=>`<div><span class="${ok?'integration-ok':'integration-warn'}">${ok?'PASS':'CHECK'}</span> ${n}</div>`).join('')};
+$('saveCloudConfig').onclick=()=>{if(!parentShellRequired('cloudConfigMsg'))return;const provider=$('cloudProvider').value,url=$('cloudUrl').value.trim(),key=$('cloudKey').value.trim();if(provider!=='none'&&(!/^[a-z0-9-]{6,}$/.test(url)||key.length<20)){$('cloudConfigMsg').textContent='Add a valid Firebase Project ID and Web API key.';return}INTEGRATIONS.cloud={provider,url,key};saveIntegrations();$('cloudConfigMsg').textContent='Firebase configuration saved locally.'};
+$('runIntegrationCheck').onclick=async()=>{if(!parentShellRequired('integrationCheckResult'))return;const rows=await integrationCheck();$('integrationCheckResult').innerHTML=rows.map(([n,ok])=>`<div><span class="${ok?'integration-ok':'integration-warn'}">${ok?'PASS':'CHECK'}</span> ${n}</div>`).join('')};
 
 
-$('retryQueue').onclick=async()=>{try{const r=await retryPendingSync();$('mergeResult').textContent=`Retry finished: ${r.ok} ok, ${r.failed} failed.`}catch(e){$('mergeResult').textContent=e.message}};
-$('exportCloudSnapshot').onclick=()=>{const b=new Blob([JSON.stringify(cloudSnapshot(),null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='brainbite-cloud-snapshot.json';a.click()};
+$('retryQueue').onclick=async()=>{if(!parentShellRequired('mergeResult'))return;try{const r=await retryPendingSync();$('mergeResult').textContent=`Retry finished: ${r.ok} ok, ${r.failed} failed.`}catch(e){$('mergeResult').textContent=e.message}};
+$('exportCloudSnapshot').onclick=()=>{if(!parentShellRequired('mergeResult'))return;const b=new Blob([JSON.stringify(cloudSnapshot(),null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='brainbite-cloud-snapshot.json';a.click()};
 $('deleteCloudAccount').onclick=async event=>{
  const status=$('mergeResult');if(!parentShellRequired('mergeResult'))return;
  const approved=await requestSensitiveAction({title:'Check cloud deletion availability?',description:'This client cannot delete cloud family documents or the Firebase authentication account. Confirm to view the current status. No local or cloud data will change.',confirmText:'Check deletion status',invoker:event.currentTarget,statusId:'mergeResult'});
@@ -3074,7 +3105,7 @@ $('deleteCloudAccount').onclick=async event=>{
  status.textContent='No cloud data or Firebase account was deleted. This build does not yet have the privileged deletion service required for that action. Local progress, cloud documents, the account, the signed-in session, and pending sync changes remain unchanged.'
 };
 
-$('saveLocalAccount').onclick=()=>{const email=$('localAccountEmail').value.trim();if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){$('localAccountStatus').textContent='Enter a valid email address.';return}SYNC.account={email,createdAt:SYNC.account?.createdAt||Date.now()};saveSync()};
+$('saveLocalAccount').onclick=()=>{if(!parentShellRequired('localAccountStatus'))return;const email=$('localAccountEmail').value.trim();if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){$('localAccountStatus').textContent='Enter a valid email address.';return}SYNC.account={email,createdAt:SYNC.account?.createdAt||Date.now()};saveSync()};
 if('serviceWorker'in navigator){
  const updateStatus=$('updateStatus'),applyUpdate=$('applyUpdate');
  const announceUpdate=message=>{if(updateStatus)updateStatus.textContent=message;if(applyUpdate)applyUpdate.hidden=false};
@@ -3097,28 +3128,28 @@ if(bubbleReefLivePreviewBtn){
  };
 }
 
-$('downloadReleaseBackup').onclick=()=>{const b=new Blob([JSON.stringify(exportEnvelope(),null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='brainbite-v2.0-release-backup.json';a.click()};
-$('downloadDiagnostics').onclick=()=>{const b=new Blob([JSON.stringify(diagnosticBundle(),null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='brainbite-v2.0-diagnostics.json';a.click()};
+$('downloadReleaseBackup').onclick=()=>{if(!parentShellRequired())return;const b=new Blob([JSON.stringify(exportEnvelope(),null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='brainbite-v2.0-release-backup.json';a.click()};
+$('downloadDiagnostics').onclick=()=>{if(!parentShellRequired())return;const b=new Blob([JSON.stringify(diagnosticBundle(),null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='brainbite-v2.0-diagnostics.json';a.click()};
 
 
-$('labLearnerSelect').onchange=()=>{const id=$('labLearnerSelect').value;applyLabFoundation(foundation=>{if(foundation.learners[id])foundation.activeLearnerId=id})};
+$('labLearnerSelect').onchange=()=>{if(!parentShellRequired())return;const id=$('labLearnerSelect').value;applyLabFoundation(foundation=>{if(foundation.learners[id])foundation.activeLearnerId=id})};
 $('labSwitchLearner').onclick=()=>{$('labLearnerSelect').dispatchEvent(new Event('change'))};
-$('labCreateLearner').onclick=()=>{const c=core();if(!c)return;const name=$('labLearnerName').value.trim()||`Lab Kid ${Date.now()}`;applyLabFoundation(foundation=>{const learner=c.defaultLearner(name);foundation.learners[learner.profileId]=learner;foundation.activeLearnerId=learner.profileId;$('labLearnerName').value=''})};
-$('labResetLearner').onclick=()=>{const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];foundation.learners[foundation.activeLearnerId]=c.defaultLearner(learner.name,learner.profileId)})};
-$('labSetSkillState').onclick=()=>{const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];const skillId=$('labSkill').value||LAB.skillId||'number-facts';learner.skills[skillId]=labPresetState($('labSkillPreset').value||LAB.preset||'practicing',skillId);learner.mastery[skillId]=learner.skills[skillId].masteryScore})};
-$('labSimCorrect').onclick=()=>simulateLabAttempt('correct');
-$('labSimAssisted').onclick=()=>simulateLabAttempt('assisted');
-$('labSimIncorrect').onclick=()=>simulateLabAttempt('incorrect');
-$('labSimRandom').onclick=()=>simulateLabAttempt('random');
-$('labForceBrainBase').onclick=()=>{const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];learner.stage='brainbase';learner.activeActivity=null;learner.currentChallenge=null})};
-$('labJumpKraken').onclick=()=>{if(!labAllowed())return;LAB.krakenPhase=$('labKrakenPhase').value||LAB.krakenPhase||'intro';saveLab()};
-$('labGrantReward').onclick=()=>{const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];foundation.learners[foundation.activeLearnerId]=c.grantBrainifact(learner,'fraction-kraken')})};
-$('labUpgradeHub').onclick=()=>{const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];foundation.learners[foundation.activeLearnerId]=c.upgradeBrainBase(learner)})};
-$('labQueueOffline').onclick=()=>{const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];const skillId=$('labSkill').value||LAB.skillId||'number-facts';const event={id:newCryptographicUuid(),type:'LearningAttemptRecorded',payload:{skillId,family:$('labFamily').value||LAB.family||'target-smash',difficulty:$('labDifficulty').value||LAB.difficulty||'normal',mode:'queued'},createdAt:Date.now()};foundation.learners[foundation.activeLearnerId]=c.queueOfflineEvent(learner,event)})};
-$('labReplayOffline').onclick=()=>{const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];const replay=c.replayOfflineQueue(learner,()=>true);foundation.learners[foundation.activeLearnerId]=replay.learner})};
-$('labSaveSnapshot').onclick=()=>{const c=core();if(!c)return;applyLabFoundation(foundation=>c.createRecoverySnapshot(foundation))};
-$('labCorruptSave').onclick=()=>{if(!labAllowed())return;const foundation=loadFoundation();if(!foundation)return;persistFoundation(foundation);localStorage.setItem(KEY,'{broken');renderLab()};
-$('labRestoreRecovery').onclick=()=>{if(!labAllowed())return;const recovered=readStoredStore(localStorage.getItem(BACK))||readStoredStore(localStorage.getItem(RECOVERY_KEY));if(!recovered)return;STORE=recovered;writeStoreCopies(STORE);render();renderLab()};
+$('labCreateLearner').onclick=()=>{if(!parentShellRequired())return;const c=core();if(!c)return;const name=$('labLearnerName').value.trim()||`Lab Kid ${Date.now()}`;applyLabFoundation(foundation=>{const learner=c.defaultLearner(name);foundation.learners[learner.profileId]=learner;foundation.activeLearnerId=learner.profileId;$('labLearnerName').value=''})};
+$('labResetLearner').onclick=()=>{if(!parentShellRequired())return;const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];foundation.learners[foundation.activeLearnerId]=c.defaultLearner(learner.name,learner.profileId)})};
+$('labSetSkillState').onclick=()=>{if(!parentShellRequired())return;const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];const skillId=$('labSkill').value||LAB.skillId||'number-facts';learner.skills[skillId]=labPresetState($('labSkillPreset').value||LAB.preset||'practicing',skillId);learner.mastery[skillId]=learner.skills[skillId].masteryScore})};
+$('labSimCorrect').onclick=()=>{if(parentShellRequired())simulateLabAttempt('correct')};
+$('labSimAssisted').onclick=()=>{if(parentShellRequired())simulateLabAttempt('assisted')};
+$('labSimIncorrect').onclick=()=>{if(parentShellRequired())simulateLabAttempt('incorrect')};
+$('labSimRandom').onclick=()=>{if(parentShellRequired())simulateLabAttempt('random')};
+$('labForceBrainBase').onclick=()=>{if(!parentShellRequired())return;const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];learner.stage='brainbase';learner.activeActivity=null;learner.currentChallenge=null})};
+$('labJumpKraken').onclick=()=>{if(!parentShellRequired()||!labAllowed())return;LAB.krakenPhase=$('labKrakenPhase').value||LAB.krakenPhase||'intro';saveLab()};
+$('labGrantReward').onclick=()=>{if(!parentShellRequired())return;const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];foundation.learners[foundation.activeLearnerId]=c.grantBrainifact(learner,'fraction-kraken')})};
+$('labUpgradeHub').onclick=()=>{if(!parentShellRequired())return;const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];foundation.learners[foundation.activeLearnerId]=c.upgradeBrainBase(learner)})};
+$('labQueueOffline').onclick=()=>{if(!parentShellRequired())return;const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];const skillId=$('labSkill').value||LAB.skillId||'number-facts';const event={id:newCryptographicUuid(),type:'LearningAttemptRecorded',payload:{skillId,family:$('labFamily').value||LAB.family||'target-smash',difficulty:$('labDifficulty').value||LAB.difficulty||'normal',mode:'queued'},createdAt:Date.now()};foundation.learners[foundation.activeLearnerId]=c.queueOfflineEvent(learner,event)})};
+$('labReplayOffline').onclick=()=>{if(!parentShellRequired())return;const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];const replay=c.replayOfflineQueue(learner,()=>true);foundation.learners[foundation.activeLearnerId]=replay.learner})};
+$('labSaveSnapshot').onclick=()=>{if(!parentShellRequired())return;const c=core();if(!c)return;applyLabFoundation(foundation=>c.createRecoverySnapshot(foundation))};
+$('labCorruptSave').onclick=()=>{if(!parentShellRequired()||!labAllowed())return;const foundation=loadFoundation();if(!foundation)return;persistFoundation(foundation);localStorage.setItem(KEY,'{broken');renderLab()};
+$('labRestoreRecovery').onclick=()=>{if(!parentShellRequired()||!labAllowed())return;const recovered=readStoredStore(localStorage.getItem(BACK))||readStoredStore(localStorage.getItem(RECOVERY_KEY));if(!recovered)return;STORE=preserveCurrentProfileDeletions(recovered);writeStoreCopies(STORE);render();renderLab()};
 $('labRefreshBrainBase').onclick=()=>{renderBrainBase(loadFoundation());renderLab()};
 $('labSkill').onchange=renderLab;
 $('labFamily').onchange=renderLab;
@@ -3126,9 +3157,9 @@ $('labDifficulty').onchange=renderLab;
 $('labSkillPreset').onchange=renderLab;
 $('labKrakenPhase').onchange=renderLab;
 
-$('qaDeviceA').onclick=()=>{QA.deviceA=true;QA.deviceAPushed=false;saveQA();alert('Device A: play a mission, then use Account & Sync → Push to Cloud. Mark the next step after that push succeeds.')};
-$('qaDeviceB').onclick=()=>{QA.deviceB=true;saveQA();alert('Device B: open BrainBite on a second browser/device, sign in with the same parent account, then Pull from Cloud.')};
-$('qaIsolation').onclick=()=>{QA.isolationTested=true;saveQA();alert('Isolation test: sign in with a different Firebase parent account. That account must not be able to read the first family profile documents.')};
+$('qaDeviceA').onclick=()=>{if(!parentShellRequired())return;QA.deviceA=true;QA.deviceAPushed=false;saveQA();alert('Device A: play a mission, then use Account & Sync → Push to Cloud. Mark the next step after that push succeeds.')};
+$('qaDeviceB').onclick=()=>{if(!parentShellRequired())return;QA.deviceB=true;saveQA();alert('Device B: open BrainBite on a second browser/device, sign in with the same parent account, then Pull from Cloud.')};
+$('qaIsolation').onclick=()=>{if(!parentShellRequired())return;QA.isolationTested=true;saveQA();alert('Isolation test: sign in with a different Firebase parent account. That account must not be able to read the first family profile documents.')};
 // Keep the board's grid semantics valid for assistive technology without changing its visual layout.
 new MutationObserver(() => {
  const board=document.getElementById('board');

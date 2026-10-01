@@ -143,6 +143,81 @@ Deferred to the owner: the mastery *formula* decision, whether read-aloud and fi
 guidance are assistance, token storage strategy, an allowlisted export schema, and the
 screen-reader model for the DOM movement board.
 
+## Round 3 — audit of 2026-10-01 (continuing the loop)
+
+Two further read-only assignments on ground not yet covered — presentation-layer lifecycle and
+parental gating — plus one implementation fix dispatched from CI evidence rather than an audit.
+
+### CI cannot finish: configured ceiling
+
+Runs 36902430641 and 36902437216 were **cancelled**, not failed: "The job has exceeded the
+maximum execution time of 20m0s", while the browser suite was around test 44 of 220. Recent
+green runs measured 14m48s, 16m57s and 18m38s, so the suite has genuinely outgrown the
+configured 20-minute ceiling and dies with no verdict. Improvement 10 makes that a deliberate
+ceiling instead of an accidental one.
+
+### R4 — presentation-layer lifecycle leaks
+
+Audited with real-module experiments against `a5613f7`.
+
+1. **Unbounded measurement arrays** (`presentation/performance-budget.mjs:239-246`): every
+   frame, renderer sample, save and scene-load measurement is appended forever, while
+   navigation labels are capped at 50. An experiment recorded 100,000 retained frame samples.
+   This is definite linear memory growth in a long session, and it makes reporting progressively
+   more expensive.
+2. **A scene factory that throws after instrumentation leaves no disposer**: the adapter only
+   registers a disposer after the factory returns a view, so a long-task observer, canvas and
+   listeners rooted during partial construction survive. Deferred: needs an owned-factory shape
+   beyond this round.
+3. **Repeat navigation with an unresolved GLB request**: each mount adds promise continuations
+   retaining its abandoned scene closure until the shared request settles. Bounded unless the
+   request never settles.
+4. **Shared GLTF resources are disposed despite the detach-only ownership contract**, causing
+   repeated GPU invalidation and re-upload of cache-shared geometry. Resource churn, not a leak.
+5. `releaseGltfCache()` has no caller in production or in tests. Deferred to an owner decision
+   when permanent DOM fallback should release the parse cache.
+
+The audit confirmed the strong side too: successful disposal is comprehensive and idempotent,
+RAFs are cancelled, generation guards reject superseded mounts, the GLTF cache is bounded at
+five documents, and a pending restore timer is cleared on disposal.
+
+### R5 — the parent gate does not stay shut
+
+1. **High — Back to kid hub does not lock.** The 15-minute grant lapses only when
+   `hasParentAccess()` is consulted; nothing re-gates an already-visible parent screen, and the
+   "Back to kid hub" handler only navigates (`app.js:2850`). For the rest of the grant a child
+   can re-enter Parents without the PIN, and several parent-screen handlers run without any
+   parent check at all — notably **Download Full Backup** (`app.js:3100`), which exports the
+   whole store.
+2. **High — restore and import can resurrect a deleted profile.** Ordinary merging is
+   deletion-authoritative, but `replaceCanonicalState()` replaces all copies wholesale
+   (`app.js:846-864`) and import validation only compares tombstones *inside the import*
+   (`app.js:921-959`), never against current tombstones. Restoring an older backup or importing
+   an older export after a deletion brings the deleted learner back; the cloud tombstone only
+   repairs it after the next sync.
+3. **Medium — concurrent PIN checks defeat the lockout.** `verifyParentPin()` reads
+   `failedAttempts`, awaits PBKDF2 (measured 141 ms), then writes a stale object, so several
+   tabs or rapid resubmits can all read zero and consume one recorded attempt.
+4. **Medium — switching profiles bypasses an exhausted session limit**, because limits are
+   keyed per profile and child profile switching requires no authorization. Deferred to an
+   owner decision on per-profile versus device-wide limits.
+5. **Low — first-run name capture and guided completion are optional**, and there is no
+   consent gate. Deferred to an owner decision, in scope for legal review.
+
+## Round 3 improvements selected
+
+| # | Improvement | Files | Acceptance |
+|---|---|---|---|
+| 10 | CI `test` job ceiling raised to a measured 30 minutes | `.github/workflows/ci.yml` | A green run always reports a verdict |
+| 11 | Measurement arrays capped the way navigation labels are | `presentation/performance-budget.mjs`, its tests | A long session no longer grows linearly |
+| 12 | Parent grant locks on "Back to kid hub", an expiry callback re-gates any visible parent screen, and every parent-only handler calls `parentShellRequired()` | `app.js`, release specs | Back-to-kid immediately re-gates; an expired grant cannot operate a parent control |
+| 13 | Restore and import are deletion-authoritative: current tombstones are unioned into a replacement, and tombstoned profile IDs are dropped | `app.js`, release specs | Restore-after-delete cannot resurrect the learner |
+| 14 | PIN verification serialized, failed-attempt counter re-read before commit, unlock control disabled while busy | `app.js`, release specs | Concurrent tab submissions cannot defeat the lockout |
+| 15 | Cache-shared GLTF resources are only detached by ownership contract, not disposed | `presentation/gltf-assets.mjs`, `presentation/webgl-home.mjs`, `presentation/webgl-battle.mjs` | Dispose no longer invalidates cache-shared geometry |
+
+Deferred to the owner: `releaseGltfCache()` policy, time-limit scope (per profile or device),
+first-run consent, and the partially-built-factory disposer.
+
 ## Not claimed
 
 Device, screen-reader, Spanish, legal, production Firebase, publishing, signing, and educator

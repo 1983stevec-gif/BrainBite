@@ -349,6 +349,7 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
   let frameCount = 0;
   let characterAnimation = null;
   let portalEnergyMaterial = null;
+  const gltfRoots = new Set();
   let pendingAssetLoads = 0;
   let sceneReadyRecorded = false;
   let frameTimingActive = false;
@@ -374,6 +375,7 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
         return;
       }
       if (fallback) fallback.visible = false;
+      gltfRoots.add(root);
       scene.add(root);
       onInstall?.(root);
       host.dispatchEvent(new CustomEvent('bb:webgl-asset-loaded', { detail: { asset } }));
@@ -548,7 +550,6 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
       bubbleReefRouteKit?.dispose();
       bubbleReefContribution?.dispose();
       window.removeEventListener('bb:bit-event', onBitEvent);
-      scene.traverse(child => { child.userData.originalEnergyMaterial?.dispose(); });
       window.removeEventListener('resize', onResize);
       motionQuery.removeEventListener('change', onMotionChange);
       classObserver.disconnect();
@@ -556,6 +557,11 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
       renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
       renderer.domElement.removeEventListener('webglcontextrestored', handleContextRestored);
       clearTimeout(restoreTimer);
+      // GLTF clones share their geometry, original materials, textures, and skeleton data
+      // with the parse cache. Detach them before disposing resources owned by this scene.
+      for (const root of gltfRoots) disposeGltfAsset(root);
+      gltfRoots.clear();
+      portalEnergyMaterial?.dispose();
       disposeObject(scene);
       sun.shadow.dispose();
       renderer.dispose();

@@ -31,6 +31,7 @@ async function unlockViaGate(page) {
 // Parent destinations live in the parent shell, which is only present in parent context.
 async function enterParentArea(page) {
   if (!(await page.locator('#parentShellNav').isVisible())) {
+    if (await page.locator('#parentPinInput').isVisible()) { await unlockViaGate(page); return; }
     const orb = page.getByRole('button', { name: 'Parents', exact: true });
     if (!(await orb.isVisible())) await page.locator('#childDock button[data-screen="home"]').click();
     await orb.click();
@@ -150,6 +151,7 @@ test('child hub drops placeholder cards, debug badges, and duplicated docks', as
   // The parent shell only appears inside parent context.
   await expect(page.locator('#parentShellNav')).toBeHidden();
   await page.getByRole('button', { name: 'Parents', exact: true }).click();
+  if (await page.locator('#parentPinInput').isVisible()) await unlockViaGate(page);
   await expect(page.locator('#parentShellNav')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Back to kid hub' })).toBeVisible();
   await page.getByRole('button', { name: 'Back to kid hub' }).click();
@@ -460,6 +462,42 @@ test('fresh installs keep child play available and enforce verifier setup with p
   await expect(page.locator('#parentPinInput')).toHaveValue('');
 });
 
+test('parent exit locks immediately and grant expiry re-gates before a parent control can mutate', async ({ page }) => {
+  await page.getByRole('button', { name: 'Parents', exact: true }).click();
+  await expect(page.locator('#parentGate')).toBeVisible();
+  await expect(page.locator('#parentContent')).toBeHidden();
+  await unlockViaGate(page);
+  await page.locator('#parentShellNav button[data-screen="controls"]').click();
+  const before = await page.evaluate(() => P().controls.dailyMinutes);
+  await page.evaluate(() => { parentUnlockedUntil = Date.now() + 50; scheduleParentAccessExpiry(); });
+  await expect(page.locator('#parentGate')).toBeVisible();
+  await expect(page.locator('#parentContent')).toBeHidden();
+  await page.evaluate(() => { document.querySelector('#dailyMinutes').value = '99'; document.querySelector('#saveControls').click(); });
+  expect(await page.evaluate(() => P().controls.dailyMinutes)).toBe(before);
+});
+
+test('concurrent PIN verification serializes all five failed-attempt commits and unlock stays single-flight', async ({ page, context }) => {
+  const secondTab = await context.newPage(); await secondTab.goto('/?match=0&webgl=0');
+  const [firstResults, secondResults] = await Promise.all([
+    page.evaluate(() => Promise.all(Array.from({ length: 3 }, () => verifyParentPin('000000')))),
+    secondTab.evaluate(() => Promise.all(Array.from({ length: 2 }, () => verifyParentPin('000000')))),
+  ]);
+  const concurrent = await page.evaluate(() => { const auth = readParentAuth(); return { failedAttempts: auth.failedAttempts, locked: auth.lockedUntil > Date.now() }; });
+  concurrent.results = [...firstResults, ...secondResults]; await secondTab.close();
+  expect(concurrent.failedAttempts).toBe(5);
+  expect(concurrent.locked).toBe(true);
+  expect(concurrent.results.filter(result => result.locked)).not.toHaveLength(0);
+  await page.evaluate(() => { const auth = readParentAuth(); auth.failedAttempts = 0; auth.lockedUntil = 0; writeParentAuth(auth); });
+  await page.getByRole('button', { name: 'Parents', exact: true }).click();
+  await page.evaluate(() => { globalThis.__releaseDeriveBits = SubtleCrypto.prototype.deriveBits; SubtleCrypto.prototype.deriveBits = async function(...args) { await new Promise(resolve => setTimeout(resolve, 300)); return globalThis.__releaseDeriveBits.apply(this, args); }; });
+  await page.locator('#parentPinInput').fill('000000');
+  await page.locator('#unlockParent').click();
+  await expect(page.locator('#unlockParent')).toBeDisabled();
+  await page.locator('#unlockParent').dispatchEvent('click');
+  await expect(page.locator('#parentGateMsg')).toContainText('4 attempt(s) remaining', { timeout: 15_000 });
+  expect(await page.evaluate(() => { SubtleCrypto.prototype.deriveBits = globalThis.__releaseDeriveBits; return readParentAuth().failedAttempts; })).toBe(1);
+});
+
 test('legacy secrets are scrubbed and every external boundary omits forbidden auth material', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const forbiddenKeys = new Set(['parentPin','parentAuth','pinHash','pinSalt','password','idToken','refreshToken','accessToken']);
@@ -632,6 +670,7 @@ test('Phase 2.4 nested cloud projections reject adversarial child data while val
 });
 test('parent authorization is revoked when the active child profile changes', async ({ page }) => {
   await page.getByRole('button', { name: 'Parents', exact: true }).click();
+  if (await page.locator('#parentPinInput').isVisible()) await unlockViaGate(page);
   await parentDestination(page, 'Profiles');
   await page.locator('#newProfile').fill('Different Child');
   await page.getByRole('button', { name: 'Add Profile' }).click();
@@ -3076,6 +3115,20 @@ test('Phase 2.3 restore keeps a distinct rollback snapshot and a failed replacem
   expect(failed).toEqual({ memory: 'Current Failure Kid', primary: 'Current Failure Kid', backup: 'Should Not Replace', copiesMatch: true, rollbackName: 'Current Failure Kid' });
 });
 
+test('Phase 2.3 restore after profile deletion preserves the tombstone and cannot resurrect the learner', async ({ page }) => {
+  const deletedId = await page.evaluate(async () => {
+    const deleted = blank('Restore Deleted Kid'); STORE.profiles.push(deleted); STORE.active = STORE.profiles.length - 1; await save();
+    const olderBackup = structuredClone(STORE); rememberProfileDeletion(deleted.id, Date.now()); await save();
+    localStorage.setItem(BACK, JSON.stringify(olderBackup)); return deleted.id;
+  });
+  await parentDestination(page, 'Recovery');
+  await page.getByRole('button', { name: 'Restore Backup' }).click(); await approveSensitiveAction(page);
+  await expect(page.locator('#saveHealth')).toContainText('Backup restored');
+  const restored = await page.evaluate(id => ({ names: STORE.profiles.map(profile => profile.name), live: STORE.profiles.some(profile => profile.id === id), tombstoned: STORE.deletedProfiles.some(item => item.id === id), copies: [KEY, BACK].map(key => JSON.parse(localStorage.getItem(key))) }), deletedId);
+  expect(restored.names).not.toContain('Restore Deleted Kid'); expect(restored.live).toBe(false); expect(restored.tombstoned).toBe(true);
+  for (const copy of restored.copies) { expect(copy.profiles.some(profile => profile.id === deletedId)).toBe(false); expect(copy.deletedProfiles.some(item => item.id === deletedId)).toBe(true); }
+});
+
 test('Phase 2.3 import rejects invalid identities before rollback mutation and supports valid modern and legacy stores', async ({ page }) => {
   await page.evaluate(async () => { P().name = 'Before Import'; await save(); });
   await parentDestination(page, 'Recovery');
@@ -3108,6 +3161,19 @@ test('Phase 2.3 import rejects invalid identities before rollback mutation and s
   await page.locator('#importFile').setInputFiles({ name: 'legacy.json', mimeType: 'application/json', buffer: Buffer.from(legacy) }); await approveSensitiveAction(page);
   const migratedLegacy = await page.evaluate(() => ({ name: P().name, id: P().id, schemaVersion: STORE.schemaVersion, completed: progression().completedMissionIds }));
   expect(migratedLegacy.name).toBe('Legacy Import'); expect(migratedLegacy.id).toMatch(/^legacy-/); expect(migratedLegacy.schemaVersion).toBe(9); expect(migratedLegacy.completed).toContain(1);
+});
+
+test('Phase 2.3 import after profile deletion preserves the local tombstone and cannot resurrect the learner', async ({ page }) => {
+  const setup = await page.evaluate(async () => {
+    const deleted = blank('Import Deleted Kid'); STORE.profiles.push(deleted); STORE.active = STORE.profiles.length - 1; await save();
+    const olderExport = structuredClone(STORE); rememberProfileDeletion(deleted.id, Date.now()); await save();
+    return { deletedId: deleted.id, text: JSON.stringify(olderExport) };
+  });
+  await parentDestination(page, 'Recovery');
+  await page.locator('#importFile').setInputFiles({ name: 'older-before-delete.json', mimeType: 'application/json', buffer: Buffer.from(setup.text) }); await approveSensitiveAction(page);
+  await expect(page.locator('#saveHealth')).toContainText('Progress imported');
+  const imported = await page.evaluate(id => ({ names: STORE.profiles.map(profile => profile.name), live: STORE.profiles.some(profile => profile.id === id), tombstoned: STORE.deletedProfiles.some(item => item.id === id) }), setup.deletedId);
+  expect(imported.names).not.toContain('Import Deleted Kid'); expect(imported.live).toBe(false); expect(imported.tombstoned).toBe(true);
 });
 
 test('Phase 2.3 production excludes debug controls and locked parent tools cannot be opened directly', async ({ page }) => {

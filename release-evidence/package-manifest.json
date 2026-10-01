@@ -1,10 +1,10 @@
 {
   "schema": "brainbite.package-manifest.v1",
-  "generatedAt": "2026-10-01T17:49:50.033Z",
+  "generatedAt": "2026-10-01T21:56:37.997Z",
   "files": {
     "app.js": {
-      "sha256": "ecdd168d795ef898913ebeb7ecdbb0ccbbc91ca6a9a0aef55d53f3b430fe8fb7",
-      "bytes": 288845
+      "sha256": "bfdce33f119d573c92b918adf10afb19055b051b8adc6e95714fe128027a9bb0",
+      "bytes": 292660
     },
     "assets/art/bite-village.svg": {
       "sha256": "10de1eed7772e502d1ac29f41c00e7b51b9dbea230312ece358a0184ebb2e49a",
@@ -327,8 +327,8 @@
       "bytes": 12231
     },
     "presentation/performance-budget.mjs": {
-      "sha256": "ce32cceb767fda914a6903ff28ae1efc794e7e7a741f9ce0cfd4aee90257a9c4",
-      "bytes": 12388
+      "sha256": "ccb85d5d41feebeb5f5c485d70c33346b12560ad8dfafe85157b815be23618c0",
+      "bytes": 12993
     },
     "presentation/platform.js": {
       "sha256": "d4d714149a51b20ce2ec60e8dea6ba6ac81fe86cf87f631d0ccf7b488688390a",
@@ -351,12 +351,12 @@
       "bytes": 2255
     },
     "presentation/webgl-battle.mjs": {
-      "sha256": "5cdc4fd187d69124a507a40c9f21310146e09c5d1e17e765d53f6de156f88514",
-      "bytes": 38906
+      "sha256": "fbed3eb72b32571256664ffa36a49443fd3b12f94a921886c36ac9b0c9275965",
+      "bytes": 39424
     },
     "presentation/webgl-home.mjs": {
-      "sha256": "55ca50ef0c5d8f653288aaa3ac0c9a9046d0eac44bb79d995e4fc49beacb74a8",
-      "bytes": 23174
+      "sha256": "ec96b6add5e46af7642c77ba6ccd74da478d777527f340e31bbb93c3e5a9d351",
+      "bytes": 23452
     },
     "presentation/world-profiles.mjs": {
       "sha256": "dfe484696c6c56827433b9c44067030e0010acf71a83db41bb14c267b33dc290",
@@ -367,7 +367,7 @@
       "bytes": 3059
     },
     "service-worker.js": {
-      "sha256": "ef4c3ff7c7741a66b0c827104b8ac13fb838936e39350494ce7cfe925453ca8b",
+      "sha256": "82d519999f2f3b73a4a8fed8e265403d0b89184818a06e759c4192bab9833fc4",
       "bytes": 4951
     },
     "styles.css": {

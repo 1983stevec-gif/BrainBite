@@ -668,6 +668,8 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
   let pendingAssetLoads = 0;
   let sceneReadyRecorded = false;
   let frameTimingActive = false;
+  const gltfRoots = new Set();
+  const gltfOwnedMaterials = new Set();
   const applyQuality = createQualityController(renderer, scene, sun, host);
   applyQuality();
   const classObserver = new MutationObserver(() => {
@@ -687,6 +689,7 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
       });
       if (disposed || webglContextLost) return disposeGltfAsset(root);
       fallback?.traverse?.(child => { child.visible = false; });
+      gltfRoots.add(root);
       scene.add(root);
       onInstall?.(root);
       host.dispatchEvent(new CustomEvent('bb:webgl-asset-loaded', { detail: { asset } }));
@@ -744,6 +747,7 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
       if (child.userData.brainbite_kind === 'answer_pillar_label') child.visible = false;
       if (/pillar_(ring|shaft)/.test(child.userData.brainbite_kind || '') && child.material) {
         child.material = child.material.clone();
+        gltfOwnedMaterials.add(child.material);
       }
     });
     setChoices(currentChoices, true);
@@ -886,6 +890,12 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
       controls.remove();
       delete host.dataset.encounter;
       for (const key of ['characterAnimated', 'characterState', 'characterPoseY', 'graphicsTier', 'shadowSize', 'pixelRatio', 'programmableBit', 'answerDiscs', 'lastAnswer', 'nibblerSlot', 'nibblerNext', 'bossPhase', 'inked', 'rescue']) delete host.dataset[key];
+      // GLTF clone resources belong to the parse cache. Only the highlight materials cloned
+      // locally above belong to this scene; detach cached roots before generic traversal.
+      for (const material of gltfOwnedMaterials) material.dispose();
+      gltfOwnedMaterials.clear();
+      for (const root of gltfRoots) disposeGltfAsset(root);
+      gltfRoots.clear();
       disposeObject(scene);
       sun.shadow.dispose();
       renderer.dispose();
