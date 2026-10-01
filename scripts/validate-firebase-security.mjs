@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const RULES_PATH = 'firebase/firestore.rules';
 // Deliberately independent of the rules file at runtime: any reviewed rule change,
 // including comments or line-ending changes, requires an explicit audited digest update.
-const REVIEWED_RULES_SHA256 = '07443d2ff4e5320996fbbb2373349aa4728ffc19b7f4ba7e73708c58e9cb4aeb';
+const REVIEWED_RULES_SHA256 = 'a937c0aa60dd69bf7915801f675b64907b2d672e0987f920b5807ae8f57a82c4';
 
 function sha256(source) {
   return crypto.createHash('sha256').update(source, 'utf8').digest('hex');
@@ -230,7 +230,7 @@ function parseAllowDeclarations(source) {
 
     const operationText = source.slice(operationStart, cursor).trim();
     const operations = operationText ? operationText.split(',').map(operation => operation.trim()) : [];
-    if (!operations.length || operations.some(operation => !['read', 'write', 'create', 'update', 'delete'].includes(operation))
+    if (!operations.length || operations.some(operation => !['read', 'write', 'get', 'list', 'create', 'update', 'delete'].includes(operation))
       || new Set(operations).size !== operations.length) {
       valid = false;
       break;
@@ -435,8 +435,15 @@ export function validateFirebaseRulesSource(source) {
     && globalDeclarations[0].condition === 'false', 'Global default deny must be exactly one allow read, write: if false declaration.');
   expect(errors, familyDeclarations.length === 4
     && familyDeclarations.every(declaration => declaration.operations.length === 1), 'Family matcher must contain exactly one single-operation allow for each intended operation.');
-  expect(errors, profileDeclarations.length === 4
-    && profileDeclarations.every(declaration => declaration.operations.length === 1), 'Profile matcher must contain exactly one single-operation allow for each intended operation.');
+  // The profile matcher splits read into get and list. `signedInAs(familyId)` requires
+  // `request.auth.uid == familyId`, and familyId is the path segment, so a collection read is
+  // scoped to the caller's own family path. A document read additionally proves the stored
+  // owner and the path ID, which a REST listDocuments cannot prove for an unfiltered list.
+  const PROFILE_OPERATIONS = ['get', 'list', 'create', 'update', 'delete'];
+  expect(errors, profileDeclarations.length === PROFILE_OPERATIONS.length
+    && profileDeclarations.every(declaration => declaration.operations.length === 1)
+    && PROFILE_OPERATIONS.every(operation => profileDeclarations.filter(declaration => declaration.operations[0] === operation).length === 1),
+    `Profile matcher must contain exactly one single-operation allow for each intended operation (${PROFILE_OPERATIONS.join(', ')}).`);
 
   const familyRead = allowCondition(familyDeclarations, 'read');
   const familyCreate = allowCondition(familyDeclarations, 'create');
@@ -447,11 +454,13 @@ export function validateFirebaseRulesSource(source) {
   expect(errors, familyUpdate.includes('request.resource.data.ownerId == resource.data.ownerId'), 'Family ownerId must be immutable.');
   expect(errors, familyDelete === 'false', 'Client family deletion must be denied because it does not cascade profiles.');
 
-  const profileRead = allowCondition(profileDeclarations, 'read');
+  const profileGet = allowCondition(profileDeclarations, 'get');
+  const profileList = allowCondition(profileDeclarations, 'list');
   const profileCreate = allowCondition(profileDeclarations, 'create');
   const profileUpdate = allowCondition(profileDeclarations, 'update');
   const profileDelete = allowCondition(profileDeclarations, 'delete');
-  expect(errors, profileRead.includes('signedInAs(familyId)') && profileRead.includes('resource.data.ownerId == request.auth.uid') && profileRead.includes('resource.data.clientProfileId == profileId'), 'Profile reads need family, stored-owner, and path-ID checks.');
+  expect(errors, profileGet.includes('signedInAs(familyId)') && profileGet.includes('resource.data.ownerId == request.auth.uid') && profileGet.includes('resource.data.clientProfileId == profileId'), 'Profile document reads need family, stored-owner, and path-ID checks.');
+  expect(errors, profileList.includes('signedInAs(familyId)'), 'Profile collection reads must be scoped to the caller\'s own family path.');
   expect(errors, profileCreate.includes('signedInAs(familyId)') && profileCreate.includes('validProfileDocument('), 'Profile creates need authentication and full validation.');
   expect(errors, profileUpdate.includes('validProfileUpdate(resource.data, request.resource.data, profileId, familyId)'), 'Profile updates must use the bounded mutable-field allowlist.');
   expect(errors, profileUpdate.includes('!isStoredTombstone(resource.data)') && profileUpdate.includes('request.resource.data == resource.data'), 'Stored tombstones must allow only identical idempotent retries.');

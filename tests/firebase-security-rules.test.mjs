@@ -24,13 +24,13 @@ test('current Firebase rules satisfy the complete static security contract', () 
 
 test('the pinned reviewed source rejects semantic relaxations, quoted decoys, and even comment edits', () => {
   const authReturn = 'return request.auth != null && request.auth.uid == familyId;';
-  const profileRead = `allow read: if signedInAs(familyId)
+  const profileGetRead = `allow get: if signedInAs(familyId)
           && resource.data.ownerId == request.auth.uid
           && resource.data.clientProfileId == profileId;`;
   const familyCreate = `allow create: if signedInAs(familyId)
         && validFamilyDocument(request.resource.data, familyId);`;
   const attacks = [
-    ['profile read OR true', profileRead, profileRead.replace(';', ' || true;')],
+    ['profile document read OR true', profileGetRead, profileGetRead.replace(';', ' || true;')],
     ['family create OR signed-in user', familyCreate, familyCreate.replace(';', ' || signedInAs(familyId);')],
     ['auth helper OR true', authReturn, 'return true || (request.auth != null && request.auth.uid == familyId);'],
     ['auth requirements inside quoted strings', authReturn,
@@ -85,11 +85,11 @@ test('commented secure function and allow clauses cannot mask insecure executabl
   assert.match(validateFirebaseRulesSource(insecureFunction).join('\n'), /Family authentication/);
 
   const insecureAllow = source.replace(
-    `        allow read: if signedInAs(familyId)\n          && resource.data.ownerId == request.auth.uid\n          && resource.data.clientProfileId == profileId;`,
-    `        /* allow read: if signedInAs(familyId)\n          && resource.data.ownerId == request.auth.uid\n          && resource.data.clientProfileId == profileId; */\n        allow read: if true;`,
+    `        allow get: if signedInAs(familyId)\n          && resource.data.ownerId == request.auth.uid\n          && resource.data.clientProfileId == profileId;`,
+    `        /* allow get: if signedInAs(familyId)\n          && resource.data.ownerId == request.auth.uid\n          && resource.data.clientProfileId == profileId; */\n        allow get: if true;`,
   );
   assert.notEqual(insecureAllow, source);
-  assert.match(validateFirebaseRulesSource(insecureAllow).join('\n'), /Profile reads/);
+  assert.match(validateFirebaseRulesSource(insecureAllow).join('\n'), /Profile document reads/);
 });
 
 test('unterminated block comments and strings fail closed', () => {
