@@ -140,6 +140,7 @@ export const PresentationAdapter = {
         await loadMatchFactories();
         if (generation !== homeGeneration || mode !== 'match' || !document.getElementById('home')?.classList.contains('show')) return;
         homeView = matchHomeFactory(document.getElementById('home'));
+        homeView?.focus?.();
       } catch (error) {
         if (generation === homeGeneration) this.fallbackToDom(error);
       } finally {
@@ -198,6 +199,7 @@ export const PresentationAdapter = {
         await loadMatchFactories();
         if (generation !== battleGeneration || mode !== 'match' || !document.getElementById('game')?.classList.contains('show')) return;
         battleView = matchBattleFactory(document.getElementById('game'), handlers);
+        battleView?.focus?.();
       } catch (error) {
         if (generation === battleGeneration) this.fallbackToDom(error);
       } finally {

@@ -22,6 +22,87 @@ test('current Firebase rules satisfy the complete static security contract', () 
   assert.deepEqual(validateFirebaseRulesSource(source), []);
 });
 
+test('the pinned reviewed source rejects semantic relaxations, quoted decoys, and even comment edits', () => {
+  const authReturn = 'return request.auth != null && request.auth.uid == familyId;';
+  const profileGetRead = `allow get: if signedInAs(familyId)
+          && resource.data.ownerId == request.auth.uid
+          && resource.data.clientProfileId == profileId;`;
+  const familyCreate = `allow create: if signedInAs(familyId)
+        && validFamilyDocument(request.resource.data, familyId);`;
+  const attacks = [
+    ['profile document read OR true', profileGetRead, profileGetRead.replace(';', ' || true;')],
+    ['family create OR signed-in user', familyCreate, familyCreate.replace(';', ' || signedInAs(familyId);')],
+    ['auth helper OR true', authReturn, 'return true || (request.auth != null && request.auth.uid == familyId);'],
+    ['auth requirements inside quoted strings', authReturn,
+      "return 'request.auth != null && request.auth.uid == familyId' == 'request.auth != null && request.auth.uid == familyId';"],
+    ['owner requirement inside quoted strings', '&& data.ownerId == familyId',
+      "&& 'data.ownerId == familyId' == 'data.ownerId == familyId'"],
+    // A raw-source digest also pins comments: harmless edits incur an intentional audit cost.
+    ['comment edit', '// A profile is deleted by replacing it with a permanent tombstone.',
+      '// A profile is deleted by replacing it with a permanent tombstone. Reviewed comment edit.'],
+  ];
+  for (const [label, before, after] of attacks) {
+    assert.match(validateFirebaseRulesSource(mutated(before, after)).join('\n'),
+      /pinned reviewed SHA-256 contract; intentional audited rule changes must update/, label);
+  }
+});
+
+test('an appended duplicate profile matcher cannot bypass the owner check', () => {
+  const duplicate = source.replace(
+    `        allow delete: if false;
+      }
+    }
+
+    match /{document=**} {`,
+    `        allow delete: if false;
+      }
+
+      match /profiles/{profileId} {
+        allow read: if true;
+      }
+    }
+
+    match /{document=**} {`,
+  );
+  assert.notEqual(duplicate, source);
+  assert.match(validateFirebaseRulesSource(duplicate).join('\n'), /exactly one nested \/profiles/);
+});
+
+test('composite and additive profile grants are rejected', () => {
+  const marker = `        allow delete: if false;\n      }\n    }\n\n    match /{document=**}`;
+  for (const grant of ['allow read, write: if true;', 'allow write: if true;']) {
+    const mutatedSource = source.replace(marker, `        allow delete: if false;\n        ${grant}\n      }\n    }\n\n    match /{document=**}`);
+    assert.notEqual(mutatedSource, source);
+    assert.match(validateFirebaseRulesSource(mutatedSource).join('\n'), /single-operation|exactly one/);
+  }
+});
+
+test('commented secure function and allow clauses cannot mask insecure executable rules', () => {
+  const insecureFunction = source.replace(
+    `function signedInAs(familyId) {\n      return request.auth != null && request.auth.uid == familyId;\n    }`,
+    `function signedInAs(familyId) {\n      /* return request.auth != null && request.auth.uid == familyId; */\n      return true;\n    }`,
+  );
+  assert.match(validateFirebaseRulesSource(insecureFunction).join('\n'), /Family authentication/);
+
+  const insecureAllow = source.replace(
+    `        allow get: if signedInAs(familyId)\n          && resource.data.ownerId == request.auth.uid\n          && resource.data.clientProfileId == profileId;`,
+    `        /* allow get: if signedInAs(familyId)\n          && resource.data.ownerId == request.auth.uid\n          && resource.data.clientProfileId == profileId; */\n        allow get: if true;`,
+  );
+  assert.notEqual(insecureAllow, source);
+  assert.match(validateFirebaseRulesSource(insecureAllow).join('\n'), /Profile document reads/);
+});
+
+test('unterminated block comments and strings fail closed', () => {
+  const unterminatedComment = `${source}\n/*`;
+  assert.match(validateFirebaseRulesSource(unterminatedComment).join('\n'), /unterminated block comment/);
+
+  const unterminatedString = source.replace(
+    "value.matches('^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$')",
+    "value.matches('^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$)",
+  );
+  assert.match(validateFirebaseRulesSource(unterminatedString).join('\n'), /unterminated block comment or quoted string/);
+});
+
 rejectsMutation(
   'family path ownership cannot be weakened to any authenticated user',
   'request.auth.uid == familyId',

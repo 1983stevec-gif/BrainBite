@@ -18,21 +18,16 @@ gates and must not be reported as completed by repository work.
 
 ## Current Status (2026-09-27)
 
-The in-scope engineering work for the closed-beta candidate is implemented on
-`mobile/runtime-readiness`. Runtime/evidence baseline `a6786aaa04ec09d1ffdda2420ffff30a59b07e4b`
-and browser-readiness commit `2cf4de6367d7d9cc90fb8549ef687013b5809331` are in open,
-mergeable [PR #2](https://github.com/1983stevec-gif/BrainBite/pull/2). The latest fully
-tested gameplay commit `3ebcf35d8bc7ea18d7c69b64b9015cdedd7201e6` passed GitHub Actions
-[run 36316190009](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316190009) and
-[run 36316192782](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316192782).
-Both runs passed all validators, native package verification, 236 unit tests, 211 browser
-tests with zero retries, 11/11 smoke checks, the clean-tree guard, and the Firestore emulator job.
-The historical Windows certification passed 17/17 stages; its two retry-only browser
-attempts were followed by no-retry group passes at 92/92 and 14/14. The latest focused
-reload-sensitive rerun passed 2/2. A fresh Windows `native:build` produced the unsigned
-installer, and `native:verify:runtime` opened the rebuilt app and child processes with zero
-TCP listeners. The historical certification snapshot was captured on `36887b9` with the
-final stylesheet/evidence changes in the worktree; those changes were committed in `a6786aa`.
+The in-scope engineering work for the closed-beta candidate is implemented on the local
+Cycle 2 worktree. The current scoped acceptance recheck passes
+`node --test tests/content-review.test.mjs` (**25/25**) and
+`npm run check:content-review` (105 records, zero digest mismatches). The broader Cycle 2
+final local audit records 255/255 unit tests, 211/211 browser tests with zero retries, 15/15
+repeated targeted cases, and 11/11 smoke checks after the final digest-gate acceptance fix.
+
+The PR #2 branch, its remote CI results, and its native verification are historical records
+only. No remote CI, native, device, educator, or external certification is claimed for the
+current worktree.
 
 Steve owns the PR merge under decision D6. Publication, physical-device testing, educator
 approval, accessibility/Spanish/legal review, and production setup remain external gates.
@@ -262,12 +257,12 @@ single five-target dock, the parent shell is hidden outside parent context, the
 presentation selector is a parent-only device setting, and the placeholder
 news/promo/energy/reward-hat cards, duplicate dock CSS, and debug badge are removed.
 
-Batch 3.2 (battle composition): IMPLEMENTED/VERIFIED. The DOM board and the 3D answer
+Batch 3.2 (battle composition): IMPLEMENTED/VERIFIED in the historical PR #2 record. The DOM board and the 3D answer
 controls are mutually exclusive per active challenge, 3D pillar taps are live, and the
 battle fits one viewport at 390x844, 768x1024, and 1280x800 in both DOM and live-3D
 presentation. The dismissible short-landscape rotation prompt and the direct pointer-to-answer
-regression passed in both CI runs 36316190009 and 36316192782. Each full run passed all 211
-browser tests with zero retries.
+regression passed in historical PR #2 runs 36316190009 and 36316192782. Each historical run
+passed all 211 browser tests with zero retries; this is not current Cycle 2 verification.
 
 ### Batch 3.1 - Navigation and information architecture
 
@@ -373,10 +368,10 @@ Repository work may prepare evidence for these gates but may not mark them compl
 - Current engine: static local-first JavaScript/Three.js runtime; its browser harness remains for development and tests.
 - Production shell decision (2026-09-19): Tauri 2 installed Windows app with bundled assets and no localhost listener.
 - Unity: absent; a full Unity rewrite remains a separate future engine migration, not a claim of this closed-beta build.
-- Branch: `mobile/runtime-readiness`; latest fully tested gameplay commit `3ebcf35d8bc7ea18d7c69b64b9015cdedd7201e6`, including runtime/evidence baseline `a6786aaa04ec09d1ffdda2420ffff30a59b07e4b` and browser-readiness commit `2cf4de6367d7d9cc90fb8549ef687013b5809331`, is in open PR #2 to `main`.
+- Historical branch record: `mobile/runtime-readiness`; gameplay commit `3ebcf35d8bc7ea18d7c69b64b9015cdedd7201e6`, including runtime/evidence baseline `a6786aaa04ec09d1ffdda2420ffff30a59b07e4b` and browser-readiness commit `2cf4de6367d7d9cc90fb8549ef687013b5809331`, is in PR #2 to `main`.
 - Product state: closed-beta candidate with the implementation phases complete. It is not merged or published, and external gates remain open.
-- Verification: Windows local certification 17/17; CI runs 36316190009 and 36316192782 each passed 236 unit tests, 211 browser tests with zero retries, 11/11 smokes, validators, native packaging, clean tree, and Firestore emulator. The direct WebGL pointer-parity check passed in both full runs; the focused reload-sensitive rerun passed 2/2; fresh native build and zero-listener runtime audit passed.
-- Owner action: review and merge PR #2. Device, human-review, publication, and production-setup gates remain separately listed above.
+- Historical verification record: Windows local certification 17/17; PR #2 CI runs 36316190009 and 36316192782 each passed 236 unit tests, 211 browser tests with zero retries, 11/11 smokes, validators, native packaging, clean tree, and Firestore emulator. The direct WebGL pointer-parity check passed in both historical runs; the focused reload-sensitive rerun passed 2/2; the historical native build and zero-listener runtime audit passed. These are not current Cycle 2 claims.
+- Owner action: review and merge the implementation under decision D6. Device, human-review, publication, and production-setup gates remain separately listed above.
 
 ## Verified Progress Ledger
 
@@ -587,7 +582,7 @@ Updated: 2026-09-22
 - Batch 2.3: COMPLETE. Destructive operations use an accessible fresh-PIN step-up dialog; profile deletion requires the exact learner name; restore/import create a distinct pre-operation rollback snapshot; production debug controls are Lab-only; and cloud deletion reports partial outcomes without clearing local session/queue state prematurely. Strict pre-import identity validation rejects duplicate, malformed, tombstoned, and invalid-active profile identities before authorization, rollback, or mutation.
 - Batch 2.4: COMPLETE. Snap-to-Game and OCR controls are absent from production, while legacy records remain available in parent-authorized local recovery exports. Cloud synchronization uses typed, bounded, recursive structural projections; worksheet text/images, data/blob/file URLs, unknown nested objects, Code Lab projects, and Snap records cannot cross the cloud boundary. Mission-only legacy sessions round-trip without reopening private-data leakage, and bounded deletion tombstones remain authoritative against stale-device resurrection.
 
-Current focused evidence:
+Historical focused evidence:
 
 - `node --test tests/core.test.mjs`: 44 passed, 0 failed.
 - `node --test tests/content-review.test.mjs`: 22 passed, 0 failed.
@@ -600,19 +595,23 @@ Current focused evidence:
 - Phase 2.3 focused Playwright suite: 9 passed, 0 failed; independent exact duplicate-ID and blank-ID probes preserved store, sync, primary, backup, recovery, and rollback unchanged.
 - Phase 2.3 destructive-dialog stress: 5 repeated tests covering 105 fresh-PIN approvals passed; full unit suite remains 183 passed, 0 failed.
 - Phase 2.4 final independent review: privacy/Firebase/tombstone suite 4 passed, Phase 2.2-2.3 regression suite 19 passed, Phase 2.1 counterexamples 3 passed, static Firebase rules 19 passed with 1 emulator test skipped, and runtime/release/Firebase validators passed.
-- Phase 2.4 native staging: `native:verify` staged 90 files and passed 1/1; staged forbidden-surface scans returned zero Snap/OCR controls, source/staged hashes matched, and the service-worker cache is `v35-snap-retired`.
-- Native package verification: 1 passed, Cargo check passed, release build passed, live process listener audit passed with zero TCP listeners.
+- Historical Phase 2.4 native staging: `native:verify` staged 90 files and passed 1/1; staged forbidden-surface scans returned zero Snap/OCR controls, source/staged hashes matched, and the service-worker cache was versioned.
+- Historical native package verification: 1 passed, Cargo check passed, release build passed, live process listener audit passed with zero TCP listeners.
 
-Repository evidence (2026-09-27):
+Current scoped acceptance evidence (2026-09-27):
 
-- Branch: `mobile/runtime-readiness`; latest fully tested gameplay commit `3ebcf35d8bc7ea18d7c69b64b9015cdedd7201e6` includes runtime/evidence baseline `a6786aaa04ec09d1ffdda2420ffff30a59b07e4b` and browser-readiness commit `2cf4de6367d7d9cc90fb8549ef687013b5809331` in PR #2.
-- Remote: `https://github.com/1983stevec-gif/BrainBite`; PR #2 is open, mergeable, and CI-green.
-- `npm ci` and Windows local certification completed. CI runs 36316190009 and 36316192782 each verify 211 browser tests with zero retries, 11/11 smokes, and a clean tracked tree; Firestore emulator checks also pass. A fresh native installer build and live no-listener verification passed.
-- The local certification records a dirty initial working tree because it refreshed tracked screenshots and release evidence; generated emulator output stays local and must not enter the PR.
+- `node --test tests/content-review.test.mjs`: **25/25** passed.
+- `npm run check:content-review`: PASS; 105 records, zero digest mismatches.
+- The final local audit recorded 255/255 unit tests, 211/211 browser tests with zero
+  retries, 15/15 repeated targeted cases, and 11/11 smokes after the final digest-gate
+  acceptance fix. These are local results, not remote CI or external certification.
+
+Historical repository evidence retained from PR #2 includes the remote CI, native build,
+and local certification records described above. They are not current worktree claims.
 
 ## Next Assignment Order
 
-1. Steve reviews and merges PR #2 under decision D6.
+1. Steve reviews and merges the implementation under decision D6; PR #2 references are historical.
 2. After merge, configure GitHub Pages and complete the external gates listed above and in
    `docs/HANDOFF.md` before making a publication or beta-certification claim.
 

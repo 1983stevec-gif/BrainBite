@@ -31,6 +31,33 @@ function clear(el) {
   while (el.firstChild) el.removeChild(el.firstChild);
 }
 
+function setTextIfChanged(element, value) {
+  if (element && element.textContent !== value) element.textContent = value;
+}
+
+function concealUnderlyingShell(host, selector) {
+  const shell = host?.querySelector(selector);
+  if (!shell) return () => {};
+  const previousInert = shell.getAttribute('inert');
+  const previousAriaHidden = shell.getAttribute('aria-hidden');
+  shell.setAttribute('inert', '');
+  shell.setAttribute('aria-hidden', 'true');
+  let concealed = true;
+  return () => {
+    if (!concealed) return;
+    concealed = false;
+    if (previousInert === null) shell.removeAttribute('inert');
+    else shell.setAttribute('inert', previousInert);
+    if (previousAriaHidden === null) shell.removeAttribute('aria-hidden');
+    else shell.setAttribute('aria-hidden', previousAriaHidden);
+  };
+}
+
+function focusFirstControl(stage) {
+  const target = stage?.querySelector('.match-hotspot');
+  if (target?.isConnected) target.focus({ preventScroll: true });
+}
+
 function layoutHotspots(stage, img) {
   const nw = img.naturalWidth || 1;
   const nh = img.naturalHeight || 1;
@@ -131,9 +158,16 @@ export function mountHomeMatch(root) {
   // Portal keeps the approved fractions plate demo; PLAY uses Continue / lastMission.
   spot(stage, 'hs-portal', 'Enter Play Portal', () => window.BrainBiteGame?.startPracticeMission?.(8), [58, 42, 14, 22]);
 
+  const revealShell = concealUnderlyingShell(host, '.dash-shell');
+
   return {
     kind: 'home-match',
-    dispose() { unbind(); layer?.remove(); },
+    focus() { focusFirstControl(stage); },
+    dispose() {
+      unbind();
+      layer?.remove();
+      revealShell();
+    },
   };
 }
 
@@ -190,11 +224,10 @@ export function mountBattleMatch(root, { onSelect } = {}) {
 
   const syncA11y = () => {
     const prompt = document.getElementById('prompt')?.textContent?.trim() || '';
-    const feedback = document.getElementById('feedback')?.textContent?.trim() || '';
-    promptLive.textContent = prompt || feedback;
+    setTextIfChanged(promptLive, prompt);
     const captionsOn = document.documentElement.classList.contains('captions-on');
     const captionSrc = document.getElementById('captionText')?.textContent?.trim() || prompt;
-    captionLive.textContent = captionSrc;
+    setTextIfChanged(captionLive, captionSrc);
     captionLive.hidden = !captionsOn || !captionSrc;
   };
   syncA11y();
@@ -241,8 +274,11 @@ export function mountBattleMatch(root, { onSelect } = {}) {
   };
   document.addEventListener('keydown', onKey);
 
+  const revealShell = concealUnderlyingShell(host, '.battle-shell');
+
   return {
     kind: 'battle-match',
+    focus() { focusFirstControl(stage); },
     setChoices(choices = []) {
       const next = choices.filter(Boolean).slice(0, 4);
       if (!next.length) return;
@@ -270,6 +306,7 @@ export function mountBattleMatch(root, { onSelect } = {}) {
       document.removeEventListener('keydown', onKey);
       unbind();
       layer?.remove();
+      revealShell();
     },
   };
 }

@@ -197,9 +197,14 @@ service cloud.firestore {
       allow delete: if false;
 
       match /profiles/{profileId} {
-        allow read: if signedInAs(familyId)
+        // A document GET can inspect its stored owner and path ID. REST
+        // listDocuments cannot prove either predicate for an unfiltered list,
+        // so keep that GET check and scope collection reads to the UID path.
+        allow get: if signedInAs(familyId)
           && resource.data.ownerId == request.auth.uid
           && resource.data.clientProfileId == profileId;
+
+        allow list: if signedInAs(familyId);
 
         allow create: if signedInAs(familyId)
           && validProfileDocument(request.resource.data, profileId, familyId);

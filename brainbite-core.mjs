@@ -1174,6 +1174,16 @@ function createSkillState(skillId, definition = {}) {
   };
 }
 
+const EVIDENCE_KEYS = Object.freeze([
+  'attempts',
+  'independentSuccesses',
+  'assistedSuccesses',
+  'hintsUsed',
+  'incorrectAttempts',
+  'rapidAttempts',
+  'responseTimeMsTotal',
+]);
+
 function masteryStateFor(score, confidence, evidence) {
   if (score >= 85 && confidence >= 0.72 && evidence.independentSuccesses >= 2 && evidence.incorrectAttempts <= 1) return 'Mastered';
   if (score >= 65) return 'Strong';
@@ -1195,9 +1205,16 @@ function normalizeSkillState(skillState, definition = {}) {
     missing: Array.isArray(skillState.prerequisiteState?.missing) ? clone(skillState.prerequisiteState.missing) : [...base.prerequisiteState.missing],
   };
   out.rewardIds = Array.isArray(skillState.rewardIds) ? clone(skillState.rewardIds) : [];
-  out.masteryScore = clamp(Number(out.masteryScore) || 0, 0, 100);
-  out.confidence = clamp(Number(out.confidence) || 0, 0, 1);
-  out.masteryState = MASTERY_STATES.includes(out.masteryState) ? out.masteryState : masteryStateFor(out.masteryScore, out.confidence, out.evidence);
+  const hasEvidence = EVIDENCE_KEYS.some(key => (Number(out.evidence[key]) || 0) > 0);
+  // Pre-evidence saves only recorded the scalar. Keep that real legacy progress,
+  // but make any available evidence authoritative so forged scalars cannot win.
+  out.masteryScore = hasEvidence
+    ? Math.round(computeMasteryScore(out))
+    : clamp(Number(skillState.masteryScore) || 0, 0, 100);
+  out.confidence = hasEvidence
+    ? computeConfidence(out.evidence)
+    : out.masteryScore > 0 ? clamp(out.masteryScore / 200, 0, 0.4) : computeConfidence(out.evidence);
+  out.masteryState = masteryStateFor(out.masteryScore, out.confidence, out.evidence);
   out.evidenceProvenance = evidenceProvenanceFor(skillState);
   return out;
 }
@@ -1221,16 +1238,6 @@ function computeMasteryScore(skillState) {
   const responseBonus = evidence.attempts ? clamp(evidence.responseTimeMsTotal / evidence.attempts, 0, 15000) < 3500 ? 4 : 0 : 0;
   return clamp(correctWeight - penaltyWeight + responseBonus, 0, 100);
 }
-
-const EVIDENCE_KEYS = Object.freeze([
-  'attempts',
-  'independentSuccesses',
-  'assistedSuccesses',
-  'hintsUsed',
-  'incorrectAttempts',
-  'rapidAttempts',
-  'responseTimeMsTotal',
-]);
 
 // Metadata-free callers stay bounded here; exact divergent merges require distinct stable origins and sequences.
 const LOCAL_UNSCOPED_EVIDENCE_SOURCE = 'local-unscoped';
@@ -1542,25 +1549,19 @@ function scoreAttempt(attempt = {}, skillState = createSkillState('skill')) {
     if (independent) {
       next.evidence.independentSuccesses += 1;
       next.lastIndependentSuccessAt = next.lastPracticedAt;
-      next.masteryScore += 18;
     } else {
       next.evidence.assistedSuccesses += 1;
-      next.masteryScore += 9;
     }
     if (hintsUsed) next.evidence.hintsUsed += hintsUsed;
     if (rapid) next.evidence.rapidAttempts += 1;
   } else {
     next.evidence.incorrectAttempts += 1;
-    next.masteryScore -= assisted ? 4 : 8;
     if (rapid) next.evidence.rapidAttempts += 1;
   }
 
-  if (hintsUsed) next.masteryScore -= hintsUsed * 1.2;
-  if (attempt.prerequisiteMissing) next.masteryScore -= 3;
-  if (attempt.randomLike) next.masteryScore -= 4;
   if (attempt.repeatedPattern) next.evidence.rapidAttempts += 1;
 
-  next.masteryScore = clamp(Math.round(next.masteryScore), 0, 100);
+  next.masteryScore = Math.round(computeMasteryScore(next));
   next.confidence = computeConfidence(next.evidence);
   next.masteryState = masteryStateFor(next.masteryScore, next.confidence, next.evidence);
   next.prerequisiteState = {
@@ -1627,18 +1628,6 @@ function mergeSkillStates(leftValue, rightValue, { preferRight = false } = {}) {
     met: [...new Set([...(left.prerequisiteState?.met || []), ...(right.prerequisiteState?.met || [])])],
     missing: [...new Set([...(left.prerequisiteState?.missing || []), ...(right.prerequisiteState?.missing || [])])],
   };
-  const importedMasteryFloor = Math.max(left.legacyImported ? left.masteryScore : 0, right.legacyImported ? right.masteryScore : 0);
-  // The incremental scorer (scoreAttempt) and the evidence formula
-  // (computeMasteryScore) are tuned differently on purpose, so recomputing on
-  // every merge would nudge a score even when the merge added no evidence.
-  // When one side already holds exactly the merged evidence, its score stands;
-  // only a merge that genuinely combines new evidence recomputes.
-  const sameEvidence = (a, b) => EVIDENCE_KEYS.every(key => Number(a?.evidence?.[key]) === Number(b?.evidence?.[key]));
-  if (merged.evidence.attempts > 0 && sameEvidence(merged, right) && !right.legacyImported) merged.masteryScore = right.masteryScore;
-  else if (merged.evidence.attempts > 0 && sameEvidence(merged, left) && !left.legacyImported) merged.masteryScore = left.masteryScore;
-  else merged.masteryScore = merged.evidence.attempts > 0 ? Math.round(computeMasteryScore(merged)) : importedMasteryFloor;
-  merged.confidence = computeConfidence(merged.evidence);
-  merged.masteryState = masteryStateFor(merged.masteryScore, merged.confidence, merged.evidence);
   return normalizeSkillState(merged);
 }
 
@@ -2489,7 +2478,16 @@ function replayOfflineQueue(learner, transport) {
   const remaining = [];
   for (const event of next.offlineQueue) {
     if (next.sentEventIds.includes(event.id)) continue;
-    const accepted = transport ? !!transport(clone(event)) : true;
+    let accepted = true;
+    if (transport) {
+      try {
+        accepted = !!transport(clone(event));
+      } catch {
+        // A transient transport failure must leave this event queued. Continue so
+        // an independent later event can still be delivered in the same replay.
+        accepted = false;
+      }
+    }
     if (accepted) {
       next.sentEventIds.push(event.id);
       sent.push(event.id);
@@ -3004,12 +3002,12 @@ function createActivityForStage(stage, learner, foundation) {
 }
 
 function activityMarkup(stage, activity, learner) {
-  const stageLabelText = stageLabel(stage);
+  const stageLabelText = escapeHtml(stageLabel(stage));
   if (stage === 'secret-reward') {
     return `
       <div class="bbf-activity-card">
         <h4>${stageLabelText}</h4>
-        <p>${activity.prompt}</p>
+        <p>${escapeHtml(activity.prompt)}</p>
         <button data-reward-open>Open chest</button>
         <p class="bbf-feedback">${activity.open ? 'Chest opened.' : 'Chest is sealed.'}</p>
       </div>
@@ -3019,10 +3017,10 @@ function activityMarkup(stage, activity, learner) {
     return `
       <div class="bbf-activity-card">
         <h4>${stageLabelText}</h4>
-        <p>${activity.prompt}</p>
-        <p class="bbf-phase">Kraken stage: <strong>${krakenPhaseLabel(activity.phase)}</strong></p>
-        <p class="bbf-phase">Health: ${activity.health} tentacles remaining</p>
-        <div class="bbf-choice-grid">${activity.choices.map(choice => `<button data-choice="${choice}">${choice}</button>`).join('')}</div>
+        <p>${escapeHtml(activity.prompt)}</p>
+        <p class="bbf-phase">Kraken stage: <strong>${escapeHtml(krakenPhaseLabel(activity.phase))}</strong></p>
+        <p class="bbf-phase">Health: ${escapeHtml(activity.health)} tentacles remaining</p>
+        <div class="bbf-choice-grid">${activity.choices.map(choice => `<button data-choice="${escapeHtml(choice)}">${escapeHtml(choice)}</button>`).join('')}</div>
         <p class="bbf-feedback">${learner.hub.expansionUnlocked ? 'The BrainBase already shows the Kraken upgrade.' : 'The hub is still in starter form.'}</p>
       </div>
     `;
@@ -3031,7 +3029,7 @@ function activityMarkup(stage, activity, learner) {
     return `
       <div class="bbf-activity-card">
         <h4>${stageLabelText}</h4>
-        <p>${activity.prompt}</p>
+        <p>${escapeHtml(activity.prompt)}</p>
         <div class="bbf-choice-grid">${activity.choices.map(choice => `<button data-choice="${escapeHtml(choice.value)}">${escapeHtml(choice.value)}</button>`).join('')}</div>
         <p class="bbf-feedback">${activity.completed ? 'Target Smash complete.' : 'Pop the correct answers.'}</p>
       </div>
@@ -3041,9 +3039,9 @@ function activityMarkup(stage, activity, learner) {
     return `
       <div class="bbf-activity-card">
         <h4>${stageLabelText}</h4>
-        <p>${activity.prompt}</p>
+        <p>${escapeHtml(activity.prompt)}</p>
         <div class="bbf-trail">${activity.choices.map(choice => `<button data-letter="${escapeHtml(choice)}">${escapeHtml(choice)}</button>`).join('')}</div>
-        <p class="bbf-feedback">Trail progress: ${activity.revealed.join('')}</p>
+        <p class="bbf-feedback">Trail progress: ${activity.revealed.map(escapeHtml).join('')}</p>
       </div>
     `;
   }
@@ -3051,16 +3049,16 @@ function activityMarkup(stage, activity, learner) {
     return `
       <div class="bbf-activity-card">
         <h4>${stageLabelText}</h4>
-        <p>${activity.prompt}</p>
+        <p>${escapeHtml(activity.prompt)}</p>
         <div class="bbf-choice-grid">${activity.platforms.map(choice => `<button data-platform="${escapeHtml(choice)}">${escapeHtml(choice)}</button>`).join('')}</div>
-        <p class="bbf-feedback">Platform path: ${activity.visited.join(' → ') || 'None yet'}</p>
+        <p class="bbf-feedback">Platform path: ${activity.visited.map(escapeHtml).join(' → ') || 'None yet'}</p>
       </div>
     `;
   }
   return `
     <div class="bbf-activity-card">
       <h4>${stageLabelText}</h4>
-      <p>${activity.prompt}</p>
+      <p>${escapeHtml(activity.prompt)}</p>
       <button data-stage-advance>Advance</button>
       <p class="bbf-feedback">Greybox placeholder.</p>
     </div>

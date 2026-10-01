@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   ACTIVITY_FAMILIES,
   OFFLINE_QUEUE_LIMIT,
@@ -30,11 +31,13 @@ import {
   mergeSkillStates,
   evidenceProvenanceSources,
   normalizeFoundationState,
+  normalizeSkillState,
   persistFoundationState,
   recordHomeworkAttempt,
   queueOfflineEvent,
   recordBossVictory,
   recordLearnerAttempt,
+  renderBrainBaseShell,
   remediateChallenge,
   replayOfflineQueue,
   resolveKnowledgePlatformChoice,
@@ -53,6 +56,21 @@ import {
   upgradeBrainBase,
   validateContentBundle,
 } from '../brainbite-core.mjs';
+
+const appSource = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
+
+function appFunctionSource(name) {
+  const match = new RegExp(`function\\s+${name}\\s*\\(`).exec(appSource);
+  assert.ok(match, `${name} must be declared in app.js`);
+  const bodyStart = appSource.indexOf('{', match.index);
+  let depth = 0;
+  for (let index = bodyStart; index < appSource.length; index += 1) {
+    if (appSource[index] === '{') depth += 1;
+    if (appSource[index] === '}') depth -= 1;
+    if (depth === 0) return appSource.slice(match.index, index + 1);
+  }
+  throw new Error(`Could not extract ${name} from app.js`);
+}
 
 function makeStorage(seed = {}) {
   const store = new Map(Object.entries(seed));
@@ -117,6 +135,46 @@ test('same-skill cloud branches merge unique evidence without double-counting sh
   assert.equal(merged.evidence.incorrectAttempts, 1);
   assert.equal(merged.recentPerformance.length, 3);
   assert.deepEqual(mergeSkillStates(merged, right.skills['number-facts'], { preferRight: true }).evidence, merged.evidence);
+});
+
+test('document-unique page writers preserve two attempts allocated from the same floor', () => {
+  let uuidCalls = 0;
+  let sessionReads = 0;
+  let sessionWrites = 0;
+  const globalThis = { crypto: { randomUUID: () => `00000000-0000-4000-8000-${String(++uuidCalls).padStart(12, '0')}` } };
+  const sessionStorage = {
+    value: null,
+    getItem() { sessionReads += 1; return this.value; },
+    setItem(key, value) { sessionWrites += 1; this.value = value; },
+  };
+  const makeWriterId = new Function('globalThis', 'sessionStorage', `
+    const UUID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const PAGE_WRITER_SESSION_KEY='bb-core-writer-v1';
+    ${appFunctionSource('newCryptographicUuid')}
+    ${appFunctionSource('pageWriterId')}
+    return pageWriterId;
+  `)(globalThis, sessionStorage);
+  const writerIds = [makeWriterId(), makeWriterId()];
+  assert.equal(uuidCalls, 2);
+  assert.equal(sessionReads, 0);
+  assert.equal(sessionWrites, 0);
+  assert.notEqual(writerIds[0], writerIds[1]);
+
+  const persistedFloor = 7;
+  const base = defaultLearner('Parallel', 'profile-parallel-writers');
+  const branches = writerIds.map((writerId, index) => recordLearnerAttempt(structuredClone(base), 'number-facts', {
+    id: `parallel-${index}`,
+    originId: `10000000-0000-4000-8000-000000000001:${writerId}`,
+    originSequence: persistedFloor + 1,
+    correct: true,
+    independent: true,
+    responseTimeMs: 1200,
+    at: index + 1,
+  }, { id: 'number-facts' }));
+  const merged = mergeSkillStates(branches[0].skills['number-facts'], branches[1].skills['number-facts']);
+  assert.equal(merged.evidence.attempts, 2);
+  assert.equal(merged.evidence.independentSuccesses, 2);
+  assert.equal(evidenceProvenanceSources(merged).length, 2);
 });
 
 test('bounded cloud branches preserve all canonical hidden attempts after their visible histories diverge', () => {
@@ -615,6 +673,20 @@ test('offline queue replays exactly once and rejects duplicates', () => {
   assert.equal(second.sent.length, 0);
 });
 
+test('offline queue retains events whose transport throws without blocking later events', () => {
+  let learner = defaultLearner('Network', 'profile-network');
+  for (const id of ['evt-ok-before', 'evt-transient', 'evt-ok-after']) {
+    learner = queueOfflineEvent(learner, { id, type: 'attempt', payload: { id } });
+  }
+  const replay = replayOfflineQueue(learner, event => {
+    if (event.id === 'evt-transient') throw new Error('offline');
+    return true;
+  });
+  assert.deepEqual(replay.sent, ['evt-ok-before', 'evt-ok-after']);
+  assert.deepEqual(replay.learner.offlineQueue.map(event => event.id), ['evt-transient']);
+  assert.deepEqual(replay.learner.sentEventIds, ['evt-ok-before', 'evt-ok-after']);
+});
+
 test('offline queue normalizes foreign event ownership to the active learner', () => {
   const eventId = '11111111-1111-4111-8111-111111111111';
   let learner = defaultLearner('Fia', 'profile-f');
@@ -1059,6 +1131,77 @@ test('merging a skill state with itself leaves the mastery score unchanged', () 
   assert.equal(merged.evidence.attempts, state.evidence.attempts);
   const pulledNothingNew = mergeSkillStates(state, mergeSkillStates(state, state));
   assert.equal(pulledNothingNew.masteryScore, state.masteryScore);
+});
+
+test('a forged mastery scalar cannot survive a merge with its own evidence', () => {
+  const legitimate = scoreAttempt({
+    id: 'assisted-attempt',
+    correct: true,
+    assisted: true,
+    responseTimeMs: 1800,
+  }, createSkillState('fractions'));
+  const forged = {
+    ...structuredClone(legitimate),
+    masteryScore: 100,
+    confidence: 1,
+    masteryState: 'Strong',
+  };
+
+  const merged = mergeSkillStates(legitimate, forged, { preferRight: true });
+  const ingested = normalizeSkillState(forged);
+  assert.equal(ingested.masteryScore, legitimate.masteryScore);
+  assert.equal(ingested.confidence, legitimate.confidence);
+  assert.equal(ingested.masteryState, legitimate.masteryState);
+  assert.equal(merged.masteryScore, legitimate.masteryScore);
+  assert.equal(merged.confidence, legitimate.confidence);
+  assert.equal(merged.masteryState, legitimate.masteryState);
+  assert.notEqual(merged.masteryScore, 100);
+});
+
+test('a legacy skill with a recorded score and no evidence keeps its progress', () => {
+  const lastPracticedAt = 1_700_000_000_000;
+  const nextReviewAt = lastPracticedAt + 60 * 60 * 1000;
+  const legacy = {
+    ...createSkillState('fractions'),
+    masteryScore: 64,
+    confidence: 1,
+    masteryState: 'Mastered',
+    lastPracticedAt,
+    nextReviewAt,
+    legacyImported: true,
+  };
+
+  const normalized = normalizeSkillState(legacy);
+  assert.equal(normalized.masteryScore, 64);
+  assert.equal(normalized.confidence, 0.32);
+  assert.equal(normalized.masteryState, 'Developing');
+  assert.equal(normalized.lastPracticedAt, lastPracticedAt);
+  assert.equal(normalized.nextReviewAt, nextReviewAt);
+});
+
+test('BrainBase activity markup escapes a hostile imported prompt', () => {
+  const hostilePrompt = '<img src=x onerror=alert(1)>';
+  const learner = defaultLearner('Markup', 'profile-markup');
+  learner.stage = 'brainbase';
+  learner.activeActivity = { family: 'BrainBase', prompt: hostilePrompt };
+  const activitySlot = {
+    innerHTML: '',
+    querySelectorAll() { return []; },
+    querySelector() { return null; },
+  };
+  const root = {
+    innerHTML: '',
+    querySelector(selector) { return selector === '#bbf-activity' ? activitySlot : null; },
+    querySelectorAll() { return []; },
+  };
+
+  renderBrainBaseShell(root, {
+    learners: { [learner.profileId]: learner },
+    activeLearnerId: learner.profileId,
+  }, { storage: makeStorage() });
+
+  assert.doesNotMatch(activitySlot.innerHTML, /<img/);
+  assert.match(activitySlot.innerHTML, /&lt;img src=x onerror=alert\(1\)&gt;/);
 });
 
 test('a replayed attempt with the same id is scored once', () => {

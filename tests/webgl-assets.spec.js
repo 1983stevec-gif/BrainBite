@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 const assets = ['mascot', 'jungle_props', 'portal', 'answer_pillars', 'kraken'];
 
-test('parsed GLB documents are cached and every mount receives an independent clone', async ({ page }) => {
+test('parsed GLB documents are cached and scene disposal only detaches their shared resources', async ({ page }) => {
   const glbRequests = [];
   page.on('request', request => { if (/\.glb($|\?)/.test(request.url())) glbRequests.push(request.url().split('/').pop()); });
   await page.goto('/?presentation=webgl');
@@ -11,12 +11,36 @@ test('parsed GLB documents are cached and every mount receives an independent cl
   const afterHome = { size: await page.evaluate(() => window.BrainBiteGltfCache.size()), clones: await page.evaluate(() => window.BrainBiteGltfCache.clones()), requests: glbRequests.length };
   expect(afterHome.requests).toBeGreaterThan(0);
 
+  const probedResources = await page.evaluate(async () => {
+    const { loadGltfAsset, disposeGltfAsset } = await import('/presentation/gltf-assets.mjs');
+    const root = await loadGltfAsset('mascot');
+    const resources = new Set();
+    root.traverse(child => {
+      if (child.geometry) resources.add(child.geometry);
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      for (const material of materials) {
+        if (!material) continue;
+        resources.add(material);
+        for (const value of Object.values(material)) if (value?.isTexture) resources.add(value);
+      }
+      if (child.skeleton?.boneTexture) resources.add(child.skeleton.boneTexture);
+    });
+    const probe = { disposals: 0, root };
+    for (const resource of resources) resource.addEventListener('dispose', () => { probe.disposals += 1; });
+    window.__sharedGltfDisposalProbe = probe;
+    disposeGltfAsset(root);
+    return resources.size;
+  });
+  expect(probedResources).toBeGreaterThan(0);
+  expect(await page.evaluate(() => window.__sharedGltfDisposalProbe.disposals)).toBe(0);
+
   // Move to the battle and back: the same assets must come from the cache, not the network.
   await page.evaluate(() => window.BrainBiteGame.startMission(1));
   await expect(page.locator('#game canvas.webgl-canvas')).toHaveCount(1);
   await page.evaluate(() => document.querySelector('nav button[data-screen="home"]')?.click());
   await expect(page.locator('#home canvas.webgl-canvas')).toHaveCount(1);
   await expect.poll(() => page.evaluate(() => window.BrainBiteGltfCache.clones())).toBeGreaterThan(afterHome.clones);
+  expect(await page.evaluate(() => window.__sharedGltfDisposalProbe.disposals)).toBe(0);
 
   const after = { size: await page.evaluate(() => window.BrainBiteGltfCache.size()), clones: await page.evaluate(() => window.BrainBiteGltfCache.clones()) };
   const repeatRequests = glbRequests.slice(afterHome.requests).filter(name => glbRequests.slice(0, afterHome.requests).includes(name));
@@ -121,14 +145,23 @@ test('animated Bite and real quality budgets load in both scenes', async ({ page
 });
 
 test('live WebGL scenes expose frame and scene-load budget evidence', async ({ page }) => {
+  const createLongTask = () => page.evaluate(() => {
+    const startedAt = performance.now();
+    while (performance.now() - startedAt < 80) {
+      // Keep the main thread busy long enough to emit a PerformanceLongTaskTiming entry.
+    }
+  });
   await page.goto('/?presentation=webgl');
   await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.home?.metrics?.sceneLoad?.count || 0)).toBe(1);
   await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.home?.metrics?.frame?.count || 0)).toBeGreaterThan(2);
   await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.home?.assetTiming?.count || 0)).toBe(3);
+  const homeLongTaskCount = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().home.metrics.longTask.count);
+  await createLongTask();
+  await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.home?.metrics?.longTask?.count || 0)).toBeGreaterThan(homeLongTaskCount);
   const homeReport = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().home);
   expect(homeReport.metrics.sceneLoad.count).toBe(1);
   expect(homeReport.metrics.frame.p95).not.toBeNull();
-  expect(homeReport.metrics.longTask).toBeDefined();
+  expect(homeReport.metrics.longTask.count).toBeGreaterThan(homeLongTaskCount);
   expect(homeReport.metrics.rendererGeometries.count).toBeGreaterThan(0);
   expect(homeReport.metrics.renderCalls.max).toBeLessThanOrEqual(200);
   expect(homeReport.assetTiming.count).toBeGreaterThan(0);
@@ -137,10 +170,13 @@ test('live WebGL scenes expose frame and scene-load budget evidence', async ({ p
   await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.battle?.metrics?.sceneLoad?.count || 0)).toBe(1);
   await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.battle?.metrics?.frame?.count || 0)).toBeGreaterThan(2);
   await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.battle?.assetTiming?.count || 0)).toBe(3);
+  const battleLongTaskCount = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().battle.metrics.longTask.count);
+  await createLongTask();
+  await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.battle?.metrics?.longTask?.count || 0)).toBeGreaterThan(battleLongTaskCount);
   const battleReport = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().battle);
   expect(battleReport.metrics.sceneLoad.count).toBe(1);
   expect(battleReport.metrics.frame.p99).not.toBeNull();
-  expect(battleReport.metrics.longTask).toBeDefined();
+  expect(battleReport.metrics.longTask.count).toBeGreaterThan(battleLongTaskCount);
   expect(battleReport.metrics.rendererGeometries.count).toBeGreaterThan(0);
   expect(battleReport.assetTiming.count).toBeGreaterThan(0);
   const runtimeReport = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().runtime);

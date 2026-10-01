@@ -170,17 +170,17 @@ player.move()</textarea><div class="code-bridge-actions"><button id="codeRun">Ru
 <p class="small" id="parentPresentationNote" hidden>Scene presentation is a device setting for this installation.</p>
 </div></section>
 
-<section id="practice" class="screen"><h2>Practice Lab</h2><div class="panel"><label>Subject <select id="practiceSubject"><option value="math">Math</option><option value="words">Words</option><option value="spanish">Spanish</option><option value="reading">Reading</option><option value="spelling">Spelling</option><option value="vocabulary">Vocabulary</option><option value="grammar">Grammar</option></select></label><label>Grade <select id="practiceGrade"><option value="K">K</option><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select></label><label>Topic <input id="practiceTopic" placeholder="e.g. fractions, synonyms, colors"></label><label>Difficulty <select id="practiceDifficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><label><input id="homeworkMode" type="checkbox"> Homework mode</label><button id="buildPractice">Build Practice</button><p id="practiceResult"></p></div></section>
+<section id="practice" class="screen"><h2>Practice Lab</h2><div class="panel"><label>Subject <select id="practiceSubject"><option value="math">Math</option><option value="words">Words</option><option value="spanish">Spanish</option><option value="reading">Reading</option><option value="spelling">Spelling</option><option value="vocabulary">Vocabulary</option><option value="grammar">Grammar</option></select></label><label>Grade <select id="practiceGrade"><option value="K">K</option><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select></label><label>Topic <input id="practiceTopic" placeholder="e.g. fractions, synonyms, colors"></label><label>Difficulty <select id="practiceDifficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><label><input id="homeworkMode" type="checkbox"> Homework mode</label><button id="buildPractice">Build Practice</button><p id="practiceResult" role="status" aria-live="polite" aria-atomic="true"></p></div></section>
 
 <section id="bites" class="screen"><h2>My Bites</h2><div class="cards" id="biteCards"></div><div class="panel"><h3>Spark Shop</h3><p>You have <b id="sparkCount">0</b> Spark. Cosmetics never change gameplay power.</p><div id="shopList"></div></div></section>
 <section id="profiles" class="screen"><h2>Family Profiles</h2><div id="profileList"></div><div class="panel"><label>New profile name <input id="newProfile"></label><button id="addProfile">Add Profile</button><button id="exportActiveProfile">Export Active Profile</button><button id="deleteActiveProfile" class="danger">Delete Active Profile</button><p id="profileActionStatus" role="status" aria-live="polite"></p></div></section>
 
-<section id="recovery" class="screen"><h2>Progress Recovery</h2><div class="panel"><p id="saveHealth"></p><button id="backupBtn">Create Backup</button><button id="restoreBtn">Restore Backup</button><button id="exportBtn">Export Versioned Progress</button><label>Import a progress file <input id="importFile" type="file" accept="application/json"></label></div></section>
+<section id="recovery" class="screen"><h2>Progress Recovery</h2><div class="panel"><p id="saveHealth" role="status" aria-live="polite" aria-atomic="true"></p><button id="backupBtn">Create Backup</button><button id="restoreBtn">Restore Backup</button><button id="exportBtn">Export Versioned Progress</button><label>Import a progress file <input id="importFile" type="file" accept="application/json"></label></div></section>
 
 <section id="account" class="screen"><h2>Account & Sync</h2>
 <div class="cards"><div class="panel"><h3>Mode</h3><p id="syncMode">Local-first</p></div><div class="panel"><h3>Queue</h3><p id="syncQueueCount">0 pending</p></div><div class="panel"><h3>Last Sync</h3><p id="lastSync">Never</p></div></div>
 <div class="panel"><h3>Parent Account</h3><label>Parent email <input id="localAccountEmail" type="email" autocomplete="email" placeholder="parent@example.com"></label><label>Password <input id="parentPassword" type="password" minlength="8" autocomplete="current-password"></label><div class="cloud-actions"><button id="createCloudAccount">Create Firebase Account</button><button id="signInCloud">Sign In</button><button id="signOutCloud">Sign Out</button><button id="saveLocalAccount">Save Email Locally</button></div><p id="localAccountStatus" role="status" aria-live="polite"></p></div>
-<div class="panel"><h3>Cloud Sync</h3><p>Progress stays local until a dedicated BrainBite Firebase project is connected. Offline changes queue safely for retry.</p><div class="cloud-actions"><button id="pushCloudSync">Push to Cloud</button><button id="pullCloudSync">Pull from Cloud</button><button id="retryQueue">Retry Pending Sync</button><button id="exportCloudSnapshot">Export Account Data</button><button id="deleteCloudAccount" class="danger">Delete Cloud Data &amp; Account</button></div><p id="mergeResult" role="status" aria-live="polite"></p></div>
+<div class="panel"><h3>Cloud Sync</h3><p>Progress stays local until a dedicated BrainBite Firebase project is connected. Offline changes queue safely for retry.</p><div class="cloud-actions"><button id="pushCloudSync">Push to Cloud</button><button id="pullCloudSync">Pull from Cloud</button><button id="retryQueue">Retry Pending Sync</button><button id="exportCloudSnapshot">Export Account Data</button><button id="deleteCloudAccount" class="danger">Check Cloud Deletion Status</button></div><p id="mergeResult" role="status" aria-live="polite"></p></div>
 </section>
 <section id="integrations" class="screen"><h2>Integrations</h2>
 <div class="cards">
@@ -193,13 +193,13 @@ player.move()</textarea><div class="code-bridge-actions"><button id="codeRun">Ru
 <label>Project ID <input id="cloudUrl" placeholder="your-firebase-project-id"></label>
 <label>Web API key <input id="cloudKey" placeholder="AIza..."></label>
 <button id="saveCloudConfig">Save Cloud Config</button>
-<p id="cloudConfigMsg"></p><p class="small">For Firebase, use only public web-app configuration values. Never place Admin SDK/service-account secrets in the browser.</p>
+<p id="cloudConfigMsg" role="status" aria-live="polite" aria-atomic="true"></p><p class="small">For Firebase, use only public web-app configuration values. Never place Admin SDK/service-account secrets in the browser.</p>
 </div>
 <div class="panel"><h3>Quick Firebase Setup</h3>
 <ol><li>Create a Firebase project.</li><li>Enable Email/Password Authentication.</li><li>Create Firestore.</li><li>Deploy the included <code>firebase/firestore.rules</code>.</li><li>Paste Project ID + Web API key above.</li></ol>
-<button id="copyFirebaseChecklist">Copy Setup Checklist</button><span id="copySetupMsg"></span>
+<button id="copyFirebaseChecklist">Copy Setup Checklist</button><span id="copySetupMsg" role="status" aria-live="polite" aria-atomic="true"></span>
 </div>
-<div class="panel"><h3>Connectivity Test</h3><button id="runIntegrationCheck">Run Integration Check</button><div id="integrationCheckResult"></div></div>
+<div class="panel"><h3>Connectivity Test</h3><button id="runIntegrationCheck">Run Integration Check</button><div id="integrationCheckResult" role="status" aria-live="polite" aria-atomic="true"></div></div>
 </section>
 <section id="controls" class="screen"><h2>Parent Controls</h2>
 <div class="panel">
@@ -207,10 +207,10 @@ player.move()</textarea><div class="code-bridge-actions"><button id="codeRun">Ru
 <label>Max single session (minutes) <input id="maxSessionMinutes" type="number" min="5" max="120" step="5"></label>
 <label><input id="requireParentForPractice" type="checkbox"> Require parent unlock for Practice Lab</label>
 <button id="saveControls">Save Controls</button>
-<p id="controlsStatus"></p>
+<p id="controlsStatus" role="status" aria-live="polite" aria-atomic="true"></p>
 <p id="timeLedgerWarning" class="limit-warn" role="alert" hidden></p>
 </div>
-<div class="panel"><h3>Today</h3><p id="todayUsage">0 minutes played</p><p id="sessionLimitStatus"></p></div>
+<div class="panel"><h3>Today</h3><p id="todayUsage" role="status" aria-live="polite" aria-atomic="true">0 minutes played</p><p id="sessionLimitStatus" role="status" aria-live="polite" aria-atomic="true"></p></div>
 </section>
 <section id="diagnostics" class="screen"><h2>Diagnostics</h2>
 <div class="cards">

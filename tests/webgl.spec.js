@@ -167,12 +167,20 @@ test('a restored WebGL context keeps the live 3D scene and the active mission',a
   // recovers from the browser's own restore, and that the 1.5s fallback window is cancelled.
   const lost=await canvas.evaluate(node=>{
     const gl=node.getContext('webgl2')||node.getContext('webgl');
-    window.__bbLoseContext=gl.getExtension('WEBGL_lose_context');
-    window.__bbLoseContext.loseContext();
+    const extension=gl.getExtension('WEBGL_lose_context');
+    window.__bbContextEvents={lost:0,restored:0};
+    node.addEventListener('webglcontextrestored',()=>{window.__bbContextEvents.restored++},{once:true});
+    node.addEventListener('webglcontextlost',()=>{
+      window.__bbContextEvents.lost++;
+      // Allow every loss handler (including preventDefault) to finish, then
+      // restore in-page without spending the fallback window on a round trip.
+      setTimeout(()=>extension.restoreContext(),0);
+    },{once:true});
+    extension.loseContext();
     return gl.isContextLost();
   });
   expect(lost).toBe(true);
-  await canvas.evaluate(()=>window.__bbLoseContext.restoreContext());
+  await expect.poll(()=>page.evaluate(()=>window.__bbContextEvents)).toEqual({lost:1,restored:1});
   await expect(page.locator('html')).toHaveClass(/presentation-webgl/);
   await expect(page.locator('#game canvas.webgl-canvas')).toHaveCount(1);
   await expect(page.locator('#feedback')).toContainText('reconnected');
@@ -355,8 +363,11 @@ for(const [width,height] of [[360,740],[390,844],[1024,682],[1280,800]]){
 
 test('the arrival status clears so the prompt card shows only the prompt',async({page})=>{
   await page.goto('/?presentation=webgl');
-  await page.evaluate(()=>window.BrainBiteGame.startMission(1));
-  await expect(page.locator('#feedback')).toContainText('Entering');
+  const arrival=await page.evaluate(()=>{
+    window.BrainBiteGame.startMission(1);
+    return document.getElementById('feedback').textContent;
+  });
+  expect(arrival).toContain('Entering');
   await expect(page.locator('#feedback')).toHaveText('',{timeout:3000});
   await expect(page.locator('#feedback')).toHaveAttribute('role','status');
 });
@@ -593,17 +604,47 @@ test('the scene locks input only during the hop and re-enables it within 700 ms'
   await expect.poll(()=>page.evaluate(()=>window.BrainBiteGame.getState().correct)).toBe(2);
 });
 
-test('reduced motion shows the answer state without a hop or particles',async({page})=>{
+test('reduced motion preserves correct/wrong answer states and gameplay counters',async({page},testInfo)=>{
   await page.emulateMedia({reducedMotion:'reduce'});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  const diagnostics={events:[],attempts:[]};
+  await page.addInitScript(()=>{
+    window.__bbAnswerDiagnostics=[];
+    for(const type of ['bb:answer','bb:presentation-fallback','bb:presentation-restored']){
+      window.addEventListener(type,event=>window.__bbAnswerDiagnostics.push({type,detail:event.detail,at:performance.now()}));
+    }
+    for(const type of ['webglcontextlost','webglcontextrestored']){
+      document.addEventListener(type,()=>window.__bbAnswerDiagnostics.push({type,at:performance.now()}),true);
+    }
+  });
+  try {
   await page.goto('/?presentation=webgl');
+  await waitForPresentationReady(page);
   await page.evaluate(()=>window.BrainBiteGame.startMission(1));
+  await page.evaluate(()=>window.BrainBitePresentation.syncFromScreen());
   await expect(page.locator('#game .battle-frame')).toHaveAttribute('data-answer-discs','4');
-  await answerCorrect(page);
+  const attempt=correct=>page.evaluate(correct=>{
+    const game=window.BrainBiteGame,g=game.getState();
+    const choices=game.pillarChoices(),slot=game.nibblerState()?.slot;
+    const value=correct?(choices.find((v,i)=>g.webglRemaining.includes(v)&&i!==slot)||choices.find(v=>g.webglRemaining.includes(v))||g.webglRemaining[0]):g.m.wrong[0];
+    const accepted=game.tryAnswer(value);
+    return {value,accepted,correct:g.correct,wrong:g.wrong,eaten:g.eaten,combo:g.combo,lives:g.lives,lastAnswer:document.querySelector('#game .battle-frame')?.dataset.lastAnswer,mode:window.BrainBitePresentation.mode};
+  },correct);
+  diagnostics.attempts.push(await attempt(true));
+  expect(diagnostics.attempts[0]).toMatchObject({accepted:true,correct:1,wrong:0,eaten:1,combo:1,lives:3,mode:'webgl'});
   await expect(page.locator('#game .battle-frame')).toHaveAttribute('data-last-answer','correct');
-  await answerWrong(page);
+  diagnostics.attempts.push(await attempt(false));
+  // tryAnswer returns correctness: a false result must still record the wrong attempt.
+  expect(diagnostics.attempts[1]).toMatchObject({accepted:false,correct:1,wrong:1,eaten:1,combo:0,lives:2,mode:'webgl'});
   await expect(page.locator('#game .battle-frame')).toHaveAttribute('data-last-answer','wrong');
   expect(errors).toEqual([]);
+  } catch(error) {
+    diagnostics.errors=errors;
+    diagnostics.events=await page.evaluate(()=>window.__bbAnswerDiagnostics||[]).catch(()=>[]);
+    diagnostics.presentation=await page.evaluate(()=>({mode:window.BrainBitePresentation?.mode,report:window.BrainBitePresentation?.getPerformanceReport?.(),frame:document.querySelector('#game .battle-frame')?.dataset})).catch(()=>null);
+    await testInfo.attach('reduced-motion-diagnostics',{body:JSON.stringify(diagnostics,null,2),contentType:'application/json'});
+    throw error;
+  }
 });
 
 test('three in a row flashes the combo panel and announces the streak',async({page})=>{

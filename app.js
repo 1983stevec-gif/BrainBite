@@ -4,6 +4,7 @@ const KEY='bb-core-v3',BACK='bb-core-v3-back';
 // Declared here, before the canonical load runs, because load() reconciles the copies.
 const STORE_COPY_KEYS=BrainBiteStorageCopies.DEFAULT_KEYS;
 const PRE_OPERATION_ROLLBACK_KEY='bb-core-v3-pre-operation-rollback';
+const UNREADABLE_STORE_QUARANTINE_KEY='bb-core-v3-unreadable-quarantine';
 const PARENT_AUTH_KEY='bb-parent-auth-v1';
 const PARENT_AUTH_ITERATIONS=600000;
 const PARENT_LOCK_MS=15*60*1000;
@@ -16,6 +17,7 @@ const TIME_EXTENSION_MS=15*60*1000;
 const TIME_EXIT_PREFIX='bb-time-usage-v1-exit:';
 const TIME_EXIT_RECEIPT_LIMIT=128;
 const SECRET_KEYS=new Set(['parentPin','parentAuth','pinHash','pinSalt','password','idToken','refreshToken','accessToken']);
+const STORED_PROFILE_ID_PATTERN=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const $=id=>document.getElementById(id);
 const REGISTRY=window.BrainBiteRegistry;
 const CONTENT_REVIEW=window.BrainBiteContentReviewManifest;
@@ -304,13 +306,7 @@ function newCryptographicUuid(){
  const hex=[...bytes].map(value=>value.toString(16).padStart(2,'0'));
  return `${hex.slice(0,4).join('')}-${hex.slice(4,6).join('')}-${hex.slice(6,8).join('')}-${hex.slice(8,10).join('')}-${hex.slice(10).join('')}`
 }
-const PAGE_WRITER_SESSION_KEY='bb-core-writer-v1';
-function pageWriterId(){
- let value='';try{value=sessionStorage.getItem(PAGE_WRITER_SESSION_KEY)||''}catch{}
- if(UUID_PATTERN.test(value))return value;
- value=newCryptographicUuid();try{sessionStorage.setItem(PAGE_WRITER_SESSION_KEY,value)}catch{}
- return value;
-}
+function pageWriterId(){return newCryptographicUuid()}
 const PAGE_WRITER_ID=pageWriterId();
 function belongsToInstallation(originId,installationId){const value=String(originId||'');return value===installationId||value.startsWith(`${installationId}:`)}
 function stableSyncJson(value){
@@ -596,8 +592,17 @@ function prepareTimeUsageLaunch(){
  entry=ensureProfileTimeUsage(TIME_USAGE,profileId,now);TIME_RUNTIME={profileId,sessionId:entry.sessionId,lastTickAt:now,lifecycleCaptured:false};return true
 }
 function gameplayIsVisible(){return !!G&&!G.timeExpired&&$('game')?.classList.contains('show')&&document.visibilityState!=='hidden'}
+function invalidateStaleGame(){
+ if(!G||G.profileId===P()?.id&&!isProfileDeleted(G.profileId))return false;
+ G=null;TIME_RUNTIME={profileId:null,sessionId:null,lastTickAt:0,lifecycleCaptured:false};TIME_PENDING_LAUNCH=null;
+ hideSnackCard();hideExplainer();hideBattleToast();applyWorldTheme('');
+ if($('game')?.classList.contains('show')||$('timeup')?.classList.contains('show'))show('home');
+ return true
+}
 function checkpointGameplayActivity({forceActive=false,reason='activity',bestEffortOnly=false}={}){
- if(!G||G.timeExpired||TIME_RUNTIME.profileId!==P().id)return !G?.timeExpired;
+ if(invalidateStaleGame())return false;
+ if(!G)return true;
+ if(G.timeExpired||TIME_RUNTIME.profileId!==G.profileId)return false;
  const now=Date.now(),active=(forceActive&&$('game')?.classList.contains('show'))||gameplayIsVisible(),elapsed=Math.max(0,now-TIME_RUNTIME.lastTickAt),delta=active?Math.min(TIME_CHECKPOINT_MS,elapsed):0;TIME_RUNTIME.lastTickAt=now;
  if(!delta){if(reason==='activity')queueTimeUsageMutation(P().id,(entry,commitNow)=>({...entry,lastActivityAt:commitNow,lastTickAt:commitNow,updatedAt:commitNow,lastSeenWallClock:Math.max(entry.lastSeenWallClock,commitNow)}));return true}
  if(bestEffortOnly){const entry=ensureProfileTimeUsage(TIME_USAGE,P().id,now),next=consumeTimeDelta(entry,delta,now);TIME_USAGE.profiles[P().id]=next;TIME_USAGE.updatedAt=Math.max(TIME_USAGE.updatedAt,next.updatedAt)}
@@ -635,10 +640,11 @@ function mergeSyncStates(localValue,persistedValue){
 const DIAGNOSTIC_KEY='bb-diagnostics-v1';
 const DIAGNOSTIC_LIMIT=50;
 let DIAGNOSTICS=[];
-try{const stored=JSON.parse(localStorage.getItem(DIAGNOSTIC_KEY)||'[]');if(Array.isArray(stored))DIAGNOSTICS=stored.slice(-DIAGNOSTIC_LIMIT)}catch{DIAGNOSTICS=[]}
+function redactDiagnosticText(value,limit){return String(value||'').replace(/\b(authorization|proxy-authorization)\s*:\s*(?:(?:Basic|Bearer)\s+)?[A-Za-z0-9._~+\/=\-]+/gi,'$1: [REDACTED]').replace(/\bBearer\s+[A-Za-z0-9._~+\/=\-]+/gi,'Bearer [REDACTED]').replace(/(["']?)(authorization|proxy-authorization|password|passwd|passcode|pin|(?:[a-z0-9_-]*(?:token|secret|credential))|api[_-]?key|client[_-]?secret)\1\s*([:=])\s*(?:"[^"]*"|'[^']*'|[^\s,;&}]+)/gi,(_,quote,key,separator)=>`${quote}${key}${quote}${separator} [REDACTED]`).replace(/(?:[A-Za-z0-9_-]{8,}\.){2}[A-Za-z0-9_-]{8,}|[A-Za-z0-9_~+\/=\-]{32,}/g,'[REDACTED]').slice(0,limit)}
+try{const stored=JSON.parse(localStorage.getItem(DIAGNOSTIC_KEY)||'[]');if(Array.isArray(stored))DIAGNOSTICS=stored.slice(-DIAGNOSTIC_LIMIT).map(entry=>({...entry,type:redactDiagnosticText(entry?.type,40),message:redactDiagnosticText(entry?.message,240),context:redactDiagnosticText(entry?.context,120)}))}catch{DIAGNOSTICS=[]}
 function recordDiagnostic(type,message,context=''){
  try{
-  const entry={type:String(type||'issue').slice(0,40),message:String(message||'').slice(0,240),context:String(context||'').slice(0,120),ts:Date.now()};
+  const entry={type:redactDiagnosticText(type||'issue',40),message:redactDiagnosticText(message,240),context:redactDiagnosticText(context,120),ts:Date.now()};
   DIAGNOSTICS.push(entry);
   if(DIAGNOSTICS.length>DIAGNOSTIC_LIMIT)DIAGNOSTICS=DIAGNOSTICS.slice(-DIAGNOSTIC_LIMIT);
   localStorage.setItem(DIAGNOSTIC_KEY,JSON.stringify(DIAGNOSTICS));
@@ -658,6 +664,7 @@ function reportPersistenceFailure(error){
 function persistCanonicalState({renderAfter=false}={}){
  PERSISTENCE_CHAIN=PERSISTENCE_CHAIN.catch(()=>{}).then(()=>withPersistenceLock(()=>{
   STORE=mergeStores(STORE,readAllStoredStores());
+  invalidateStaleGame();
   SYNC=mergeSyncStates(SYNC,readStoredSync());
   writeStoreCopiesUnlocked(STORE);
   localStorage.setItem(SYNC_KEY,JSON.stringify(SYNC));
@@ -669,7 +676,9 @@ function initializeCanonicalState(){
  PERSISTENCE_CHAIN=PERSISTENCE_CHAIN.catch(()=>{}).then(()=>withPersistenceLock(()=>{
   const currentRaw=localStorage.getItem(KEY);
   if(currentRaw!==LOADED_STORE_RAW)STORE=mergeStores(STORE,readAllStoredStores());
+  invalidateStaleGame();
   SYNC=mergeSyncStates(SYNC,readStoredSync());
+  preserveUnreadableStoreCopies();
   writeStoreCopiesUnlocked(STORE);
   localStorage.setItem(SYNC_KEY,JSON.stringify(SYNC));
   LOADED_STORE_RAW=JSON.stringify(STORE);
@@ -686,19 +695,25 @@ window.addEventListener('storage',event=>{
  }
  if(![KEY,BACK,RECOVERY_KEY,SYNC_KEY].includes(event.key))return;
  STORE=mergeStores(STORE,readAllStoredStores());
+ invalidateStaleGame();
  SYNC=mergeSyncStates(SYNC,readStoredSync());
  if(document.readyState!=='loading')render();
 });
 if(PERSISTENCE_CHANNEL)PERSISTENCE_CHANNEL.onmessage=event=>{
  if(!event.data?.store||!event.data?.sync)return;
  STORE=event.data.replace?migrateStore(structuredClone(event.data.store)):mergeStores(STORE,[event.data.store]);
+ invalidateStaleGame();
  SYNC=mergeSyncStates(SYNC,event.data.sync);
  if(document.readyState!=='loading')render();
 };
 function nextAttemptOrigin(){
  if(!UUID_PATTERN.test(String(SYNC.installationId||'')))SYNC.installationId=newCryptographicUuid();
+ // A different tab can persist a newer sequence after this page boots. Refresh the
+ // floor before every allocation so a late storage merge cannot reuse an origin
+ // sequence when this writer resumes recording attempts.
+ const persistedFloor=Math.max(Number(SYNC.attemptSequence)||0,persistedAttemptSequence(),installationSequenceFloor(SYNC.installationId));
  const current=Number(PAGE_ATTEMPT_SEQUENCE);
- if(!Number.isSafeInteger(current)||current<0)PAGE_ATTEMPT_SEQUENCE=Math.max(Number(SYNC.attemptSequence)||0,installationSequenceFloor(SYNC.installationId));
+ PAGE_ATTEMPT_SEQUENCE=Math.max(Number.isSafeInteger(current)&&current>=0?current:0,persistedFloor);
  if(PAGE_ATTEMPT_SEQUENCE>=Number.MAX_SAFE_INTEGER)throw new Error('Learning attempt sequence exhausted.');
  PAGE_ATTEMPT_SEQUENCE+=1;SYNC.attemptSequence=Math.max(Number(SYNC.attemptSequence)||0,PAGE_ATTEMPT_SEQUENCE);
  return {originId:`${SYNC.installationId}:${PAGE_WRITER_ID}`,originSequence:PAGE_ATTEMPT_SEQUENCE}
@@ -715,15 +730,44 @@ function queueSyncEvent(event){
  SYNC.queue=normalizeSyncQueue([...SYNC.queue,next],SYNC.acknowledgedEventIds,SYNC_IN_FLIGHT);
 }
 
+function isReadableModernStoredGeneration(store){
+ if(!store||typeof store!=='object'||Array.isArray(store)||!Number.isInteger(store.schemaVersion)||store.schemaVersion<8||store.schemaVersion>SCHEMA_VERSION)return false;
+ if(!Number.isInteger(store.active)||store.active<0||store.active>=store.profiles.length)return false;
+ if(Object.hasOwn(store,'deletedProfiles')&&!Array.isArray(store.deletedProfiles))return false;
+ const ids=new Set();
+ for(const profile of store.profiles){
+  if(!profile||typeof profile!=='object'||Array.isArray(profile)||typeof profile.id!=='string'||!STORED_PROFILE_ID_PATTERN.test(profile.id)||ids.has(profile.id)||typeof profile.name!=='string'||!profile.name.trim())return false;
+  ids.add(profile.id);
+ }
+ for(const tombstone of store.deletedProfiles||[]){
+  if(!tombstone||typeof tombstone!=='object'||Array.isArray(tombstone)||typeof tombstone.id!=='string'||!STORED_PROFILE_ID_PATTERN.test(tombstone.id)||ids.has(tombstone.id))return false;
+ }
+ return true;
+}
 function readStoredStore(raw){
  try{
    const parsed=JSON.parse(raw);
-   return parsed&&Array.isArray(parsed.profiles)?migrateStore(parsed):null;
+   if(!parsed||!Array.isArray(parsed.profiles)||parsed.profiles.length===0)return null;
+   // An absent schema stays migration-compatible; a declared schema must be a
+   // supported integer before migration can mask a healthy sibling generation.
+   if(Object.hasOwn(parsed,'schemaVersion')&&(!Number.isInteger(parsed.schemaVersion)||parsed.schemaVersion<1||parsed.schemaVersion>SCHEMA_VERSION))return null;
+   if(parsed.schemaVersion>=8&&!isReadableModernStoredGeneration(parsed))return null;
+   return migrateStore(parsed);
  }catch{
    return null;
  }
 }
 function readStoredCopy(key){return readStoredStore(localStorage.getItem(key))}
+
+function preserveUnreadableStoreCopies(){
+ if(readAllStoredStores().length)return false;
+ const generations={};for(const key of [KEY,BACK,RECOVERY_KEY]){const raw=localStorage.getItem(key);if(raw!==null)generations[key]=raw}
+ if(!Object.keys(generations).length)return false;
+ const existingRaw=localStorage.getItem(UNREADABLE_STORE_QUARANTINE_KEY);let snapshots=[];
+ if(existingRaw!==null)try{const existing=JSON.parse(existingRaw);snapshots=existing?.version===1&&Array.isArray(existing.snapshots)?existing.snapshots:[{unreadableQuarantine:existingRaw}]}catch{snapshots=[{unreadableQuarantine:existingRaw}]}
+ const signature=JSON.stringify(generations);if(snapshots.some(snapshot=>JSON.stringify(snapshot?.generations)===signature))return false;
+ snapshots.push({generations});localStorage.setItem(UNREADABLE_STORE_QUARANTINE_KEY,JSON.stringify({version:1,snapshots}));return true
+}
 
 function writeStoreCopiesUnlocked(store){
  const payload=BrainBiteStorageCopies.writeRotated(localStorage,STORE_COPY_KEYS,store,readStoredCopy);
@@ -809,9 +853,18 @@ function replaceStoreCopiesUnlocked(store){
  return replacement;
 }
 
+function preserveCurrentProfileDeletions(store){
+ const replacement=migrateStore(structuredClone(store)),activeId=replacement.profiles[replacement.active]?.id,tombstones=new Map();
+ for(const item of [...(replacement.deletedProfiles||[]),...(STORE.deletedProfiles||[])])if(item?.id)tombstones.set(String(item.id),Math.max(tombstones.get(String(item.id))||0,Number(item.deletedAt)||0));
+ replacement.deletedProfiles=[...tombstones].map(([id,deletedAt])=>({id,deletedAt}));
+ replacement.profiles=replacement.profiles.filter(profile=>!tombstones.has(String(profile?.id)));
+ replacement.active=Math.max(0,replacement.profiles.findIndex(profile=>profile.id===activeId));
+ return migrateStore(replacement)
+}
+
 function replaceCanonicalState(store,{renderAfter=true}={}){
  PERSISTENCE_CHAIN=PERSISTENCE_CHAIN.catch(()=>{}).then(()=>withPersistenceLock(()=>{
-  STORE=replaceStoreCopiesUnlocked(store);
+  STORE=replaceStoreCopiesUnlocked(preserveCurrentProfileDeletions(store));
   SYNC=mergeSyncStates(SYNC,readStoredSync());
   localStorage.setItem(SYNC_KEY,JSON.stringify(SYNC));
   LOADED_STORE_RAW=localStorage.getItem(KEY);
@@ -845,6 +898,35 @@ async function replaceCanonicalStateSafely(operation,replacementFactory){
  }
 }
 
+const IMPORTED_STAGE_FAMILIES={'child-profile':'Child Profile',brainbase:'BrainBase','play-portal':'Play Portal','jungle-circuit':'Jungle Circuit','target-smash':'Target Smash','letter-trail':'Letter Trail','knowledge-platforms':'Knowledge Platforms','secret-reward':'Reward Chest','fraction-kraken':'Fraction Kraken','brainbase-upgrade':'BrainBase Upgrade',save:'Save',exit:'Exit',reopen:'Reopen',continue:'Continue'};
+function validImportedActivityText(value,max=160){return typeof value==='string'&&value.length>0&&value.length<=max&&!/[<>\u0000-\u001f\u007f]/.test(value)}
+function validateImportedActivityArray(value,name,{objects=false,max=64}={}){if(!Array.isArray(value)||value.length>max)throw new Error(`The selected file has an invalid activity ${name}.`);if(!objects&&value.some(item=>!validImportedActivityText(item)))throw new Error(`The selected file has an invalid activity ${name}.`)}
+function validateImportedActivity(activity,stage){
+ if(activity==null)return;
+ if(!activity||typeof activity!=='object'||Array.isArray(activity))throw new Error('The selected file has an invalid active activity.');
+ const family=IMPORTED_STAGE_FAMILIES[stage],common=['family','prompt'],familyFields={
+  'Target Smash':['id','skillId','subject','grade','domain','source','answerType','difficulty','allowMovement','timed','supportLevel','answers','distractors','choices','attempts','selected','completed'],
+  'Letter Trail':['id','skillId','subject','grade','domain','source','difficulty','targetSequence','distractors','choices','revealed','completed','hintsUsed','errors'],
+  'Knowledge Platforms':['id','skillId','subject','grade','domain','source','difficulty','platformOrder','distractors','platforms','visited','completed'],
+  'Reward Chest':['open'],'Fraction Kraken':['phase','health','choices','rewards'],
+ };
+ const allowed=new Set([...common,...(familyFields[family]||[])]);if(!family||activity.family!==family||Object.keys(activity).some(key=>!allowed.has(key))||!validImportedActivityText(activity.prompt,500))throw new Error('The selected file has an invalid active activity.');
+ for(const key of ['family','id','skillId','subject','domain','source','answerType','difficulty'])if(Object.hasOwn(activity,key)&&!validImportedActivityText(activity[key],key==='family'?40:160))throw new Error(`The selected file has an invalid activity ${key}.`);
+ if(Object.hasOwn(activity,'grade')&&!(validImportedActivityText(activity.grade,16)||Number.isFinite(activity.grade)))throw new Error('The selected file has an invalid activity grade.');
+ for(const key of ['allowMovement','timed','completed','open'])if(Object.hasOwn(activity,key)&&typeof activity[key]!=='boolean')throw new Error(`The selected file has an invalid activity ${key}.`);
+ for(const key of ['supportLevel','phase','health','hintsUsed','errors'])if(Object.hasOwn(activity,key)&&(!Number.isFinite(activity[key])||activity[key]<0||activity[key]>100))throw new Error(`The selected file has an invalid activity ${key}.`);
+ for(const key of ['answers','distractors','selected','targetSequence','choices','revealed','platformOrder','platforms','visited','rewards'])if(Object.hasOwn(activity,key)&&!(family==='Target Smash'&&key==='choices'))validateImportedActivityArray(activity[key],key);
+ if(family==='Target Smash'){
+  for(const key of ['answers','distractors','choices','attempts','selected'])if(!Object.hasOwn(activity,key))throw new Error('The selected file has an incomplete active activity.');
+  validateImportedActivityArray(activity.choices,'choices',{objects:true});for(const choice of activity.choices){if(!choice||typeof choice!=='object'||Array.isArray(choice)||Object.keys(choice).some(key=>!['id','value','correct','x','y'].includes(key))||!validImportedActivityText(choice.id,64)||!(validImportedActivityText(choice.value,160)||Number.isFinite(choice.value))||typeof choice.correct!=='boolean'||!Number.isInteger(choice.x)||choice.x<0||choice.x>5||!Number.isInteger(choice.y)||choice.y<0||choice.y>5)throw new Error('The selected file has an invalid activity choice.');}
+  validateImportedActivityArray(activity.attempts,'attempts',{objects:true});for(const attempt of activity.attempts){if(!attempt||typeof attempt!=='object'||Array.isArray(attempt)||Object.keys(attempt).some(key=>!['correct','assisted','hintsUsed','responseTimeMs','independent','randomLike'].includes(key))||['correct','assisted','independent','randomLike'].some(key=>typeof attempt[key]!=='boolean')||!Number.isFinite(attempt.hintsUsed)||attempt.hintsUsed<0||attempt.hintsUsed>100||!Number.isFinite(attempt.responseTimeMs)||attempt.responseTimeMs<0||attempt.responseTimeMs>86400000)throw new Error('The selected file has an invalid activity attempt.');}
+ }
+ if(family==='Letter Trail')for(const key of ['targetSequence','distractors','choices','revealed'])if(!Object.hasOwn(activity,key))throw new Error('The selected file has an incomplete active activity.');
+ if(family==='Knowledge Platforms')for(const key of ['platformOrder','distractors','platforms','visited'])if(!Object.hasOwn(activity,key))throw new Error('The selected file has an incomplete active activity.');
+ if(family==='Reward Chest'&&typeof activity.open!=='boolean')throw new Error('The selected file has an incomplete active activity.');
+ if(family==='Fraction Kraken'&&(!Number.isInteger(activity.phase)||!Number.isInteger(activity.health)||!Array.isArray(activity.choices)||!Array.isArray(activity.rewards)))throw new Error('The selected file has an incomplete active activity.');
+}
+function validateImportedLearningState(profile){const learner=profile.learningCore;if(learner==null)return;if(!learner||typeof learner!=='object'||Array.isArray(learner))throw new Error('The selected file has an invalid learning state.');if(!validImportedActivityText(learner.stage,32)||!Object.hasOwn(IMPORTED_STAGE_FAMILIES,learner.stage))throw new Error('The selected file has an invalid learning stage.');validateImportedActivity(learner.activeActivity,learner.stage)}
 function validateImportedStoreIdentity(raw){
  if(!raw||typeof raw!=='object'||Array.isArray(raw)||!Array.isArray(raw.profiles)||raw.profiles.length===0)throw new Error('The selected file does not contain learner profiles.');
  if(Object.hasOwn(raw,'schemaVersion')&&(!Number.isInteger(raw.schemaVersion)||raw.schemaVersion<1||raw.schemaVersion>9))throw new Error('The selected file has an unsupported schema version.');
@@ -861,6 +943,7 @@ function validateImportedStoreIdentity(raw){
  const profileIds=new Set();
  for(const profile of raw.profiles){
   if(!profile||typeof profile!=='object'||Array.isArray(profile))throw new Error('The selected file has an invalid learner profile.');
+  validateImportedLearningState(profile);
   const hasId=Object.hasOwn(profile,'id')&&profile.id!==null&&profile.id!==undefined&&profile.id!=='';
   if(!hasId){if(modern)throw new Error('The selected file has a missing profile ID.');continue}
   if(typeof profile.id!=='string'||!idPattern.test(profile.id))throw new Error('The selected file has an unsafe profile ID.');
@@ -1040,7 +1123,9 @@ function mergeLearningCore(localCore,remoteCore,{preferRemote=false}={}){
  out.telemetry=mergeHistory(localCore.telemetry,remoteCore.telemetry,200);
  out.sentEventIds=[...new Set([...(localCore.sentEventIds||[]),...(remoteCore.sentEventIds||[])])];
  const sent=new Set(out.sentEventIds);
- out.offlineQueue=mergeHistory(localCore.offlineQueue,remoteCore.offlineQueue,200).filter(event=>!sent.has(event.id||event.eventId));
+ // Acknowledged events must not consume slots before the canonical 500-event bound.
+ // mergeHistory deduplicates by event identity and sorts deterministically by timestamp.
+ out.offlineQueue=mergeHistory((localCore.offlineQueue||[]).filter(event=>!sent.has(event?.id||event?.eventId)),(remoteCore.offlineQueue||[]).filter(event=>!sent.has(event?.id||event?.eventId)),500);
  out.skills={};
  for(const skillId of new Set([...Object.keys(localCore.skills||{}),...Object.keys(remoteCore.skills||{})])){
   const left=localCore.skills?.[skillId],right=remoteCore.skills?.[skillId];
@@ -1145,7 +1230,7 @@ function rememberProfileDeletion(profileId,deletedAt=Date.now()){
   if(existing)existing.deletedAt=Math.max(Number(existing.deletedAt)||0,Number(deletedAt)||0);
   else STORE.deletedProfiles.push({id:profileId,deletedAt:Number(deletedAt)||Date.now()});
   const removedIndex=STORE.profiles.findIndex(profile=>profile.id===profileId);
-  if(removedIndex>=0){STORE.profiles.splice(removedIndex,1);if(STORE.active>=STORE.profiles.length)STORE.active=Math.max(0,STORE.profiles.length-1)}
+  if(removedIndex>=0){STORE.profiles.splice(removedIndex,1);if(STORE.active>=STORE.profiles.length)STORE.active=Math.max(0,STORE.profiles.length-1);invalidateStaleGame()}
 }
 function testConflictMerge(){
  const a={name:'Kid',score:100,stars:3,completed:[1,2],mastery:{math:30},updatedAt:100};
@@ -1347,11 +1432,17 @@ class BrainBiteFirebaseREST {
   async pullProfiles(){
     if(!this.userId())throw new Error('Sign in first');
     const url=`https://firestore.googleapis.com/v1/projects/${encodeURIComponent(this.projectId)}/databases/(default)/documents/families/${encodeURIComponent(this.userId())}/profiles`;
-    const r=await this.fetchAuthorized(url);
-    if(r.status===404)return [];
-    if(!r.ok)throw new Error(`Cloud read failed (${r.status})`);
-    const d=await r.json();
-    return (d.documents||[]).map(doc=>({name:doc.name,progress:this.unwrapValue(doc.fields?.progress),client_updated_at:doc.fields?.clientUpdatedAt?.timestampValue,updated_at:doc.updateTime}))
+    const profiles=[];
+    let pageToken=null;
+    do{
+      const r=await this.fetchAuthorized(pageToken?`${url}?pageToken=${encodeURIComponent(pageToken)}`:url);
+      if(r.status===404)return profiles;
+      if(!r.ok)throw new Error(`Cloud read failed (${r.status})`);
+      const d=await r.json();
+      profiles.push(...(d.documents||[]).map(doc=>({name:doc.name,progress:this.unwrapValue(doc.fields?.progress),client_updated_at:doc.fields?.clientUpdatedAt?.timestampValue,updated_at:doc.updateTime})));
+      pageToken=d.nextPageToken||null;
+    }while(pageToken);
+    return profiles
   }
   async deleteFamily(){
     if(!this.userId())throw new Error('Sign in first');
@@ -1388,7 +1479,7 @@ const SHOP=[
  {id:'boss_crown',name:'Boss Crown',cost:36}
 ];
 const REVIEW_MS={first:10*60*1000,second:24*60*60*1000,mastered:3*24*60*60*1000};
-let parentUnlocked=false,parentUnlockedUntil=0,deferredPrompt=null;
+let parentUnlocked=false,parentUnlockedUntil=0,parentAccessExpiryTimer=null,parentUnlockInFlight=false,deferredPrompt=null;
 function bytesToB64(bytes){let binary='';for(const byte of bytes)binary+=String.fromCharCode(byte);return btoa(binary)}
 function b64ToBytes(value){const binary=atob(String(value||''));return Uint8Array.from(binary,character=>character.charCodeAt(0))}
 function readParentAuth(){
@@ -1402,16 +1493,33 @@ async function deriveParentVerifier(pin,salt,iterations=PARENT_AUTH_ITERATIONS){
 function sameBytes(left,right){if(left.length!==right.length)return false;let difference=0;for(let index=0;index<left.length;index++)difference|=left[index]^right[index];return difference===0}
 async function createParentAuth(pin){if(!/^\d{6,10}$/.test(pin))throw new Error('PIN must be 6-10 digits.');const salt=crypto.getRandomValues(new Uint8Array(16)),verifier=await deriveParentVerifier(pin,salt);const auth={version:1,algorithm:'PBKDF2-SHA-256',iterations:PARENT_AUTH_ITERATIONS,saltB64:bytesToB64(salt),verifierB64:bytesToB64(verifier),failedAttempts:0,lockedUntil:0,updatedAt:Date.now()};writeParentAuth(auth);return auth}
 async function verifyParentPin(pin){
- const auth=readParentAuth();if(!auth)return {ok:false,setup:true};
- const now=Date.now();if(auth.lockedUntil>now)return {ok:false,locked:true,lockedUntil:auth.lockedUntil};
- if(auth.lockedUntil){auth.failedAttempts=0;auth.lockedUntil=0}
- const actual=await deriveParentVerifier(pin,b64ToBytes(auth.saltB64),auth.iterations),ok=sameBytes(actual,b64ToBytes(auth.verifierB64));
- if(ok){auth.failedAttempts=0;auth.lockedUntil=0;auth.updatedAt=now;writeParentAuth(auth);return {ok:true}}
- auth.failedAttempts+=1;if(auth.failedAttempts>=5)auth.lockedUntil=now+PARENT_LOCK_MS;auth.updatedAt=now;writeParentAuth(auth);return {ok:false,locked:auth.lockedUntil>now,lockedUntil:auth.lockedUntil,remaining:Math.max(0,5-auth.failedAttempts)}
+ const initial=readParentAuth();if(!initial)return {ok:false,setup:true};
+ const startedAt=Date.now();if(initial.lockedUntil>startedAt)return {ok:false,locked:true,lockedUntil:initial.lockedUntil};
+ const actual=await deriveParentVerifier(pin,b64ToBytes(initial.saltB64),initial.iterations),ok=sameBytes(actual,b64ToBytes(initial.verifierB64));
+ return withPersistenceLock(()=>{
+  const auth=readParentAuth();if(!auth)return {ok:false,setup:true};
+  if(auth.saltB64!==initial.saltB64||auth.verifierB64!==initial.verifierB64)return {ok:false,changed:true,remaining:Math.max(0,5-auth.failedAttempts)};
+  const now=Date.now();if(auth.lockedUntil>now)return {ok:false,locked:true,lockedUntil:auth.lockedUntil};
+  if(auth.lockedUntil){auth.failedAttempts=0;auth.lockedUntil=0}
+  if(ok){auth.failedAttempts=0;auth.lockedUntil=0;auth.updatedAt=now;writeParentAuth(auth);return {ok:true}}
+  auth.failedAttempts+=1;if(auth.failedAttempts>=5)auth.lockedUntil=now+PARENT_LOCK_MS;auth.updatedAt=now;writeParentAuth(auth);return {ok:false,locked:auth.lockedUntil>now,lockedUntil:auth.lockedUntil,remaining:Math.max(0,5-auth.failedAttempts)}
+ })
 }
 function hasParentAccess(){if(parentUnlocked&&Date.now()>=parentUnlockedUntil)lockParentAccess();return parentUnlocked}
-function lockParentAccess(){parentUnlocked=false;parentUnlockedUntil=0;for(const id of ['parentPinInput','confirmParentPin','changeCurrentParentPin','newParentPin','changeConfirmParentPin','parentPassword'])if($(id))$(id).value=''}
-function unlockParentAccess(){parentUnlocked=true;parentUnlockedUntil=Date.now()+15*60*1000}
+function lockParentAccess(){if(parentAccessExpiryTimer!==null){clearTimeout(parentAccessExpiryTimer);parentAccessExpiryTimer=null}parentUnlocked=false;parentUnlockedUntil=0;if(SENSITIVE_ACTION)closeSensitiveAction(false);for(const id of ['parentPinInput','confirmParentPin','changeCurrentParentPin','newParentPin','changeConfirmParentPin','parentPassword'])if($(id))$(id).value=''}
+function scheduleParentAccessExpiry(){
+ if(parentAccessExpiryTimer!==null)clearTimeout(parentAccessExpiryTimer);
+ const expectedUntil=parentUnlockedUntil;
+ parentAccessExpiryTimer=setTimeout(()=>{
+  parentAccessExpiryTimer=null;
+  if(!parentUnlocked||parentUnlockedUntil!==expectedUntil)return;
+  if(Date.now()<expectedUntil){scheduleParentAccessExpiry();return}
+  const screen=document.querySelector('.screen.show')?.id;
+  lockParentAccess();
+  if(screen==='parent'||PARENT_ONLY_SCREENS.has(screen))show('parent')
+ },Math.max(0,expectedUntil-Date.now()))
+}
+function unlockParentAccess(){lockParentAccess();parentUnlocked=true;parentUnlockedUntil=Date.now()+15*60*1000;scheduleParentAccessExpiry()}
 async function requireParentAuthorization({inputId='timeUpParentPin',statusId='timeUpStatus'}={}){
  const status=$(statusId),input=$(inputId);
  const auth=readParentAuth();
@@ -1618,6 +1726,7 @@ function renderFirstRun() {
 function parentShellRequired(statusId){
  if(hasParentAccess())return true;
  const status=statusId?$(statusId):null;if(status)status.textContent='Parent areas are locked. Unlock them before using this action.';
+ const screen=document.querySelector('.screen.show')?.id;if(screen==='parent'||PARENT_ONLY_SCREENS.has(screen))show('parent');
  return false
 }
 function show(id){
@@ -1635,7 +1744,14 @@ function show(id){
  }
  const active=document.querySelector('.screen.show')?.id;
  if(active==='game'&&id!=='game'){checkpointGameplayActivity({forceActive:true,reason:'navigation'});applyWorldTheme('')}
- document.querySelectorAll('.screen').forEach(x=>x.classList.remove('show'));$(id).classList.add('show');syncNavigationState(id);return requested===id
+ document.querySelectorAll('.screen').forEach(x=>x.classList.remove('show'));$(id).classList.add('show');syncNavigationState(id);
+ // Keep dialog focus trapped, and leave typing input alone when the same game redraws.
+ if(active!==id&&$('sensitiveActionBackdrop')?.hidden!==false){
+  const heading=$(id).querySelector('h2,h1,h3');
+  if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true})}
+  else {$(id).tabIndex=-1;$(id).focus({preventScroll:true})}
+ }
+ return requested===id
 }
 function syncNavigationState(id=document.querySelector('.screen.show')?.id||'home'){
  const parentContext=(id==='parent'||PARENT_ONLY_SCREENS.has(id))&&hasParentAccess();
@@ -1942,12 +2058,12 @@ function parentDashboardSummary(){
   const homework=(learner.practice||[]).filter(item=>item.homework||item.type==='homework');
   return {
    weekly:{sessions:insights.weeklySummary.sessions,avgAccuracy:insights.weeklySummary.avgAccuracy,practice:insights.weeklySummary.practiceItems,homework:insights.weeklySummary.homework,improvements:insights.improving.length},
-   priority:insights.priority.map(item=>({skill:item.name||item.skillId,skillId:item.skillId,mastery:item.masteryScore,streak:projectedStreak(learner.skills?.[item.skillId]),nextReview:learner.skills?.[item.skillId]?.nextReviewAt||null,reason:item.reason,confidence:item.confidence})),
+   priority:insights.priority.map(item=>({skill:item.name||item.skillId,skillId:item.skillId,mastery:item.masteryScore,independentSuccesses:Number(learner.skills?.[item.skillId]?.evidence?.independentSuccesses)||0,assistedSuccesses:Number(learner.skills?.[item.skillId]?.evidence?.assistedSuccesses)||0,streak:projectedStreak(learner.skills?.[item.skillId]),nextReview:learner.skills?.[item.skillId]?.nextReviewAt||null,reason:item.reason,confidence:item.confidence})),
    homework,
    insights,
   };
  }
- const skills=Object.entries(P().skills||{}).map(([skill,meta])=>({skill,mastery:meta.mastery||0,streak:meta.streak||0,nextReview:meta.nextReview||null,lastSeen:meta.lastSeen||0}));
+ const skills=Object.entries(P().skills||{}).map(([skill,meta])=>({skill,mastery:meta.mastery||0,independentSuccesses:0,assistedSuccesses:0,streak:meta.streak||0,nextReview:meta.nextReview||null,lastSeen:meta.lastSeen||0}));
  const weekAgo=Date.now()-7*24*60*60*1000;
  const weeklySessions=(P().sessions||[]).filter(s=>s.ts>=weekAgo);
  const weeklyPractice=(P().practice||[]).filter(p=>p.ts>=weekAgo);
@@ -1966,7 +2082,7 @@ function renderParent(){
  const due=dueSkills(),memoryDue=$('memoryDue');memoryDue.replaceChildren();if(due.length)due.forEach(x=>{const chip=document.createElement('span');chip.className='memory-chip';chip.textContent=String(x.skill||'skill');memoryDue.appendChild(chip)});else memoryDue.textContent='No Memory Drops due right now.';
  const summary=parentDashboardSummary();
  $('weeklySummary').innerHTML=`<div>Sessions this week: <b>${summary.weekly.sessions}</b></div><div>Avg accuracy: <b>${summary.weekly.avgAccuracy==null?'n/a':summary.weekly.avgAccuracy+'%'}</b></div><div>Practice items: <b>${summary.weekly.practice}</b></div><div>Homework items: <b>${summary.weekly.homework}</b></div><div>Recent skills touched: <b>${summary.weekly.improvements}</b></div>`;
- const priority=$('skillPriority');priority.replaceChildren();if(summary.priority.length)summary.priority.forEach(x=>{const row=document.createElement('div');row.textContent=`${String(x.skill||'skill')} · mastery ${Math.round(x.mastery)}%${x.nextReview&&x.nextReview<=Date.now()?' · due':''}`;priority.appendChild(row)});else priority.textContent='No skill priority yet.';
+ const priority=$('skillPriority');priority.replaceChildren();if(summary.priority.length)summary.priority.forEach(x=>{const row=document.createElement('div');row.textContent=`${String(x.skill||'skill')} · learning score ${Math.round(x.mastery)}% · independent ${x.independentSuccesses} · assisted ${x.assistedSuccesses}${x.nextReview&&x.nextReview<=Date.now()?' · due':''}`;priority.appendChild(row)});else priority.textContent='No skill priority yet.';
  const homeworkSummary=$('homeworkSummary');homeworkSummary.replaceChildren();
  if(summary.homework.length)summary.homework.slice(-5).reverse().forEach(x=>{const row=document.createElement('div');row.textContent=`${x.subject}${x.grade?` grade ${x.grade}`:''} · ${x.topic||'practice'}${x.homework?' · homework':''}`;homeworkSummary.appendChild(row)});
  else homeworkSummary.textContent='No homework practice recorded yet.';
@@ -2290,9 +2406,10 @@ function renderLabDeveloperTools(){
  const actions=document.createElement('div');actions.className='cloud-actions';
  const status=document.createElement('p');status.id='labDeveloperStatus';status.setAttribute('role','status');status.setAttribute('aria-live','polite');
  const add=(id,label,handler,className='')=>{const button=document.createElement('button');button.id=id;button.type='button';button.textContent=label;if(className)button.className=className;button.onclick=handler;actions.appendChild(button);return button};
- add('labSimulateSync','Run Local Sync Simulation',async()=>{await simulateLocalSync();status.textContent='Local sync simulation completed.'});
- add('labTestConflictMerge','Test Conflict Merge',()=>{status.textContent=testConflictMerge()?'Conflict merge test passed.':'Conflict merge test failed.'});
+ add('labSimulateSync','Run Local Sync Simulation',async()=>{if(!parentShellRequired('labDeveloperStatus'))return;await simulateLocalSync();status.textContent='Local sync simulation completed.'});
+ add('labTestConflictMerge','Test Conflict Merge',()=>{if(!parentShellRequired('labDeveloperStatus'))return;status.textContent=testConflictMerge()?'Conflict merge test passed.':'Conflict merge test failed.'});
  add('labDiscardSyncQueue','Discard Pending Sync Queue',async event=>{
+   if(!parentShellRequired('labDeveloperStatus'))return;
   if(!SYNC.queue.length){status.textContent='The pending sync queue is already empty.';return}
   const approved=await requestSensitiveAction({title:'Discard pending sync changes?',description:`This removes ${SYNC.queue.length} pending local sync event(s). It does not delete learner progress.`,confirmText:'Discard pending changes',confirmationValue:'DISCARD',confirmationPrompt:'Type DISCARD exactly',invoker:event.currentTarget,statusId:'labDeveloperStatus'});
   if(!approved){status.textContent='Queue discard cancelled. Pending changes were kept.';return}
@@ -2508,16 +2625,16 @@ function resolveLiveActivity(value,meta={}){
  // was a distractor; WebGL keeps its historical false return for misses.
  return currentCorrect||!document.documentElement.classList.contains('presentation-webgl')
 }
-function renderProfiles(){const l=$('profileList');l.replaceChildren();STORE.profiles.forEach((p,i)=>{const d=document.createElement('div'),details=document.createElement('div'),name=document.createElement('b'),stars=document.createElement('div'),button=document.createElement('button');d.className='profile-row';name.textContent=p.name;stars.textContent=`${p.stars} stars`;button.textContent=i===STORE.active?'Active':'Switch';button.disabled=i===STORE.active;details.append(name,stars);d.append(details,button);button.onclick=()=>{if(i===STORE.active)return;STORE.active=i;lockParentAccess();save();show('home')};l.appendChild(d)})}
+function renderProfiles(){const l=$('profileList');l.replaceChildren();STORE.profiles.forEach((p,i)=>{const d=document.createElement('div'),details=document.createElement('div'),name=document.createElement('b'),stars=document.createElement('div'),button=document.createElement('button');d.className='profile-row';name.textContent=p.name;stars.textContent=`${p.stars} stars`;button.textContent=i===STORE.active?'Active':'Switch';button.disabled=i===STORE.active;details.append(name,stars);d.append(details,button);button.onclick=()=>{if(i===STORE.active||!parentShellRequired('profileActionStatus'))return;STORE.active=i;invalidateStaleGame();lockParentAccess();save();show('home')};l.appendChild(d)})}
 function renderChildProfiles(){
  const active=$('childActiveProfile'),list=$('childProfileList');if(!active||!list)return;active.textContent=P().name;list.replaceChildren();
- STORE.profiles.forEach((profile,index)=>{const row=document.createElement('div'),label=document.createElement('span'),button=document.createElement('button'),current=index===STORE.active;row.className='profile-row child-profile-row';label.textContent=`${profile.name} · ${profile.stars} stars`;button.textContent=current?'Active learner':'Switch learner';button.disabled=current;button.setAttribute('aria-label',current?`${profile.name}, active learner`:`Switch to ${profile.name}`);button.onclick=()=>{if(current)return;STORE.active=index;lockParentAccess();void save();show('home')};row.append(label,button);list.appendChild(row)});
+ STORE.profiles.forEach((profile,index)=>{const row=document.createElement('div'),label=document.createElement('span'),button=document.createElement('button'),current=index===STORE.active;row.className='profile-row child-profile-row';label.textContent=`${profile.name} · ${profile.stars} stars`;button.textContent=current?'Active learner':'Switch learner';button.disabled=current;button.setAttribute('aria-label',current?`${profile.name}, active learner`:`Switch to ${profile.name}`);button.onclick=()=>{if(current)return;STORE.active=index;invalidateStaleGame();lockParentAccess();void save();show('home')};row.append(label,button);list.appendChild(row)});
 }
 function setCaption(text){const el=$('captionText');if(!el)return;const on=!!P().settings.captions;el.textContent=text||'';el.hidden=!on||!text}
 function start(id,options={}){const m=REGISTRY.getMission(id);return m?launchMission(m,options):false}
 function launchMission(m,{allowLocked=false,progressionEligible=true,assisted=false,source='mission',homeworkMode=false,contentControl=null}={}){const canonical=REGISTRY.getMission(m?.id),missionUnlocked=!!canonical&&REGISTRY.isMissionUnlocked(progression(),canonical.id);if(!m)return false;if(progressionEligible&&!canonical)return false;if(!allowLocked&&!missionUnlocked){$('launchHint').textContent='Complete the earlier mission in this world first.';return false}const gate=contentControl||registryMissionGate(m);if(!gate?.approved)return showContentUnavailable('launchHint');if(!prepareTimeUsageLaunch()){TIME_PENDING_LAUNCH={mission:m,options:{allowLocked,progressionEligible,assisted,source,homeworkMode,contentControl:gate}};return false}TIME_PENDING_LAUNCH=null;if(progressionEligible&&missionUnlocked){P().progression=REGISTRY.normalizeProgression({...progression(),lastMissionId:canonical.id});save()}show('game');applyWorldTheme(m.world);$('prompt').textContent=m.prompt;$('worldLabel').textContent=worldMeta(m.world).title.toUpperCase();renderMinimap(m);$('prompt').lang=m.world==='spanish'?'es':'en';
  if(progressionEligible&&missionUnlocked&&['name','world'].includes(firstRunState(P()).stage)){setFirstRunStage('mission');renderFirstRun();save()}
- const webgl=document.documentElement.classList.contains('presentation-webgl'),bossBox=$('bossBox');bossBox.hidden=!m.boss;bossBox.style.display=m.boss?'':'none';$('bossName').textContent=m.bossName||'Boss';renderBossPortrait(m);const guidedHint=assisted?(m.curriculumChallenge?.supportMetadata?.scaffold||m.curriculumChallenge?.hintMetadata?.hint||''):'';$('feedback').textContent=assisted?`Guided support is on.${guidedHint?` ${guidedHint}`:' This attempt counts as assisted evidence.'}`:`Entering ${worldMeta(m.world).title}.`;G=makeGame(m);G.progressionEligible=!!(progressionEligible&&missionUnlocked);G.internalBubbleReefPreview=G.progressionEligible&&isInternalBubbleReefPreview();G.launchOptions={allowLocked:!!allowLocked,progressionEligible:!!progressionEligible,assisted:!!assisted,source,homeworkMode:!!homeworkMode,contentControl:gate};G.contentControl=gate;G.assisted=!!assisted;G.source=source;G.homeworkMode=!!homeworkMode;G.guidedHint=guidedHint;if(webgl){G.webglRemaining=[...new Set((m.correct||[]).map(String))];G.total=m.boss?Math.min(4,G.webglRemaining.length):G.webglRemaining.length;if(!m.boss)G.nibbler={slot:3,lastChosen:null};else startBossRun()}const nibblerStatus=$('nibblerStatus');if(nibblerStatus)nibblerStatus.textContent=G.nibbler?'A Nibbler is on pillar 4. Biting its pillar costs your combo, never a heart.':'';$('speakPrompt').hidden=false;setCaption(m.prompt);hideBattleToast();hideSnackCard();hideExplainer();clearEnteringStatusSoon();draw();return true}
+ const webgl=document.documentElement.classList.contains('presentation-webgl'),bossBox=$('bossBox');bossBox.hidden=!m.boss;bossBox.style.display=m.boss?'':'none';$('bossName').textContent=m.bossName||'Boss';renderBossPortrait(m);const guidedHint=assisted?(m.curriculumChallenge?.supportMetadata?.scaffold||m.curriculumChallenge?.hintMetadata?.hint||''):'';$('feedback').textContent=assisted?`Guided support is on.${guidedHint?` ${guidedHint}`:' This attempt counts as assisted evidence.'}`:`Entering ${worldMeta(m.world).title}.`;G=makeGame(m);G.profileId=P().id;G.progressionEligible=!!(progressionEligible&&missionUnlocked);G.internalBubbleReefPreview=G.progressionEligible&&isInternalBubbleReefPreview();G.launchOptions={allowLocked:!!allowLocked,progressionEligible:!!progressionEligible,assisted:!!assisted,source,homeworkMode:!!homeworkMode,contentControl:gate};G.contentControl=gate;G.assisted=!!assisted;G.source=source;G.homeworkMode=!!homeworkMode;G.guidedHint=guidedHint;if(webgl){G.webglRemaining=[...new Set((m.correct||[]).map(String))];G.total=m.boss?Math.min(4,G.webglRemaining.length):G.webglRemaining.length;if(!m.boss)G.nibbler={slot:3,lastChosen:null};else startBossRun()}const nibblerStatus=$('nibblerStatus');if(nibblerStatus)nibblerStatus.textContent=G.nibbler?'A Nibbler is on pillar 4. Biting its pillar costs your combo, never a heart.':'';$('speakPrompt').hidden=false;setCaption(m.prompt);hideBattleToast();hideSnackCard();hideExplainer();clearEnteringStatusSoon();draw();return true}
 function startCurriculumChallenge(challenge,{assisted=false,homeworkMode=false}={}){
  const c=core(),skill=c?.findCurriculumSkill?.(challenge?.skillId),validation=c?.validateGeneratedChallenge?.(challenge,skill||{});
  const gate=c&&skill&&validation?.approved?generatedChallengeGate(challenge,skill,validation):null;
@@ -2623,7 +2740,7 @@ function announceBossPhase(first){
  fileCue('boss');
 }
 // Peeking shows the hidden answers for 2 s. It is help, so the next answer counts as assisted.
-function peekBossAnswers(){if(!G?.bossRun)return;const BP=window.BrainBiteBossPhases;if(BP.currentPhase(G.bossRun).id!=='ink-cloud')return;G.retryAssist=true;G.peekUntil=Date.now()+BP.PHASES[1].peekMs;$('feedback').textContent='Peeking! Your next answer counts as a helped answer.';draw();scheduleBossRedraw(BP.PHASES[1].peekMs)}
+function peekBossAnswers(){if(!G?.bossRun)return;const BP=window.BrainBiteBossPhases;if(BP.currentPhase(G.bossRun).id!=='ink-cloud')return;G.retryAssist=true;G.supportUsed=true;G.peekUntil=Date.now()+BP.PHASES[1].peekMs;$('feedback').textContent='Peeking! Your next answer counts as a helped answer.';draw();scheduleBossRedraw(BP.PHASES[1].peekMs)}
 // ---- Answer event contract (G2.1) -----------------------------------------------------------
 // Fired once per attempt, after the learning update and before the redraw, so presentation
 // can animate the disc that was chosen. Presentation never decides correctness.
@@ -2662,18 +2779,18 @@ function continueAsPractice(){if(!G)return;G.progressionEligible=false;G.practic
 // evidence, because the child has just been shown the reasoning; it can never raise
 // independent mastery.
 let explainerTimer=null;
-function attemptSupport(){const assisted=!!(G?.assisted||G?.retryAssist);if(assisted&&G)G.assistedAttempts=(Number(G.assistedAttempts)||0)+1;return {assisted,independent:!assisted,hintsUsed:assisted?1:0}}
+function attemptSupport(){const assisted=!!(G?.assisted||G?.retryAssist);if(assisted&&G){G.supportUsed=true;G.assistedAttempts=(Number(G.assistedAttempts)||0)+1}return {assisted,independent:!assisted,hintsUsed:assisted?1:0}}
 function wrongAnswerFeedback(value){
  const message=incorrectAttemptMessage(value);
  if(!G)return message;
- G.retryAssist=true;
+ G.retryAssist=true;G.supportUsed=true;
  const visual=window.BrainBiteExplainers?.explain?.({prompt:G.m?.prompt,skill:G.m?.skill,chosen:value});
  if(visual)showExplainer(visual);
  return visual&&!explanationForCurrentChallenge()&&!G.guidedHint?`Not ${value}. ${visual.text}`:message;
 }
 function showExplainer(visual){const box=$('explainer');if(!box)return;box.innerHTML=visual.svg||'';box.hidden=!visual.svg;clearTimeout(explainerTimer);explainerTimer=setTimeout(hideExplainer,3500)}
 function hideExplainer(){clearTimeout(explainerTimer);explainerTimer=null;const box=$('explainer');if(box){box.hidden=true;box.innerHTML=''}}
-function restartCurrentMission(){const mission=G?.m?structuredClone(G.m):null,options={...(G?.launchOptions||{})},typingMode=G?.typingMode?structuredClone(G.typingMode):null;if(!mission||G?.contentQuarantined)return;setTimeout(()=>{if(G?.contentQuarantined)return;launchMission(mission,options);if(typingMode){G.typingMode={...typingMode,targetIndex:0,target:typingMode.targets?.[0]||typingMode.target,startedAt:Date.now(),attempts:[],completed:false};draw()}},500)}
+function restartCurrentMission(){const mission=G?.m?structuredClone(G.m):null,options={...(G?.launchOptions||{})},typingMode=G?.typingMode?structuredClone(G.typingMode):null,retryAssist=!!(G?.supportUsed||G?.retryAssist||(Number(G?.assistedAttempts)||0)>0),assistedAttempts=Number(G?.assistedAttempts)||0;if(!mission||G?.contentQuarantined)return;setTimeout(()=>{if(G?.contentQuarantined)return;launchMission(mission,options);if(retryAssist){G.retryAssist=true;G.supportUsed=true;G.assistedAttempts=Math.max(1,assistedAttempts)}if(typingMode){G.typingMode={...typingMode,targetIndex:0,target:typingMode.targets?.[0]||typingMode.target,startedAt:Date.now(),attempts:[],completed:false};draw()}},500)}
 function explanationForCurrentChallenge(){
  for(const candidate of [G?.m?.curriculumChallenge,G?.activity?.challenge,G?.m]){
   const text=String(candidate?.explanation||'').trim();
@@ -2712,6 +2829,8 @@ function drawActivityBoard(b){
  delete b.dataset.typingEncounter;
  const family=activity.family,progress=new Set(activityProgress(challenge).map(value=>String(value)));
  const choices=activityChoices(challenge);
+ const focused=document.activeElement,focusedChoice=b.contains(focused)&&focused?.matches?.('button.activity-target');
+ const focusedIndex=focusedChoice?choices.findIndex(value=>String(value)===focused.dataset.activityChoice):-1;
  b.className=`board world-${G.m.world} activity-board activity-${family.toLowerCase().replace(/[^a-z]+/g,'-')}${G.m.boss?' boss-arena':''}`;
  b.dataset.activityFamily=family;
  b.dataset.activityCompleted=String(!!challenge.completed);
@@ -2728,6 +2847,12 @@ function drawActivityBoard(b){
   button.addEventListener('click',()=>resolveLiveActivity(value));
   row.appendChild(button);
  });
+ if(focusedChoice){
+  const enabled=[...row.querySelectorAll('button.activity-target:not(:disabled)')];
+  const next=enabled.find(button=>choices.findIndex(value=>String(value)===button.dataset.activityChoice)>=focusedIndex)||enabled[0];
+  if(next)next.focus({preventScroll:true});
+  else {b.tabIndex=-1;b.focus({preventScroll:true})}
+ }
  return true
 }
 function draw(){window.dispatchEvent(new CustomEvent('bb:game-draw'));renderMinimap(G?.m);$('lives').textContent=G.lives;$('combo').textContent=G.combo;const comboBanner=$('comboBanner');if(comboBanner)comboBanner.textContent=`x${G.combo}`;const stars=document.querySelectorAll('#game .battle-stars span');if(stars?.length){const lit=Math.min(3,Math.floor(G.combo/3));stars.forEach((s,i)=>{s.innerHTML=i<lit?'&#9733;':'&#9734;';s.style.color=i<lit?'#f5c518':'#9aa3b5'})}$('targets').textContent=`${G.eaten}/${G.total}`;$('bossHealth').value=G.boss;$('bossHealth').max=100;const phase=G.bossRun?G.bossRun.phase+1:G.boss>66?1:G.boss>33?2:3;$('bossPhase').textContent=G.m.boss?`${G.m.bossName} - Phase ${phase} of ${BOSS_PHASES}`:`Phase ${phase} of ${BOSS_PHASES}`;const healthFill=$('healthFill');if(healthFill)healthFill.style.width=`${Math.max(0,Math.min(100,(G.lives/3)*100))}%`;const healthText=$('healthText');if(healthText)healthText.textContent=`${Math.max(0,G.lives)} / 3`;const healthBox=document.querySelector('#game .battle-health');if(healthBox)healthBox.setAttribute('aria-label',`Lives: ${Math.max(0,G.lives)} of 3`);setCaption(G?.m?.prompt);const b=$('board');const battleSurface=document.querySelector('#game .battle-shell');if(G.activity&&!isMatchFractionCompatibilityPath()&&drawActivityBoard(b)){if(battleSurface)battleSurface.dataset.answerSurface='dom';window.BrainBitePresentation?.setBattleChoices?.([]);return}if(battleSurface)battleSurface.dataset.answerSurface='three-d';b.className=`board world-${G.m.world}${G.m.boss?' boss-arena':''}`;b.innerHTML='';for(let y=0;y<5;y++)for(let x=0;x<5;x++){const c=G.cells[ix(x,y)]||{eaten:true,value:''},d=document.createElement('div');d.className='cell';d.setAttribute('role','gridcell');if(x===G.p.x&&y===G.p.y)d.classList.add('player');if(x===G.e.x&&y===G.e.y)d.classList.add('enemy');if(G.m.boss&&G.m.world==='spanish'){const n=window.BrainBiteRunBuilder?.ringPosition?.((G.ringStep||0)+1);if(n&&n.x===x&&n.y===y)d.classList.add('enemy-next')}if(G.mist.some(m=>m.x===x&&m.y===y))d.classList.add('mistake');if(!c.eaten)d.textContent=c.value;b.appendChild(d)}}
@@ -2747,10 +2872,10 @@ function hit(){if(G.e.x===G.p.x&&G.e.y===G.p.y){G.lives--;G.combo=0;G.e={x:0,y:0
 function complete(){if(!checkpointGameplayActivity({reason:'complete'}))return false;const session={mission:G.m.id,world:G.m.world,skillId:G.m.skill,combo:G.max,accuracy:G.correct?Math.round(100*G.correct/Math.max(1,G.correct+G.wrong)):null,moves:G.moves,durationSec:Math.max(1,Math.round((Date.now()-(G.startedAt||Date.now()))/1000)),practice:G.progressionEligible===false,homework:!!G.homeworkMode,source:G.source||'mission',ts:Date.now()};if(G.progressionEligible===false){recordLearningSession(session);save();fileCue('clear');$('feedback').textContent='Practice complete!';setCaption('Practice complete.');setTimeout(()=>{show('home');render()},600);return true}const profile=P(),before=progression(),wasComplete=before.completedMissionIds.includes(G.m.id),next=REGISTRY.completeMission(before,G.m.id);if(!wasComplete&&!next.completedMissionIds.includes(G.m.id)){$('feedback').textContent='This mission is still locked.';return false}profile.progression=next;if(!wasComplete){profile.stars+=3;profile.spark+=(G.m.boss?10:3)}profile.bestCombo=Math.max(profile.bestCombo,G.max);const missionStars=missionStarRating(G);profile.missionStars={...(profile.missionStars||{})};profile.missionStars[G.m.id]=Math.max(Number(profile.missionStars[G.m.id])||0,missionStars);fileCue(G.m.boss?'boss':'clear');recordLearningSession(session);save();if(G.internalBubbleReefPreview)void grantBubbleReefPreviewReward({profileId:profile.id,missionId:G.m.id,progression:next,awardedAt:session.ts,canonicalRewardGranted:!wasComplete});$('feedback').textContent=G.m.boss?`${G.m.bossName} defeated!`:'Mission complete!';setCaption(G.m.boss?`${G.m.bossName} defeated.`:'Mission complete.');const clear={missionId:G.m.id,world:G.m.world,title:G.m.boss?`${G.m.bossName} defeated!`:'Mission complete!',stars:missionStars,earned:Number(G.earned)||0};setTimeout(()=>{const match=document.documentElement.classList.contains('presentation-match');const target=match?'home':G.m.world;show(target);render();showClearBanner(target,clear)},600);return true}
 function applySettings(){let s=P().settings;$('reducedMotion').checked=s.reducedMotion;$('cameraMotionReduction').checked=s.cameraMotionReduction;$('largeTargets').checked=s.largeTargets;$('highContrast').checked=s.highContrast;$('captions').checked=s.captions;$('dyslexicFont').checked=s.dyslexicFont;$('textScale').value=s.textScale||'1';$('qualityTier').value=s.qualityTier||'balanced';$('enemySpeed').value=s.enemySpeed;$('soundOn').checked=s.soundOn;$('musicOn').checked=s.musicOn;if($('vibrationOn'))$('vibrationOn').checked=s.vibrationOn!==false;if($('vibrationRow'))$('vibrationRow').hidden=!window.BrainBitePlatform?.isNativeShell?.();$('volume').value=String(Number.isFinite(Number(s.volume))?s.volume:80);$('volumeValue').textContent=`${$('volume').value}%`;syncMusic();const root=document.documentElement;root.classList.toggle('reduced-motion',s.reducedMotion);root.classList.toggle('camera-motion-reduction',s.cameraMotionReduction);root.classList.toggle('large-targets',s.largeTargets);root.classList.toggle('high-contrast',s.highContrast);root.classList.toggle('captions-on',s.captions);root.classList.toggle('dyslexic-font',s.dyslexicFont);root.classList.toggle('quality-ultra',s.qualityTier==='ultra');root.classList.toggle('quality-high',s.qualityTier==='high');root.classList.toggle('quality-balanced',!s.qualityTier||s.qualityTier==='balanced');root.classList.toggle('quality-performance',s.qualityTier==='performance');root.classList.toggle('quality-mobile',s.qualityTier==='mobile');root.classList.toggle('low-end-device',lowEndDevice());root.style.setProperty('--bb-text-scale',String(Number(s.textScale)||1))}
 document.querySelectorAll('[data-screen]').forEach(button=>button.addEventListener('click',()=>show(button.dataset.screen)));
-$('unlockParent').onclick=async()=>{const pin=$('parentPinInput').value,confirmPin=$('confirmParentPin').value;try{if(!readParentAuth()){if(pin!==confirmPin)throw new Error('PIN confirmation does not match.');await createParentAuth(pin);unlockParentAccess();$('parentGateMsg').textContent='Family PIN set. Parent areas are unlocked.'}else{const result=await verifyParentPin(pin);if(result.locked)throw new Error(`Too many attempts. Try again after ${new Date(result.lockedUntil).toLocaleTimeString()}.`);if(!result.ok)throw new Error(`Incorrect PIN. ${result.remaining} attempt(s) remaining.`);unlockParentAccess();$('parentGateMsg').textContent='Parent areas unlocked.'}$('parentGate').hidden=true;$('parentContent').hidden=false;syncNavigationState('parent')}catch(error){$('parentGateMsg').textContent=error.message}finally{$('parentPinInput').value='';$('confirmParentPin').value='';renderParentGate()}};
-$('saveParentPin').onclick=async()=>{const current=$('changeCurrentParentPin').value,next=$('newParentPin').value,confirmPin=$('changeConfirmParentPin').value;try{const verified=await verifyParentPin(current);if(verified.locked)throw new Error(`Too many attempts. Try again after ${new Date(verified.lockedUntil).toLocaleTimeString()}.`);if(!verified.ok)throw new Error('Current PIN is incorrect.');if(next!==confirmPin)throw new Error('New PIN confirmation does not match.');await createParentAuth(next);unlockParentAccess();$('parentPinStatus').textContent='Family PIN changed.'}catch(error){$('parentPinStatus').textContent=error.message}finally{for(const id of ['changeCurrentParentPin','newParentPin','changeConfirmParentPin'])$(id).value=''}};
+$('unlockParent').onclick=async()=>{if(parentUnlockInFlight)return;const pin=$('parentPinInput').value,confirmPin=$('confirmParentPin').value;parentUnlockInFlight=true;$('unlockParent').disabled=true;try{if(!readParentAuth()){if(pin!==confirmPin)throw new Error('PIN confirmation does not match.');await createParentAuth(pin);unlockParentAccess();$('parentGateMsg').textContent='Family PIN set. Parent areas are unlocked.'}else{const result=await verifyParentPin(pin);if(result.locked)throw new Error(`Too many attempts. Try again after ${new Date(result.lockedUntil).toLocaleTimeString()}.`);if(!result.ok)throw new Error(`Incorrect PIN. ${result.remaining} attempt(s) remaining.`);unlockParentAccess();$('parentGateMsg').textContent='Parent areas unlocked.'}$('parentGate').hidden=true;$('parentContent').hidden=false;syncNavigationState('parent')}catch(error){$('parentGateMsg').textContent=error.message}finally{parentUnlockInFlight=false;$('unlockParent').disabled=false;$('parentPinInput').value='';$('confirmParentPin').value='';renderParentGate()}};
+$('saveParentPin').onclick=async()=>{if(!parentShellRequired('parentPinStatus'))return;const current=$('changeCurrentParentPin').value,next=$('newParentPin').value,confirmPin=$('changeConfirmParentPin').value;try{const verified=await verifyParentPin(current);if(verified.locked)throw new Error(`Too many attempts. Try again after ${new Date(verified.lockedUntil).toLocaleTimeString()}.`);if(!verified.ok)throw new Error('Current PIN is incorrect.');if(next!==confirmPin)throw new Error('New PIN confirmation does not match.');await createParentAuth(next);unlockParentAccess();$('parentPinStatus').textContent='Family PIN changed.'}catch(error){$('parentPinStatus').textContent=error.message}finally{for(const id of ['changeCurrentParentPin','newParentPin','changeConfirmParentPin'])$(id).value=''}};
 $('lockParent').onclick=()=>{lockParentAccess();$('parentContent').hidden=true;$('parentGate').hidden=false;renderParentGate();syncNavigationState('parent');$('parentGateMsg').textContent='Parent areas locked.'};
-const parentExitToChild=$('parentExitToChild');if(parentExitToChild)parentExitToChild.onclick=()=>{show('home');render()};
+const parentExitToChild=$('parentExitToChild');if(parentExitToChild)parentExitToChild.onclick=()=>{lockParentAccess();show('home');render()};
 // Explicit readiness: reconcile saved generations as soon as LearningCore exists instead
 // of relying on the first render happening to be late enough.
 window.addEventListener('bb:core-ready',()=>{
@@ -2935,26 +3060,29 @@ if(installBtn)installBtn.onclick=async()=>{if(!deferredPrompt)return;deferredPro
 
 
 
-$('saveControls').onclick=()=>{const d=Math.max(5,Math.min(180,Number($('dailyMinutes').value)||30)),requested=Math.max(5,Math.min(120,Number($('maxSessionMinutes').value)||20)),m=Math.min(d,requested),corrected=m!==requested;P().controls={dailyMinutes:d,maxSessionMinutes:m,requireParentForPractice:$('requireParentForPractice').checked};$('dailyMinutes').value=d;$('maxSessionMinutes').value=m;$('controlsStatus').textContent=corrected?`Parent controls saved. Session limit corrected to ${m} minutes so it does not exceed the daily limit.`:'Parent controls saved.';clearTimeUsageWarning();save()};
+$('saveControls').onclick=()=>{if(!parentShellRequired('controlsStatus'))return;const d=Math.max(5,Math.min(180,Number($('dailyMinutes').value)||30)),requested=Math.max(5,Math.min(120,Number($('maxSessionMinutes').value)||20)),m=Math.min(d,requested),corrected=m!==requested;P().controls={dailyMinutes:d,maxSessionMinutes:m,requireParentForPractice:$('requireParentForPractice').checked};$('dailyMinutes').value=d;$('maxSessionMinutes').value=m;$('controlsStatus').textContent=corrected?`Parent controls saved. Session limit corrected to ${m} minutes so it does not exceed the daily limit.`:'Parent controls saved.';clearTimeUsageWarning();save()};
 $('timeUpParentOverride').onclick=async()=>{if(!await requireParentAuthorization())return;const profileId=P().id;queueTimeUsageMutation(profileId,(entry,now)=>({...entry,extensionGrantedMs:TIME_EXTENSION_MS,updatedAt:now,lastSeenWallClock:Math.max(entry.lastSeenWallClock,now)}));const state=timeLimitState();if(state.extensionRemainingMs<=0){$('timeUpStatus').textContent='The 15-minute extension for today has already been used.';return}const pending=TIME_PENDING_LAUNCH;G&&(G.timeExpired=false);TIME_RUNTIME={profileId,sessionId:TIME_USAGE.profiles[profileId]?.sessionId||null,lastTickAt:Date.now(),lifecycleCaptured:false};$('timeUpStatus').textContent='15 active minutes added.';if(G)show('game');else if(pending){TIME_PENDING_LAUNCH=null;launchMission(pending.mission,pending.options)}else show('home')};
 $('timeUpReturnHome').onclick=()=>{G=null;TIME_PENDING_LAUNCH=null;TIME_RUNTIME={profileId:null,sessionId:null,lastTickAt:0,lifecycleCaptured:false};applyWorldTheme('');show('home');render()};
 
 
 $('createCloudAccount').onclick=async()=>{
+ if(!parentShellRequired('localAccountStatus'))return;
  try{const c=cloudClient();if(!c||!c.configured())throw new Error('Configure Firebase first');const email=$('localAccountEmail').value.trim(),password=$('parentPassword').value;if(password.length<8)throw new Error('Password must be at least 8 characters');await c.signUp(email,password);renderCloudAuth();$('localAccountStatus').textContent=c.session?'Account created and signed in.':'Account created. Check email if confirmation is required.'}
  catch(e){$('localAccountStatus').textContent=e.message}finally{$('parentPassword').value=''}
 };
 $('signInCloud').onclick=async()=>{
+ if(!parentShellRequired('localAccountStatus'))return;
  try{const c=cloudClient();if(!c||!c.configured())throw new Error('Configure Firebase first');await c.signIn($('localAccountEmail').value.trim(),$('parentPassword').value);renderCloudAuth()}
  catch(e){$('localAccountStatus').textContent=e.message}finally{$('parentPassword').value=''}
 };
-$('signOutCloud').onclick=async()=>{try{const c=cloudClient();if(c)await c.signOut();renderCloudAuth()}catch(e){$('localAccountStatus').textContent=e.message}finally{$('parentPassword').value=''}};
-$('pushCloudSync').onclick=async()=>{try{await pushAllToFirebase();$('mergeResult').textContent='Cloud upload complete.'}catch(e){$('mergeResult').textContent=e.message}};
-$('pullCloudSync').onclick=async()=>{try{await pullAllFromFirebase();$('mergeResult').textContent='Cloud download and merge complete.'}catch(e){$('mergeResult').textContent=e.message}};
+$('signOutCloud').onclick=async()=>{if(!parentShellRequired('localAccountStatus'))return;try{const c=cloudClient();if(c)await c.signOut();renderCloudAuth()}catch(e){$('localAccountStatus').textContent=e.message}finally{$('parentPassword').value=''}};
+$('pushCloudSync').onclick=async()=>{if(!parentShellRequired('mergeResult'))return;try{await pushAllToFirebase();$('mergeResult').textContent='Cloud upload complete.'}catch(e){$('mergeResult').textContent=e.message}};
+$('pullCloudSync').onclick=async()=>{if(!parentShellRequired('mergeResult'))return;try{await pullAllFromFirebase();$('mergeResult').textContent='Cloud download and merge complete.'}catch(e){$('mergeResult').textContent=e.message}};
 
 
 
 $('copyFirebaseChecklist').onclick=async()=>{
+ if(!parentShellRequired('copySetupMsg'))return;
  const text=`BrainBite Firebase Setup
 1. Create Firebase project
 2. Enable Email/Password Authentication
@@ -2964,26 +3092,20 @@ $('copyFirebaseChecklist').onclick=async()=>{
  try{await navigator.clipboard.writeText(text);$('copySetupMsg').textContent='Copied.'}catch{$('copySetupMsg').textContent='Copy unavailable.'}
 };
 
-$('saveCloudConfig').onclick=()=>{const provider=$('cloudProvider').value,url=$('cloudUrl').value.trim(),key=$('cloudKey').value.trim();if(provider!=='none'&&(!/^[a-z0-9-]{6,}$/.test(url)||key.length<20)){$('cloudConfigMsg').textContent='Add a valid Firebase Project ID and Web API key.';return}INTEGRATIONS.cloud={provider,url,key};saveIntegrations();$('cloudConfigMsg').textContent='Firebase configuration saved locally.'};
-$('runIntegrationCheck').onclick=async()=>{const rows=await integrationCheck();$('integrationCheckResult').innerHTML=rows.map(([n,ok])=>`<div><span class="${ok?'integration-ok':'integration-warn'}">${ok?'PASS':'CHECK'}</span> ${n}</div>`).join('')};
+$('saveCloudConfig').onclick=()=>{if(!parentShellRequired('cloudConfigMsg'))return;const provider=$('cloudProvider').value,url=$('cloudUrl').value.trim(),key=$('cloudKey').value.trim();if(provider!=='none'&&(!/^[a-z0-9-]{6,}$/.test(url)||key.length<20)){$('cloudConfigMsg').textContent='Add a valid Firebase Project ID and Web API key.';return}INTEGRATIONS.cloud={provider,url,key};saveIntegrations();$('cloudConfigMsg').textContent='Firebase configuration saved locally.'};
+$('runIntegrationCheck').onclick=async()=>{if(!parentShellRequired('integrationCheckResult'))return;const rows=await integrationCheck();$('integrationCheckResult').innerHTML=rows.map(([n,ok])=>`<div><span class="${ok?'integration-ok':'integration-warn'}">${ok?'PASS':'CHECK'}</span> ${n}</div>`).join('')};
 
 
-$('retryQueue').onclick=async()=>{try{const r=await retryPendingSync();$('mergeResult').textContent=`Retry finished: ${r.ok} ok, ${r.failed} failed.`}catch(e){$('mergeResult').textContent=e.message}};
-$('exportCloudSnapshot').onclick=()=>{const b=new Blob([JSON.stringify(cloudSnapshot(),null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='brainbite-cloud-snapshot.json';a.click()};
+$('retryQueue').onclick=async()=>{if(!parentShellRequired('mergeResult'))return;try{const r=await retryPendingSync();$('mergeResult').textContent=`Retry finished: ${r.ok} ok, ${r.failed} failed.`}catch(e){$('mergeResult').textContent=e.message}};
+$('exportCloudSnapshot').onclick=()=>{if(!parentShellRequired('mergeResult'))return;const b=new Blob([JSON.stringify(cloudSnapshot(),null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='brainbite-cloud-snapshot.json';a.click()};
 $('deleteCloudAccount').onclick=async event=>{
  const status=$('mergeResult');if(!parentShellRequired('mergeResult'))return;
- const c=cloudClient();if(!c||!c.session){status.textContent='Sign in before deleting cloud family data or the Firebase account.';return}
- const approved=await requestSensitiveAction({title:'Delete cloud family and account?',description:'BrainBite will first delete the signed-in family data, then delete the Firebase authentication account. Local learner progress is kept.',confirmText:'Delete cloud account',invoker:event.currentTarget,statusId:'mergeResult'});
- if(!approved){status.textContent='Cloud deletion cancelled. No cloud or local state was changed.';return}
- try{await c.deleteFamily()}
- catch(error){status.textContent=`Cloud family data deletion failed before account deletion. The Firebase account, local progress, session, and pending sync queue were kept: ${error.message}`;return}
- try{await c.deleteAuthAccount()}
- catch(error){status.textContent=`Cloud family data was deleted, but Firebase account deletion failed. The signed-in session and pending sync queue were kept so a parent can retry safely: ${error.message}`;return}
- try{const ids=SYNC.queue.map(item=>item.eventId||item.id);acknowledgeSyncEvents(ids);SYNC.queue=SYNC.queue.filter(item=>!ids.includes(item.eventId||item.id));SYNC.lastSync=null;SYNC.provider='local-only';await saveSync();renderCloudAuth();status.textContent='Cloud family data and Firebase account were deleted. Local learner progress remains on this device.'}
- catch(error){status.textContent=`Cloud family data and Firebase account were deleted, but local sync cleanup failed. Local learner progress was kept: ${error.message}`}
+ const approved=await requestSensitiveAction({title:'Check cloud deletion availability?',description:'This client cannot delete cloud family documents or the Firebase authentication account. Confirm to view the current status. No local or cloud data will change.',confirmText:'Check deletion status',invoker:event.currentTarget,statusId:'mergeResult'});
+ if(!approved){status.textContent='Cloud deletion status check cancelled. No cloud or local state was changed.';return}
+ status.textContent='No cloud data or Firebase account was deleted. This build does not yet have the privileged deletion service required for that action. Local progress, cloud documents, the account, the signed-in session, and pending sync changes remain unchanged.'
 };
 
-$('saveLocalAccount').onclick=()=>{const email=$('localAccountEmail').value.trim();if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){$('localAccountStatus').textContent='Enter a valid email address.';return}SYNC.account={email,createdAt:SYNC.account?.createdAt||Date.now()};saveSync()};
+$('saveLocalAccount').onclick=()=>{if(!parentShellRequired('localAccountStatus'))return;const email=$('localAccountEmail').value.trim();if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){$('localAccountStatus').textContent='Enter a valid email address.';return}SYNC.account={email,createdAt:SYNC.account?.createdAt||Date.now()};saveSync()};
 if('serviceWorker'in navigator){
  const updateStatus=$('updateStatus'),applyUpdate=$('applyUpdate');
  const announceUpdate=message=>{if(updateStatus)updateStatus.textContent=message;if(applyUpdate)applyUpdate.hidden=false};
@@ -3006,28 +3128,28 @@ if(bubbleReefLivePreviewBtn){
  };
 }
 
-$('downloadReleaseBackup').onclick=()=>{const b=new Blob([JSON.stringify(exportEnvelope(),null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='brainbite-v2.0-release-backup.json';a.click()};
-$('downloadDiagnostics').onclick=()=>{const b=new Blob([JSON.stringify(diagnosticBundle(),null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='brainbite-v2.0-diagnostics.json';a.click()};
+$('downloadReleaseBackup').onclick=()=>{if(!parentShellRequired())return;const b=new Blob([JSON.stringify(exportEnvelope(),null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='brainbite-v2.0-release-backup.json';a.click()};
+$('downloadDiagnostics').onclick=()=>{if(!parentShellRequired())return;const b=new Blob([JSON.stringify(diagnosticBundle(),null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='brainbite-v2.0-diagnostics.json';a.click()};
 
 
-$('labLearnerSelect').onchange=()=>{const id=$('labLearnerSelect').value;applyLabFoundation(foundation=>{if(foundation.learners[id])foundation.activeLearnerId=id})};
+$('labLearnerSelect').onchange=()=>{if(!parentShellRequired())return;const id=$('labLearnerSelect').value;applyLabFoundation(foundation=>{if(foundation.learners[id])foundation.activeLearnerId=id})};
 $('labSwitchLearner').onclick=()=>{$('labLearnerSelect').dispatchEvent(new Event('change'))};
-$('labCreateLearner').onclick=()=>{const c=core();if(!c)return;const name=$('labLearnerName').value.trim()||`Lab Kid ${Date.now()}`;applyLabFoundation(foundation=>{const learner=c.defaultLearner(name);foundation.learners[learner.profileId]=learner;foundation.activeLearnerId=learner.profileId;$('labLearnerName').value=''})};
-$('labResetLearner').onclick=()=>{const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];foundation.learners[foundation.activeLearnerId]=c.defaultLearner(learner.name,learner.profileId)})};
-$('labSetSkillState').onclick=()=>{const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];const skillId=$('labSkill').value||LAB.skillId||'number-facts';learner.skills[skillId]=labPresetState($('labSkillPreset').value||LAB.preset||'practicing',skillId);learner.mastery[skillId]=learner.skills[skillId].masteryScore})};
-$('labSimCorrect').onclick=()=>simulateLabAttempt('correct');
-$('labSimAssisted').onclick=()=>simulateLabAttempt('assisted');
-$('labSimIncorrect').onclick=()=>simulateLabAttempt('incorrect');
-$('labSimRandom').onclick=()=>simulateLabAttempt('random');
-$('labForceBrainBase').onclick=()=>{const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];learner.stage='brainbase';learner.activeActivity=null;learner.currentChallenge=null})};
-$('labJumpKraken').onclick=()=>{if(!labAllowed())return;LAB.krakenPhase=$('labKrakenPhase').value||LAB.krakenPhase||'intro';saveLab()};
-$('labGrantReward').onclick=()=>{const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];foundation.learners[foundation.activeLearnerId]=c.grantBrainifact(learner,'fraction-kraken')})};
-$('labUpgradeHub').onclick=()=>{const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];foundation.learners[foundation.activeLearnerId]=c.upgradeBrainBase(learner)})};
-$('labQueueOffline').onclick=()=>{const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];const skillId=$('labSkill').value||LAB.skillId||'number-facts';const event={id:newCryptographicUuid(),type:'LearningAttemptRecorded',payload:{skillId,family:$('labFamily').value||LAB.family||'target-smash',difficulty:$('labDifficulty').value||LAB.difficulty||'normal',mode:'queued'},createdAt:Date.now()};foundation.learners[foundation.activeLearnerId]=c.queueOfflineEvent(learner,event)})};
-$('labReplayOffline').onclick=()=>{const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];const replay=c.replayOfflineQueue(learner,()=>true);foundation.learners[foundation.activeLearnerId]=replay.learner})};
-$('labSaveSnapshot').onclick=()=>{const c=core();if(!c)return;applyLabFoundation(foundation=>c.createRecoverySnapshot(foundation))};
-$('labCorruptSave').onclick=()=>{if(!labAllowed())return;const foundation=loadFoundation();if(!foundation)return;persistFoundation(foundation);localStorage.setItem(KEY,'{broken');renderLab()};
-$('labRestoreRecovery').onclick=()=>{if(!labAllowed())return;const recovered=readStoredStore(localStorage.getItem(BACK))||readStoredStore(localStorage.getItem(RECOVERY_KEY));if(!recovered)return;STORE=recovered;writeStoreCopies(STORE);render();renderLab()};
+$('labCreateLearner').onclick=()=>{if(!parentShellRequired())return;const c=core();if(!c)return;const name=$('labLearnerName').value.trim()||`Lab Kid ${Date.now()}`;applyLabFoundation(foundation=>{const learner=c.defaultLearner(name);foundation.learners[learner.profileId]=learner;foundation.activeLearnerId=learner.profileId;$('labLearnerName').value=''})};
+$('labResetLearner').onclick=()=>{if(!parentShellRequired())return;const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];foundation.learners[foundation.activeLearnerId]=c.defaultLearner(learner.name,learner.profileId)})};
+$('labSetSkillState').onclick=()=>{if(!parentShellRequired())return;const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];const skillId=$('labSkill').value||LAB.skillId||'number-facts';learner.skills[skillId]=labPresetState($('labSkillPreset').value||LAB.preset||'practicing',skillId);learner.mastery[skillId]=learner.skills[skillId].masteryScore})};
+$('labSimCorrect').onclick=()=>{if(parentShellRequired())simulateLabAttempt('correct')};
+$('labSimAssisted').onclick=()=>{if(parentShellRequired())simulateLabAttempt('assisted')};
+$('labSimIncorrect').onclick=()=>{if(parentShellRequired())simulateLabAttempt('incorrect')};
+$('labSimRandom').onclick=()=>{if(parentShellRequired())simulateLabAttempt('random')};
+$('labForceBrainBase').onclick=()=>{if(!parentShellRequired())return;const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];learner.stage='brainbase';learner.activeActivity=null;learner.currentChallenge=null})};
+$('labJumpKraken').onclick=()=>{if(!parentShellRequired()||!labAllowed())return;LAB.krakenPhase=$('labKrakenPhase').value||LAB.krakenPhase||'intro';saveLab()};
+$('labGrantReward').onclick=()=>{if(!parentShellRequired())return;const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];foundation.learners[foundation.activeLearnerId]=c.grantBrainifact(learner,'fraction-kraken')})};
+$('labUpgradeHub').onclick=()=>{if(!parentShellRequired())return;const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];foundation.learners[foundation.activeLearnerId]=c.upgradeBrainBase(learner)})};
+$('labQueueOffline').onclick=()=>{if(!parentShellRequired())return;const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];const skillId=$('labSkill').value||LAB.skillId||'number-facts';const event={id:newCryptographicUuid(),type:'LearningAttemptRecorded',payload:{skillId,family:$('labFamily').value||LAB.family||'target-smash',difficulty:$('labDifficulty').value||LAB.difficulty||'normal',mode:'queued'},createdAt:Date.now()};foundation.learners[foundation.activeLearnerId]=c.queueOfflineEvent(learner,event)})};
+$('labReplayOffline').onclick=()=>{if(!parentShellRequired())return;const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];const replay=c.replayOfflineQueue(learner,()=>true);foundation.learners[foundation.activeLearnerId]=replay.learner})};
+$('labSaveSnapshot').onclick=()=>{if(!parentShellRequired())return;const c=core();if(!c)return;applyLabFoundation(foundation=>c.createRecoverySnapshot(foundation))};
+$('labCorruptSave').onclick=()=>{if(!parentShellRequired()||!labAllowed())return;const foundation=loadFoundation();if(!foundation)return;persistFoundation(foundation);localStorage.setItem(KEY,'{broken');renderLab()};
+$('labRestoreRecovery').onclick=()=>{if(!parentShellRequired()||!labAllowed())return;const recovered=readStoredStore(localStorage.getItem(BACK))||readStoredStore(localStorage.getItem(RECOVERY_KEY));if(!recovered)return;STORE=preserveCurrentProfileDeletions(recovered);writeStoreCopies(STORE);render();renderLab()};
 $('labRefreshBrainBase').onclick=()=>{renderBrainBase(loadFoundation());renderLab()};
 $('labSkill').onchange=renderLab;
 $('labFamily').onchange=renderLab;
@@ -3035,9 +3157,9 @@ $('labDifficulty').onchange=renderLab;
 $('labSkillPreset').onchange=renderLab;
 $('labKrakenPhase').onchange=renderLab;
 
-$('qaDeviceA').onclick=()=>{QA.deviceA=true;QA.deviceAPushed=false;saveQA();alert('Device A: play a mission, then use Account & Sync → Push to Cloud. Mark the next step after that push succeeds.')};
-$('qaDeviceB').onclick=()=>{QA.deviceB=true;saveQA();alert('Device B: open BrainBite on a second browser/device, sign in with the same parent account, then Pull from Cloud.')};
-$('qaIsolation').onclick=()=>{QA.isolationTested=true;saveQA();alert('Isolation test: sign in with a different Firebase parent account. That account must not be able to read the first family profile documents.')};
+$('qaDeviceA').onclick=()=>{if(!parentShellRequired())return;QA.deviceA=true;QA.deviceAPushed=false;saveQA();alert('Device A: play a mission, then use Account & Sync → Push to Cloud. Mark the next step after that push succeeds.')};
+$('qaDeviceB').onclick=()=>{if(!parentShellRequired())return;QA.deviceB=true;saveQA();alert('Device B: open BrainBite on a second browser/device, sign in with the same parent account, then Pull from Cloud.')};
+$('qaIsolation').onclick=()=>{if(!parentShellRequired())return;QA.isolationTested=true;saveQA();alert('Isolation test: sign in with a different Firebase parent account. That account must not be able to read the first family profile documents.')};
 // Keep the board's grid semantics valid for assistive technology without changing its visual layout.
 new MutationObserver(() => {
  const board=document.getElementById('board');

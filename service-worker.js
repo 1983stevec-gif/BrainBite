@@ -1,4 +1,4 @@
-const CACHE = 'brainbite-v2.0-shell-v45-battle-draws';
+const CACHE = 'brainbite-v2.0-shell-runtime-c05689d1ed207d76c2c0abec487524840f34bee84654bff742dccea68ff75de9';
 const FALLBACK = './index.html';
 const CORE = [
   './',
@@ -134,4 +134,3 @@ self.addEventListener('fetch', event => {
     return response;
   })));
 });
-

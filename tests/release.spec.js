@@ -25,11 +25,13 @@ async function unlockViaGate(page) {
   await page.locator('#parentPinInput').fill('654321');
   if (await page.locator('#confirmParentPin').isVisible()) await page.locator('#confirmParentPin').fill('654321');
   await page.locator('#unlockParent').click();
+  await expect(page.locator('#parentContent')).toBeVisible();
 }
 
 // Parent destinations live in the parent shell, which is only present in parent context.
 async function enterParentArea(page) {
   if (!(await page.locator('#parentShellNav').isVisible())) {
+    if (await page.locator('#parentPinInput').isVisible()) { await unlockViaGate(page); return; }
     const orb = page.getByRole('button', { name: 'Parents', exact: true });
     if (!(await orb.isVisible())) await page.locator('#childDock button[data-screen="home"]').click();
     await orb.click();
@@ -149,6 +151,7 @@ test('child hub drops placeholder cards, debug badges, and duplicated docks', as
   // The parent shell only appears inside parent context.
   await expect(page.locator('#parentShellNav')).toBeHidden();
   await page.getByRole('button', { name: 'Parents', exact: true }).click();
+  if (await page.locator('#parentPinInput').isVisible()) await unlockViaGate(page);
   await expect(page.locator('#parentShellNav')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Back to kid hub' })).toBeVisible();
   await page.getByRole('button', { name: 'Back to kid hub' }).click();
@@ -459,6 +462,42 @@ test('fresh installs keep child play available and enforce verifier setup with p
   await expect(page.locator('#parentPinInput')).toHaveValue('');
 });
 
+test('parent exit locks immediately and grant expiry re-gates before a parent control can mutate', async ({ page }) => {
+  await page.getByRole('button', { name: 'Parents', exact: true }).click();
+  await expect(page.locator('#parentGate')).toBeVisible();
+  await expect(page.locator('#parentContent')).toBeHidden();
+  await unlockViaGate(page);
+  await page.locator('#parentShellNav button[data-screen="controls"]').click();
+  const before = await page.evaluate(() => P().controls.dailyMinutes);
+  await page.evaluate(() => { parentUnlockedUntil = Date.now() + 50; scheduleParentAccessExpiry(); });
+  await expect(page.locator('#parentGate')).toBeVisible();
+  await expect(page.locator('#parentContent')).toBeHidden();
+  await page.evaluate(() => { document.querySelector('#dailyMinutes').value = '99'; document.querySelector('#saveControls').click(); });
+  expect(await page.evaluate(() => P().controls.dailyMinutes)).toBe(before);
+});
+
+test('concurrent PIN verification serializes all five failed-attempt commits and unlock stays single-flight', async ({ page, context }) => {
+  const secondTab = await context.newPage(); await secondTab.goto('/?match=0&webgl=0');
+  const [firstResults, secondResults] = await Promise.all([
+    page.evaluate(() => Promise.all(Array.from({ length: 3 }, () => verifyParentPin('000000')))),
+    secondTab.evaluate(() => Promise.all(Array.from({ length: 2 }, () => verifyParentPin('000000')))),
+  ]);
+  const concurrent = await page.evaluate(() => { const auth = readParentAuth(); return { failedAttempts: auth.failedAttempts, locked: auth.lockedUntil > Date.now() }; });
+  concurrent.results = [...firstResults, ...secondResults]; await secondTab.close();
+  expect(concurrent.failedAttempts).toBe(5);
+  expect(concurrent.locked).toBe(true);
+  expect(concurrent.results.filter(result => result.locked)).not.toHaveLength(0);
+  await page.evaluate(() => { const auth = readParentAuth(); auth.failedAttempts = 0; auth.lockedUntil = 0; writeParentAuth(auth); });
+  await page.getByRole('button', { name: 'Parents', exact: true }).click();
+  await page.evaluate(() => { globalThis.__releaseDeriveBits = SubtleCrypto.prototype.deriveBits; SubtleCrypto.prototype.deriveBits = async function(...args) { await new Promise(resolve => setTimeout(resolve, 300)); return globalThis.__releaseDeriveBits.apply(this, args); }; });
+  await page.locator('#parentPinInput').fill('000000');
+  await page.locator('#unlockParent').click();
+  await expect(page.locator('#unlockParent')).toBeDisabled();
+  await page.locator('#unlockParent').dispatchEvent('click');
+  await expect(page.locator('#parentGateMsg')).toContainText('4 attempt(s) remaining', { timeout: 15_000 });
+  expect(await page.evaluate(() => { SubtleCrypto.prototype.deriveBits = globalThis.__releaseDeriveBits; return readParentAuth().failedAttempts; })).toBe(1);
+});
+
 test('legacy secrets are scrubbed and every external boundary omits forbidden auth material', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const forbiddenKeys = new Set(['parentPin','parentAuth','pinHash','pinSalt','password','idToken','refreshToken','accessToken']);
@@ -631,6 +670,7 @@ test('Phase 2.4 nested cloud projections reject adversarial child data while val
 });
 test('parent authorization is revoked when the active child profile changes', async ({ page }) => {
   await page.getByRole('button', { name: 'Parents', exact: true }).click();
+  if (await page.locator('#parentPinInput').isVisible()) await unlockViaGate(page);
   await parentDestination(page, 'Profiles');
   await page.locator('#newProfile').fill('Different Child');
   await page.getByRole('button', { name: 'Add Profile' }).click();
@@ -761,7 +801,10 @@ test('profile names and parent-entered topics render as text, not markup', async
   expect(await page.evaluate(()=>window.x)).toBeUndefined();
 });
 
-test('Firebase sync is idempotent, propagates profile deletion, and preserves family isolation', async ({ browser }) => {
+// Client-contract coverage against an in-memory HTTPS protocol double; this does not
+// exercise Firebase transport or deployed rules. The executable Firebase rules check is
+// tests/firebase-security-rules.test.mjs under the Firestore emulator.
+test('Firebase client-contract double is idempotent, propagates profile deletion, and preserves family isolation', async ({ browser }) => {
   test.setTimeout(120_000);
   const canonicalAttemptCount = 3000;
   const docs = new Map();
@@ -862,7 +905,7 @@ test('Firebase sync is idempotent, propagates profile deletion, and preserves fa
     return { evidence: skill.evidence, provenance: skill.evidenceProvenance, provenanceSources: window.BrainBiteCore.evidenceProvenanceSources(skill), bytes: new TextEncoder().encode(JSON.stringify(STORE.profiles.find(profile => profile.id === id))).length };
   }, cloudProfileId);
   expect(cloudReady.evidence).toMatchObject({ attempts: totalCloudAttemptCount, independentSuccesses: totalCloudAttemptCount - 1, incorrectAttempts: 1 });
-  expect(cloudReady.provenanceSources).toHaveLength(2);
+  expect(cloudReady.provenanceSources).toHaveLength(reloadAttemptCount + 2);
   expect(cloudReady.bytes).toBeLessThan(512 * 1024);
   await pageConcurrent.close();
   await unlockParent(pageA);
@@ -904,7 +947,10 @@ test('Firebase sync is idempotent, propagates profile deletion, and preserves fa
   await Promise.all([a.close(), b.close(), intruder.close()]);
 });
 
-test('Firebase concurrent device pushes merge remote evidence before write', async ({ browser }) => {
+// Client-contract coverage against an in-memory HTTPS protocol double; this does not
+// exercise Firebase transport or deployed rules. The executable Firebase rules check is
+// tests/firebase-security-rules.test.mjs under the Firestore emulator.
+test('Firebase client-contract double merges concurrent device evidence before write', async ({ browser }) => {
   test.setTimeout(60_000);
   const documents=new Map(),conflictOnce=new Set();
   let version=0,conflictResponses=0,createPreconditions=0,updatePreconditions=0;
@@ -1029,9 +1075,13 @@ test('same-installation tabs use distinct bounded provenance writers', async ({ 
   await pageA.waitForFunction(()=>!!window.BrainBiteCore);
   const reloaded=await recordAttempt(pageA,'same-installation-tab-a-reload');
   expect(reloaded.attempt.originId.startsWith(`${installationA}:`)).toBe(true);
-  expect(reloaded.attempt.originId).toBe(left.attempt.originId);
+  expect(reloaded.attempt.originId).not.toBe(left.attempt.originId);
   expect(reloaded.attempt.originId).not.toBe(right.attempt.originId);
-  expect(reloaded.attempt.originSequence).toBeGreaterThan(left.attempt.originSequence);
+  expect(reloaded.attempt.originSequence).toBeGreaterThan(Math.max(left.attempt.originSequence,right.attempt.originSequence));
+  const reloadedSources=await pageA.evaluate(skill=>window.BrainBiteCore.evidenceProvenanceSources(skill),reloaded.skill);
+  expect(reloadedSources).toHaveLength(3);
+  expect(reloadedSources.map(source=>source.id).sort()).toEqual([left.attempt.originId,right.attempt.originId,reloaded.attempt.originId].sort());
+  expect(reloadedSources.find(source=>source.id===reloaded.attempt.originId)).toMatchObject({sequence:reloaded.attempt.originSequence,attempts:1,independentSuccesses:1});
   await context.close();
 });
 
@@ -1242,6 +1292,14 @@ test('accessibility settings persist and expose captions and repeat prompt contr
   await page.locator('#dyslexicFont').check();
   await page.locator('#textScale').selectOption('1.25');
   await page.locator('#qualityTier').selectOption('performance');
+  // DOM updates precede queued storage writes; reload only after a successful save.
+  const persistence = await page.evaluate(async () => {
+    await PERSISTENCE_CHAIN;
+    const stored = JSON.parse(localStorage.getItem('bb-core-v3'));
+    return { error: window.__BRAINBITE_PERSISTENCE_ERROR__ ?? null, settings: stored.profiles[stored.active].settings };
+  });
+  expect(persistence.error).toBeNull();
+  expect(persistence.settings).toMatchObject({ cameraMotionReduction: true, captions: true, dyslexicFont: true, textScale: '1.25', qualityTier: 'performance' });
   await page.reload();
   await page.getByRole('button', { name: 'Settings' }).click();
   await expect(page.locator('#cameraMotionReduction')).toBeChecked();
@@ -1640,14 +1698,25 @@ test('automated WCAG scan has no serious or critical violations on primary scree
 });
 
 test('PWA manifest, service worker, cache boundary, and offline reload work', async ({ page, context }) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
   const manifest = await page.request.get('/manifest.webmanifest'); expect(manifest.ok()).toBeTruthy();
   const sw = await page.request.get('/service-worker.js'); const source = await sw.text();
   expect(source).toContain("url.origin !== self.location.origin");
   await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.waitForFunction(async () => Boolean(navigator.serviceWorker.controller)
+    && Boolean(await caches.match(new URL('./index.html', location.href).href)));
   await context.setOffline(true);
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: 'BrainBite' })).toBeVisible();
-  await context.setOffline(false);
+  try {
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    // A cached heading alone does not prove the JavaScript runtime booted.
+    await page.waitForFunction(() => typeof window.BrainBiteGame?.getState === 'function');
+    await expect(page.locator('#home.show')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'BrainBite' })).toBeVisible();
+    expect(errors).toEqual([]);
+  } finally {
+    await context.setOffline(false);
+  }
 });
 
 test('content review gate launches exact-digest registry missions and internal-review curriculum', async ({ page }) => {
@@ -2103,9 +2172,15 @@ test('Phase 3.1 Practice Lab locked missions complete as non-progression practic
   await page.evaluate(() => {
     // In the Classic board, each tap consumes one cell; preserve duplicate answer values
     // so repeated correct cells are consumed before the test reads the completion session.
+    // Keep unrelated randomized enemy collisions out of this practice-completion check.
+    G.e = { x: -1000, y: -1000 };
     const correctCells = G.cells.filter(cell => !cell.eaten && cell.correct).map(cell => String(cell.value));
     for (const value of correctCells) window.BrainBiteGame.tryAnswer(value);
   });
+  const mission = await page.evaluate(() => ({ eaten: G.eaten, total: G.total, lives: G.lives }));
+  expect(mission.total).toBeGreaterThan(0);
+  expect(mission.eaten).toBe(mission.total);
+  expect(mission.lives).toBeGreaterThan(0);
 
   const completed = await page.evaluate(() => {
     const p = P();
@@ -2371,7 +2446,7 @@ test('Phase 3.1 parent weekly and priority UI uses canonical LearningCore eviden
   await page.evaluate(() => renderParent());
   await expect(page.locator('#weeklySummary')).toContainText('Sessions this week: 1');
   await expect(page.locator('#weeklySummary')).toContainText('Practice items: 1');
-  await expect(page.locator('#skillPriority')).toContainText('Fractions · mastery 0%');
+  await expect(page.locator('#skillPriority')).toContainText('Fractions · learning score 0% · independent 0 · assisted 0');
   await expect(page.locator('#skillPriority')).not.toContainText('99%');
 });
 
@@ -2400,7 +2475,7 @@ test('P1 parent Words mastery card projects canonical reading evidence', async (
   expect(projection).toEqual({ words: 0, reading: 0 });
   await expect(page.locator('#parentWords')).toHaveText('0%');
   await expect(page.locator('#parentWords')).not.toHaveText('99%');
-  await expect(page.locator('#skillPriority')).toContainText('Inference · mastery 0%');
+  await expect(page.locator('#skillPriority')).toContainText('Inference · learning score 0% · independent 0 · assisted 0');
   await expect(page.locator('#skillPriority')).not.toContainText('99%');
 });
 
@@ -2580,6 +2655,161 @@ test('Phase 3.1 guided homework and independent curriculum practice record canon
   expect(canonicalHomework).toMatchObject({ subject: 'reading', grade: '4', topic: 'inference', homework: true, validated: true });
   await page.getByRole('button', { name: 'Parents', exact: true }).click();
   await expect(page.locator('#homeworkSummary')).toContainText('reading grade 4 · inference · homework');
+});
+
+test('profile reconciliation exits a live mission before remote learner deletion can credit the survivor', async ({ page, context }) => {
+  const firstId = await page.evaluate(async () => {
+    const firstId = P().id;
+    STORE.profiles.push(blank('Survivor Learner'));
+    STORE.active = 0;
+    await save();
+    return firstId;
+  });
+  const remote = await context.newPage();
+  await remote.goto('/?match=0&webgl=0');
+  await remote.waitForFunction(() => Boolean(window.BrainBiteGame?.getState));
+  await page.evaluate(() => window.BrainBiteGame.startMission(1));
+  await expect(page.locator('#game.show')).toBeVisible();
+  const survivorId = await remote.evaluate(() => STORE.profiles.find(profile => profile.name === 'Survivor Learner').id);
+  await remote.evaluate(({ firstId }) => {
+    rememberProfileDeletion(firstId, Date.now());
+    STORE.active = STORE.profiles.findIndex(profile => profile.id !== firstId);
+    return save();
+  }, { firstId });
+  await expect.poll(() => page.evaluate(() => ({ screen: document.querySelector('.screen.show')?.id, game: !!G, activeId: P()?.id })))
+    .toEqual({ screen: 'home', game: false, activeId: survivorId });
+  const staleAnswer = await page.evaluate(() => {
+    const snapshot = () => ({ score: P().score, mastery: structuredClone(P().mastery), sessions: P().sessions.length,
+      attempts: P().learningCore?.skills?.['math-4-fractions']?.evidence?.attempts || 0,
+      time: window.BrainBiteTimeUsage.read(P().id) });
+    const before = snapshot();
+    const accepted = window.BrainBiteGame.tryAnswer('12');
+    return { accepted, before, after: snapshot() };
+  });
+  expect(staleAnswer.accepted).toBe(false);
+  expect(staleAnswer.after).toEqual(staleAnswer.before);
+  expect(staleAnswer.before.score).toBe(0);
+  expect(staleAnswer.before.attempts).toBe(0);
+  await remote.close();
+});
+
+test('offline learning queues merge by identity within the canonical 500-event bound', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    const event = id => ({ id, type: 'LearningAttemptRecorded', timestamp: Number(id.replace(/\\D/g, '')) || 0, payload: { value: id } });
+    const left = { offlineQueue: Array.from({ length: 180 }, (_, index) => event(`left-${index}`)), sentEventIds: [] };
+    const right = { offlineQueue: Array.from({ length: 180 }, (_, index) => event(`right-${index}`)), sentEventIds: [] };
+    const merged = mergeLearningCore(left, right);
+    const acknowledged = { offlineQueue: [event('acknowledged'), ...Array.from({ length: 499 }, (_, index) => event(`pending-${index}`))], sentEventIds: ['acknowledged'] };
+    const fresh = mergeLearningCore(acknowledged, { offlineQueue: [event('fresh')], sentEventIds: [] });
+    return { disjoint: merged.offlineQueue, pressure: fresh.offlineQueue };
+  });
+  expect(result.disjoint).toHaveLength(360);
+  expect(new Set(result.disjoint.map(event => event.id)).size).toBe(360);
+  expect(result.pressure).toHaveLength(500);
+  expect(result.pressure.some(event => event.id === 'acknowledged')).toBe(false);
+  expect(result.pressure.some(event => event.id === 'fresh')).toBe(true);
+});
+
+test('malformed nonempty primary storage generation recovers backup and rotates without overwriting it', async ({ page }) => {
+  await page.waitForFunction(() => Boolean(window.BrainBiteCore));
+  const backup = await page.evaluate(async () => {
+    await PERSISTENCE_CHAIN;
+    const saved = structuredClone(STORE);
+    saved.profiles[0].name = 'Healthy Backup Learner';
+    localStorage.setItem('bb-core-v3', JSON.stringify({ schemaVersion: 9, active: 0, profiles: [{}], deletedProfiles: [] }));
+    localStorage.setItem('bb-core-v3-back', JSON.stringify(saved));
+    localStorage.setItem('bb-core-v3-recovery', JSON.stringify(saved));
+    return saved.profiles[0].id;
+  });
+  await page.reload();
+  await expect(page.locator('#profileName')).toHaveText('Healthy Backup Learner');
+  await page.evaluate(async () => { P().name = 'Rotated Healthy Learner'; await save(); });
+  const generations = await page.evaluate(() => Object.fromEntries(['bb-core-v3', 'bb-core-v3-back', 'bb-core-v3-recovery'].map(key => [key, JSON.parse(localStorage.getItem(key)).profiles[0]])));
+  expect(generations['bb-core-v3']).toMatchObject({ id: backup, name: 'Rotated Healthy Learner' });
+  expect(generations['bb-core-v3-back']).toMatchObject({ id: backup, name: 'Healthy Backup Learner' });
+});
+
+for (const [label, schemaVersion] of [['nonnumeric string', 'corrupt'], ['null', null], ['fraction', 7.5], ['future version', 10]]) {
+  test(`declared ${label} schema in primary recovers healthy backup on reload and rotation`, async ({ page }) => {
+    await page.waitForFunction(() => Boolean(window.BrainBiteCore));
+    const backupId = await page.evaluate(async schemaVersion => {
+      await PERSISTENCE_CHAIN;
+      const saved = structuredClone(STORE);
+      saved.profiles[saved.active].name = 'Healthy Declared-Schema Backup';
+      localStorage.setItem('bb-core-v3', JSON.stringify({ schemaVersion, active: 0, profiles: [{}], deletedProfiles: [] }));
+      localStorage.setItem('bb-core-v3-back', JSON.stringify(saved));
+      localStorage.setItem('bb-core-v3-recovery', JSON.stringify(saved));
+      return saved.profiles[saved.active].id;
+    }, schemaVersion);
+    await page.reload();
+    await expect(page.locator('#profileName')).toHaveText('Healthy Declared-Schema Backup');
+    const recoveredId = await page.evaluate(() => P().id);
+    expect(recoveredId).toBe(backupId);
+    await page.evaluate(async () => { P().name = 'Rotated Declared-Schema Backup'; await save(); await PERSISTENCE_CHAIN; });
+    const generations = await page.evaluate(() => Object.fromEntries(['bb-core-v3', 'bb-core-v3-back', 'bb-core-v3-recovery'].map(key => [key, JSON.parse(localStorage.getItem(key)).profiles[0]])));
+    expect(generations['bb-core-v3']).toMatchObject({ id: backupId, name: 'Rotated Declared-Schema Backup' });
+    expect(generations['bb-core-v3-back']).toMatchObject({ id: backupId, name: 'Healthy Declared-Schema Backup' });
+  });
+}
+
+test('Firebase profile pull follows every page and preserves live profiles and tombstones', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    localStorage.setItem('bb-firebase-session', JSON.stringify({ idToken: 'token', refreshToken: 'refresh', localId: 'family-pages', email: 'parent@example.com' }));
+    const client = new BrainBiteFirebaseREST('brainbite-test', 'AIza-test-public-web-key-123456789');
+    const live = id => ({ name: `projects/brainbite-test/databases/(default)/documents/families/family-pages/profiles/${id}`, fields: { progress: client.wrapValue({ id, name: id }) }, updateTime: new Date().toISOString() });
+    const tombstone = { name: 'projects/brainbite-test/databases/(default)/documents/families/family-pages/profiles/deleted', fields: { progress: client.wrapValue({ id: 'deleted', deleted: true, deletedAt: 123 }) }, updateTime: new Date().toISOString() };
+    const requests = [];
+    const originalFetch = window.fetch;
+    window.fetch = async url => {
+      requests.push(String(url));
+      const token = new URL(String(url)).searchParams.get('pageToken');
+      const body = token === 'page-2' ? { documents: [tombstone, live('last-live')] } : { documents: [live('first-live')], nextPageToken: 'page-2' };
+      return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+    try {
+      const profiles = await client.pullProfiles();
+      return { requests, profiles: profiles.map(row => row.progress) };
+    } finally { window.fetch = originalFetch; }
+  });
+  expect(result.requests).toHaveLength(2);
+  expect(result.requests[0]).not.toContain('pageToken');
+  expect(result.requests[1]).toContain('pageToken=page-2');
+  expect(result.profiles).toEqual([{ id: 'first-live', name: 'first-live' }, { id: 'deleted', deleted: true, deletedAt: 123 }, { id: 'last-live', name: 'last-live' }]);
+});
+
+test('navigation and DOM activity redraws keep keyboard focus on meaningful targets', async ({ page }) => {
+  await page.getByRole('button', { name: 'Parents', exact: true }).focus();
+  await page.getByRole('button', { name: 'Parents', exact: true }).press('Enter');
+  await expect(page.locator('#parent.show')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.activeElement?.closest('.screen.show')?.id)).toBe('parent');
+  await page.evaluate(() => show('home'));
+  await page.locator('#parentNav').press('Enter');
+  await expect.poll(() => page.evaluate(() => document.activeElement?.matches('#parent h2') || false)).toBe(true);
+  await page.evaluate(() => { show('home'); const route = window.BrainBiteCore.createApprovedCurriculumChallenge('math-1-addition', { seed: 31, family: 'Target Smash' }); window.BrainBiteGame.startCurriculumChallenge(route.challenge, { assisted: false }); });
+  await expect(page.locator('#game.show')).toBeVisible();
+  const wrong = await page.evaluate(() => {
+    const challenge = G.activity.challenge;
+    const correct = String(challenge.answers[0]);
+    const wrong = String(challenge.distractors[0]);
+    challenge.answers = [correct, '14'];
+    challenge.distractors = [wrong, '15'];
+    challenge.choices = [wrong, correct, '14', '15'].map((value, index) => ({ id: `test-${index}`, value, correct: challenge.answers.includes(value), x: index % 3, y: Math.floor(index / 3) }));
+    challenge.selected = [];
+    challenge.completed = false;
+    draw();
+    return wrong;
+  });
+  const wrongButton = page.locator(`#board button.activity-target[data-activity-choice="${wrong}"]`);
+  await wrongButton.focus();
+  await wrongButton.press('Enter');
+  await expect(page.locator('#feedback')).toContainText('Not');
+  await expect.poll(() => page.evaluate(() => document.activeElement?.matches('#board button.activity-target') ? document.activeElement.dataset.activityChoice : null)).not.toBe(null);
+  const firstCorrect = page.locator('#board button.activity-target[data-activity-choice="12"]');
+  await firstCorrect.focus();
+  await firstCorrect.press('Space');
+  await expect(firstCorrect).toBeDisabled();
+  await expect.poll(() => page.evaluate(() => document.activeElement?.matches('#board button.activity-target:not(:disabled)') || false)).toBe(true);
+  await expect(page.locator('#game.show')).toBeVisible();
 });
 
 test('Phase 2.2 child play works before PIN setup and an expired limit blocks launch without mutation', async ({ page }) => {
@@ -2885,6 +3115,20 @@ test('Phase 2.3 restore keeps a distinct rollback snapshot and a failed replacem
   expect(failed).toEqual({ memory: 'Current Failure Kid', primary: 'Current Failure Kid', backup: 'Should Not Replace', copiesMatch: true, rollbackName: 'Current Failure Kid' });
 });
 
+test('Phase 2.3 restore after profile deletion preserves the tombstone and cannot resurrect the learner', async ({ page }) => {
+  const deletedId = await page.evaluate(async () => {
+    const deleted = blank('Restore Deleted Kid'); STORE.profiles.push(deleted); STORE.active = STORE.profiles.length - 1; await save();
+    const olderBackup = structuredClone(STORE); rememberProfileDeletion(deleted.id, Date.now()); await save();
+    localStorage.setItem(BACK, JSON.stringify(olderBackup)); return deleted.id;
+  });
+  await parentDestination(page, 'Recovery');
+  await page.getByRole('button', { name: 'Restore Backup' }).click(); await approveSensitiveAction(page);
+  await expect(page.locator('#saveHealth')).toContainText('Backup restored');
+  const restored = await page.evaluate(id => ({ names: STORE.profiles.map(profile => profile.name), live: STORE.profiles.some(profile => profile.id === id), tombstoned: STORE.deletedProfiles.some(item => item.id === id), copies: [KEY, BACK].map(key => JSON.parse(localStorage.getItem(key))) }), deletedId);
+  expect(restored.names).not.toContain('Restore Deleted Kid'); expect(restored.live).toBe(false); expect(restored.tombstoned).toBe(true);
+  for (const copy of restored.copies) { expect(copy.profiles.some(profile => profile.id === deletedId)).toBe(false); expect(copy.deletedProfiles.some(item => item.id === deletedId)).toBe(true); }
+});
+
 test('Phase 2.3 import rejects invalid identities before rollback mutation and supports valid modern and legacy stores', async ({ page }) => {
   await page.evaluate(async () => { P().name = 'Before Import'; await save(); });
   await parentDestination(page, 'Recovery');
@@ -2919,6 +3163,19 @@ test('Phase 2.3 import rejects invalid identities before rollback mutation and s
   expect(migratedLegacy.name).toBe('Legacy Import'); expect(migratedLegacy.id).toMatch(/^legacy-/); expect(migratedLegacy.schemaVersion).toBe(9); expect(migratedLegacy.completed).toContain(1);
 });
 
+test('Phase 2.3 import after profile deletion preserves the local tombstone and cannot resurrect the learner', async ({ page }) => {
+  const setup = await page.evaluate(async () => {
+    const deleted = blank('Import Deleted Kid'); STORE.profiles.push(deleted); STORE.active = STORE.profiles.length - 1; await save();
+    const olderExport = structuredClone(STORE); rememberProfileDeletion(deleted.id, Date.now()); await save();
+    return { deletedId: deleted.id, text: JSON.stringify(olderExport) };
+  });
+  await parentDestination(page, 'Recovery');
+  await page.locator('#importFile').setInputFiles({ name: 'older-before-delete.json', mimeType: 'application/json', buffer: Buffer.from(setup.text) }); await approveSensitiveAction(page);
+  await expect(page.locator('#saveHealth')).toContainText('Progress imported');
+  const imported = await page.evaluate(id => ({ names: STORE.profiles.map(profile => profile.name), live: STORE.profiles.some(profile => profile.id === id), tombstoned: STORE.deletedProfiles.some(item => item.id === id) }), setup.deletedId);
+  expect(imported.names).not.toContain('Import Deleted Kid'); expect(imported.live).toBe(false); expect(imported.tombstoned).toBe(true);
+});
+
 test('Phase 2.3 production excludes debug controls and locked parent tools cannot be opened directly', async ({ page }) => {
   await page.goto('/?match=0&webgl=0&release=1&lab=1&contentMode=internal-review');
   for (const id of ['simulateSync','testConflictMerge','clearSyncQueue','runSelfCheck','runLaunchCheck','labSimulateSync','labTestConflictMerge','labDiscardSyncQueue']) await expect(page.locator(`#${id}`)).toHaveCount(0);
@@ -2948,23 +3205,24 @@ test('Phase 2.3 Lab queue discard requires exact confirmation and a fresh PIN', 
   }
 });
 
-test('Phase 2.3 cloud deletion reports a partial remote outcome and defers local cleanup until retry succeeds', async ({ page }) => {
+test('Phase 2.3 cloud deletion reports unavailability and leaves data, queue, and session unchanged', async ({ page }) => {
   await page.evaluate(() => {
     INTEGRATIONS.cloud = { provider: 'firebase', url: 'phase23-project', key: 'x'.repeat(24) };
     localStorage.setItem('bb-firebase-session', JSON.stringify({ idToken: 'token', refreshToken: 'refresh', localId: 'family-phase23', email: 'parent@example.com' }));
     queueSyncEvent({ type: 'store-update', profileId: P().id, payload: { phase: 23 }, schemaVersion: STORE.schemaVersion });
-    BrainBiteFirebaseREST.prototype.deleteFamily = async () => ({ profilesDeleted: 1 });
-    BrainBiteFirebaseREST.prototype.deleteAuthAccount = async () => { throw new Error('AUTH_DELETE_RETRY'); };
+    globalThis.__phase23DeleteCalls = { family: 0, auth: 0 };
+    BrainBiteFirebaseREST.prototype.deleteFamily = async () => { globalThis.__phase23DeleteCalls.family++; return { profilesDeleted: 1 }; };
+    BrainBiteFirebaseREST.prototype.deleteAuthAccount = async () => { globalThis.__phase23DeleteCalls.auth++; return true; };
     render();
   });
   await parentDestination(page, 'Account & Sync');
-  await page.getByRole('button', { name: 'Delete Cloud Data & Account' }).click(); await approveSensitiveAction(page);
-  await expect(page.locator('#mergeResult')).toContainText('family data was deleted, but Firebase account deletion failed');
-  const partial = await page.evaluate(() => ({ queue: SYNC.queue.length, session: !!localStorage.getItem('bb-firebase-session') }));
-  expect(partial.queue).toBeGreaterThan(0); expect(partial.session).toBe(true);
-
-  await page.evaluate(() => { BrainBiteFirebaseREST.prototype.deleteAuthAccount = async function phase23DeleteAccount() { this.saveSession(null); return true; }; });
-  await page.getByRole('button', { name: 'Delete Cloud Data & Account' }).click(); await approveSensitiveAction(page);
-  await expect(page.locator('#mergeResult')).toContainText('Cloud family data and Firebase account were deleted');
-  expect(await page.evaluate(() => ({ queue: SYNC.queue.length, session: localStorage.getItem('bb-firebase-session') }))).toEqual({ queue: 0, session: null });
+  const before = await page.evaluate(() => ({ store: JSON.stringify(STORE), copies: Object.fromEntries([KEY, BACK, RECOVERY_KEY].map(key => [key, localStorage.getItem(key)])), queue: JSON.stringify(SYNC.queue), session: localStorage.getItem('bb-firebase-session') }));
+  expect(JSON.parse(before.queue)).not.toHaveLength(0); expect(before.session).not.toBeNull();
+  await page.getByRole('button', { name: 'Check Cloud Deletion Status' }).click();
+  await expect(page.locator('#sensitiveActionTitle')).toHaveText('Check cloud deletion availability?');
+  await expect(page.locator('#sensitiveActionDescription')).toHaveText('This client cannot delete cloud family documents or the Firebase authentication account. Confirm to view the current status. No local or cloud data will change.');
+  await approveSensitiveAction(page);
+  await expect(page.locator('#mergeResult')).toHaveText('No cloud data or Firebase account was deleted. This build does not yet have the privileged deletion service required for that action. Local progress, cloud documents, the account, the signed-in session, and pending sync changes remain unchanged.');
+  const after = await page.evaluate(() => ({ store: JSON.stringify(STORE), copies: Object.fromEntries([KEY, BACK, RECOVERY_KEY].map(key => [key, localStorage.getItem(key)])), queue: JSON.stringify(SYNC.queue), session: localStorage.getItem('bb-firebase-session'), deleteCalls: globalThis.__phase23DeleteCalls }));
+  expect(after).toEqual({ ...before, deleteCalls: { family: 0, auth: 0 } });
 });
