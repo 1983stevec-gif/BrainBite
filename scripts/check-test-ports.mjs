@@ -8,13 +8,22 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 
 const CONFIG = 'playwright.config.js';
-const configured = (() => {
+const defaultPort = (() => {
   const text = readFileSync(CONFIG, 'utf8');
   const match = text.match(/BRAINBITE_TEST_PORT\s*\|\|\s*(\d+)/);
   return match ? match[1] : null;
 })();
+const configuredNumber = Number(process.env.BRAINBITE_TEST_PORT || defaultPort);
+const configured = Number.isInteger(configuredNumber) && configuredNumber > 0 && configuredNumber <= 65535
+  ? String(configuredNumber)
+  : null;
 
-const files = [];
+if (!defaultPort || !configured) {
+  console.error(`Could not determine a valid effective test port from ${CONFIG} and BRAINBITE_TEST_PORT.`);
+  process.exit(1);
+}
+
+const files = [CONFIG];
 for (const dir of ['tests', 'scripts']) {
   if (!existsSync(dir)) continue;
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -40,11 +49,11 @@ for (const file of files) {
   });
 }
 
-console.log(`test port drift: ${files.length} files checked against port ${configured}`);
+console.log(`test port drift: ${files.length} candidate file(s) scanned; effective port ${configured}`);
 if (problems.length) {
   console.error(`\n${problems.length} hardcoded port(s) that will not reach the test server:`);
   for (const problem of problems) console.error(`  ${problem}`);
   console.error('\nDerive the port from BRAINBITE_TEST_PORT or PLAYWRIGHT_BASE_URL instead.');
   process.exit(1);
 }
-console.log('Every harness reaches the configured test server.');
+console.log('No non-exempt harness hardcodes a loopback port that differs from the effective test server port.');

@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 // content/storage-copies.js is a classic script that attaches to the global object, so it
 // loads here exactly as the browser loads it.
 const source = readFileSync(new URL('../content/storage-copies.js', import.meta.url), 'utf8');
+const appSource = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
 const sandbox = {};
 new Function('window', 'globalThis', `${source}\nreturn window;`)(sandbox, sandbox);
 const { DEFAULT_KEYS, readAll, readEvery, writeRotated, converge } = sandbox.BrainBiteStorageCopies;
@@ -21,6 +22,18 @@ function fakeStorage(initial = {}) {
 }
 const store = name => ({ profiles: [{ id: 'p1', name }] });
 const nameOf = raw => JSON.parse(raw).profiles[0].name;
+function appFunctionSource(name) {
+  const match = new RegExp(`function\\s+${name}\\s*\\(`).exec(appSource);
+  assert.ok(match, `${name} must be declared in app.js`);
+  const bodyStart = appSource.indexOf('{', match.index);
+  let depth = 0;
+  for (let index = bodyStart; index < appSource.length; index += 1) {
+    if (appSource[index] === '{') depth += 1;
+    if (appSource[index] === '}') depth -= 1;
+    if (depth === 0) return appSource.slice(match.index, index + 1);
+  }
+  throw new Error(`Could not extract ${name} from app.js`);
+}
 // Mirrors app.js: legacy saves remain migration-readable, while modern boot
 // generations need a bounded identity/shape check before selection. Import validation
 // remains a separate app-level contract.
@@ -175,6 +188,32 @@ test('a failed read never produces a partial generation set', () => {
   writeRotated(storage, DEFAULT_KEYS, store('only'), readerFor(storage));
   assert.deepEqual(readAll(readerFor(storage), DEFAULT_KEYS).map(entry => entry.profiles[0].name), ['only']);
   assert.deepEqual(readEvery(readerFor(storage), DEFAULT_KEYS).map(entry => entry.profiles[0].name), ['only', 'only', 'only']);
+});
+
+test('total validation failure quarantines every raw generation before blank rotation', () => {
+  const quarantineKey = 'bb-core-v3-unreadable-quarantine';
+  const raw = {
+    [DEFAULT_KEYS.primary]: '{"schemaVersion":9,"active":2,"profiles":[{"id":"p1","name":"Primary evidence"}]}',
+    [DEFAULT_KEYS.backup]: '{broken backup bytes',
+    [DEFAULT_KEYS.recovery]: '{"schemaVersion":10,"active":0,"profiles":[{"id":"p2","name":"Future evidence"}]}',
+  };
+  const storage = fakeStorage(raw);
+  const reader = readerFor(storage);
+  assert.deepEqual(readAll(reader, DEFAULT_KEYS), []);
+  const initialization = appFunctionSource('initializeCanonicalState');
+  const quarantineAt = initialization.indexOf('preserveUnreadableStoreCopies();');
+  const blankWriteAt = initialization.indexOf('writeStoreCopiesUnlocked(STORE);');
+  assert.ok(quarantineAt >= 0 && quarantineAt < blankWriteAt, 'boot must quarantine unreadable bytes before writing blank state');
+  const preserve = new Function('localStorage', 'KEY', 'BACK', 'RECOVERY_KEY', 'UNREADABLE_STORE_QUARANTINE_KEY', 'readAllStoredStores', `
+    ${appFunctionSource('preserveUnreadableStoreCopies')}
+    return preserveUnreadableStoreCopies;
+  `)(storage, DEFAULT_KEYS.primary, DEFAULT_KEYS.backup, DEFAULT_KEYS.recovery, quarantineKey, () => readAll(reader, DEFAULT_KEYS));
+  assert.equal(preserve(), true);
+
+  writeRotated(storage, DEFAULT_KEYS, store('blank learner'), reader);
+  const quarantine = JSON.parse(storage.getItem(quarantineKey));
+  assert.deepEqual(quarantine.snapshots[0].generations, raw);
+  assert.equal(nameOf(storage.getItem(DEFAULT_KEYS.primary)), 'blank learner');
 });
 
 // M2 native save mirror.

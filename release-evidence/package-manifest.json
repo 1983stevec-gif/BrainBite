@@ -1,10 +1,10 @@
 {
   "schema": "brainbite.package-manifest.v1",
-  "generatedAt": "2026-10-01T00:54:11.475Z",
+  "generatedAt": "2026-10-01T14:56:23.393Z",
   "files": {
     "app.js": {
-      "sha256": "47f3931e88cd921343c2a79c60c24efbd2653d148b0bc6695ca8ac79ab9b1bc6",
-      "bytes": 281514
+      "sha256": "5c3e9d8ae936f1be4f713e5c92c99f9893fd4aee75ce8c832d810a9504d246cf",
+      "bytes": 281410
     },
     "assets/art/bite-village.svg": {
       "sha256": "10de1eed7772e502d1ac29f41c00e7b51b9dbea230312ece358a0184ebb2e49a",
@@ -275,8 +275,8 @@
       "bytes": 4577
     },
     "index.html": {
-      "sha256": "09d8e76a16a637cab43a93146e2ffe685e0abadd2eddffa315911417cf19da34",
-      "bytes": 43605
+      "sha256": "dd9279aeb0207da11220d35ce4a0420b7fb744b35b2482f92f788ee25f5ed1f2",
+      "bytes": 43601
     },
     "manifest.webmanifest": {
       "sha256": "e008f60c5e4d15a276ae1e7ede78e4c94a68a01f0eda5c8d0c81ddb3694dd499",
@@ -367,8 +367,8 @@
       "bytes": 3059
     },
     "service-worker.js": {
-      "sha256": "5dc75b0af6cb395b9e88a7403796690ffaced9644ccb68c14df593d0514a055b",
-      "bytes": 4905
+      "sha256": "bd05a782d3af321fb073839ae8de85b789d9ac1e792721d3c5a8f4e0b4c0af86",
+      "bytes": 4951
     },
     "styles.css": {
       "sha256": "7c462a633872f1c4ec1a78b0f74ac6f6a67e2d26bfb2abf3a84ff38fce084910",

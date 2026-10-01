@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   ACTIVITY_FAMILIES,
   OFFLINE_QUEUE_LIMIT,
@@ -53,6 +54,21 @@ import {
   upgradeBrainBase,
   validateContentBundle,
 } from '../brainbite-core.mjs';
+
+const appSource = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
+
+function appFunctionSource(name) {
+  const match = new RegExp(`function\\s+${name}\\s*\\(`).exec(appSource);
+  assert.ok(match, `${name} must be declared in app.js`);
+  const bodyStart = appSource.indexOf('{', match.index);
+  let depth = 0;
+  for (let index = bodyStart; index < appSource.length; index += 1) {
+    if (appSource[index] === '{') depth += 1;
+    if (appSource[index] === '}') depth -= 1;
+    if (depth === 0) return appSource.slice(match.index, index + 1);
+  }
+  throw new Error(`Could not extract ${name} from app.js`);
+}
 
 function makeStorage(seed = {}) {
   const store = new Map(Object.entries(seed));
@@ -117,6 +133,46 @@ test('same-skill cloud branches merge unique evidence without double-counting sh
   assert.equal(merged.evidence.incorrectAttempts, 1);
   assert.equal(merged.recentPerformance.length, 3);
   assert.deepEqual(mergeSkillStates(merged, right.skills['number-facts'], { preferRight: true }).evidence, merged.evidence);
+});
+
+test('document-unique page writers preserve two attempts allocated from the same floor', () => {
+  let uuidCalls = 0;
+  let sessionReads = 0;
+  let sessionWrites = 0;
+  const globalThis = { crypto: { randomUUID: () => `00000000-0000-4000-8000-${String(++uuidCalls).padStart(12, '0')}` } };
+  const sessionStorage = {
+    value: null,
+    getItem() { sessionReads += 1; return this.value; },
+    setItem(key, value) { sessionWrites += 1; this.value = value; },
+  };
+  const makeWriterId = new Function('globalThis', 'sessionStorage', `
+    const UUID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const PAGE_WRITER_SESSION_KEY='bb-core-writer-v1';
+    ${appFunctionSource('newCryptographicUuid')}
+    ${appFunctionSource('pageWriterId')}
+    return pageWriterId;
+  `)(globalThis, sessionStorage);
+  const writerIds = [makeWriterId(), makeWriterId()];
+  assert.equal(uuidCalls, 2);
+  assert.equal(sessionReads, 0);
+  assert.equal(sessionWrites, 0);
+  assert.notEqual(writerIds[0], writerIds[1]);
+
+  const persistedFloor = 7;
+  const base = defaultLearner('Parallel', 'profile-parallel-writers');
+  const branches = writerIds.map((writerId, index) => recordLearnerAttempt(structuredClone(base), 'number-facts', {
+    id: `parallel-${index}`,
+    originId: `10000000-0000-4000-8000-000000000001:${writerId}`,
+    originSequence: persistedFloor + 1,
+    correct: true,
+    independent: true,
+    responseTimeMs: 1200,
+    at: index + 1,
+  }, { id: 'number-facts' }));
+  const merged = mergeSkillStates(branches[0].skills['number-facts'], branches[1].skills['number-facts']);
+  assert.equal(merged.evidence.attempts, 2);
+  assert.equal(merged.evidence.independentSuccesses, 2);
+  assert.equal(evidenceProvenanceSources(merged).length, 2);
 });
 
 test('bounded cloud branches preserve all canonical hidden attempts after their visible histories diverge', () => {

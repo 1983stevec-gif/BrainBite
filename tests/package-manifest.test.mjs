@@ -4,6 +4,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildManifest, hashFile } from '../scripts/package-manifest.mjs';
+import { expectedRuntimeCache, runtimeCacheProblem, runtimeFingerprint } from '../scripts/check-stage.mjs';
 import { evidenceCheckForBranch } from '../scripts/lib/certification-policy.mjs';
 
 // The package manifest passed on the Windows workstation and failed in Linux CI on six
@@ -48,4 +49,46 @@ test('a manifest covers every file in the package directory', async () => {
   assert.deepEqual(Object.keys(manifest.files).sort(), ['index.html', 'nested/app.js']);
   assert.equal(manifest.schema, 'brainbite.package-manifest.v1');
   for (const entry of Object.values(manifest.files)) assert.match(entry.sha256, /^[0-9a-f]{64}$/);
+});
+
+const syntheticRuntime = {
+  'app.js': { sha256: 'a'.repeat(64), bytes: 10 },
+  'index.html': { sha256: 'b'.repeat(64), bytes: 20 },
+  'service-worker.js': { sha256: 'c'.repeat(64), bytes: 30 },
+};
+
+test('runtime fingerprint changes when a packaged file digest changes', () => {
+  const changed = structuredClone(syntheticRuntime);
+  changed['app.js'].sha256 = 'd'.repeat(64);
+  const serviceWorkerOnly = structuredClone(syntheticRuntime);
+  serviceWorkerOnly['service-worker.js'].sha256 = 'f'.repeat(64);
+  assert.notEqual(runtimeFingerprint(changed), runtimeFingerprint(syntheticRuntime));
+  assert.equal(runtimeFingerprint(serviceWorkerOnly), runtimeFingerprint(syntheticRuntime), 'service-worker.js must not create a self-reference');
+});
+
+test('runtime fingerprint changes when a packaged path is added or removed', () => {
+  const added = { ...syntheticRuntime, 'content/new.json': { sha256: 'e'.repeat(64), bytes: 40 } };
+  const removed = structuredClone(syntheticRuntime);
+  delete removed['index.html'];
+  assert.notEqual(runtimeFingerprint(added), runtimeFingerprint(syntheticRuntime));
+  assert.notEqual(runtimeFingerprint(removed), runtimeFingerprint(syntheticRuntime));
+});
+
+test('a mismatched or dynamically constructed service-worker CACHE fails comparison', () => {
+  const expected = expectedRuntimeCache(syntheticRuntime);
+  const mismatch = runtimeCacheProblem(syntheticRuntime, `const CACHE = 'brainbite-v2.0-shell-runtime-${'0'.repeat(64)}';`);
+  assert.match(mismatch, /^service-worker CACHE mismatch:/);
+  assert.match(mismatch, new RegExp(expected));
+  assert.match(mismatch, /found "brainbite-v2\.0-shell-runtime-0{64}"/);
+  assert.match(mismatch, /Set CACHE .* then run npm run package:manifest\.$/);
+  assert.match(runtimeCacheProblem(syntheticRuntime, "const CACHE = 'brainbite-' + digest;"), /not a plain string literal/);
+  assert.match(runtimeCacheProblem(syntheticRuntime, `/*\nconst CACHE = '${expected}';\n*/\nconst CACHE = prefix + digest;`), /not a plain string literal/);
+});
+
+test('the expected runtime cache uses the content-addressed constant format', () => {
+  const expected = expectedRuntimeCache(syntheticRuntime);
+  assert.equal(runtimeFingerprint(syntheticRuntime), 'a4fd618bf64a486ed8ba2351af228984fb82d114286a3d5809ba88f227cc516a');
+  assert.equal(expected, `brainbite-v2.0-shell-runtime-${runtimeFingerprint(syntheticRuntime)}`);
+  assert.match(expected, /^brainbite-v2\.0-shell-runtime-[0-9a-f]{64}$/);
+  assert.equal(runtimeCacheProblem(syntheticRuntime, `const CACHE = '${expected}';`), null);
 });

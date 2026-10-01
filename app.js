@@ -4,6 +4,7 @@ const KEY='bb-core-v3',BACK='bb-core-v3-back';
 // Declared here, before the canonical load runs, because load() reconciles the copies.
 const STORE_COPY_KEYS=BrainBiteStorageCopies.DEFAULT_KEYS;
 const PRE_OPERATION_ROLLBACK_KEY='bb-core-v3-pre-operation-rollback';
+const UNREADABLE_STORE_QUARANTINE_KEY='bb-core-v3-unreadable-quarantine';
 const PARENT_AUTH_KEY='bb-parent-auth-v1';
 const PARENT_AUTH_ITERATIONS=600000;
 const PARENT_LOCK_MS=15*60*1000;
@@ -305,13 +306,7 @@ function newCryptographicUuid(){
  const hex=[...bytes].map(value=>value.toString(16).padStart(2,'0'));
  return `${hex.slice(0,4).join('')}-${hex.slice(4,6).join('')}-${hex.slice(6,8).join('')}-${hex.slice(8,10).join('')}-${hex.slice(10).join('')}`
 }
-const PAGE_WRITER_SESSION_KEY='bb-core-writer-v1';
-function pageWriterId(){
- let value='';try{value=sessionStorage.getItem(PAGE_WRITER_SESSION_KEY)||''}catch{}
- if(UUID_PATTERN.test(value))return value;
- value=newCryptographicUuid();try{sessionStorage.setItem(PAGE_WRITER_SESSION_KEY,value)}catch{}
- return value;
-}
+function pageWriterId(){return newCryptographicUuid()}
 const PAGE_WRITER_ID=pageWriterId();
 function belongsToInstallation(originId,installationId){const value=String(originId||'');return value===installationId||value.startsWith(`${installationId}:`)}
 function stableSyncJson(value){
@@ -682,6 +677,7 @@ function initializeCanonicalState(){
   if(currentRaw!==LOADED_STORE_RAW)STORE=mergeStores(STORE,readAllStoredStores());
   invalidateStaleGame();
   SYNC=mergeSyncStates(SYNC,readStoredSync());
+  preserveUnreadableStoreCopies();
   writeStoreCopiesUnlocked(STORE);
   localStorage.setItem(SYNC_KEY,JSON.stringify(SYNC));
   LOADED_STORE_RAW=JSON.stringify(STORE);
@@ -761,6 +757,16 @@ function readStoredStore(raw){
  }
 }
 function readStoredCopy(key){return readStoredStore(localStorage.getItem(key))}
+
+function preserveUnreadableStoreCopies(){
+ if(readAllStoredStores().length)return false;
+ const generations={};for(const key of [KEY,BACK,RECOVERY_KEY]){const raw=localStorage.getItem(key);if(raw!==null)generations[key]=raw}
+ if(!Object.keys(generations).length)return false;
+ const existingRaw=localStorage.getItem(UNREADABLE_STORE_QUARANTINE_KEY);let snapshots=[];
+ if(existingRaw!==null)try{const existing=JSON.parse(existingRaw);snapshots=existing?.version===1&&Array.isArray(existing.snapshots)?existing.snapshots:[{unreadableQuarantine:existingRaw}]}catch{snapshots=[{unreadableQuarantine:existingRaw}]}
+ const signature=JSON.stringify(generations);if(snapshots.some(snapshot=>JSON.stringify(snapshot?.generations)===signature))return false;
+ snapshots.push({generations});localStorage.setItem(UNREADABLE_STORE_QUARANTINE_KEY,JSON.stringify({version:1,snapshots}));return true
+}
 
 function writeStoreCopiesUnlocked(store){
  const payload=BrainBiteStorageCopies.writeRotated(localStorage,STORE_COPY_KEYS,store,readStoredCopy);
@@ -3032,15 +3038,9 @@ $('retryQueue').onclick=async()=>{try{const r=await retryPendingSync();$('mergeR
 $('exportCloudSnapshot').onclick=()=>{const b=new Blob([JSON.stringify(cloudSnapshot(),null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='brainbite-cloud-snapshot.json';a.click()};
 $('deleteCloudAccount').onclick=async event=>{
  const status=$('mergeResult');if(!parentShellRequired('mergeResult'))return;
- const c=cloudClient();if(!c||!c.session){status.textContent='Sign in before deleting cloud family data or the Firebase account.';return}
- const approved=await requestSensitiveAction({title:'Delete cloud family and account?',description:'BrainBite will first delete the signed-in family data, then delete the Firebase authentication account. Local learner progress is kept.',confirmText:'Delete cloud account',invoker:event.currentTarget,statusId:'mergeResult'});
- if(!approved){status.textContent='Cloud deletion cancelled. No cloud or local state was changed.';return}
- try{await c.deleteFamily()}
- catch(error){status.textContent=`Cloud family data deletion failed before account deletion. The Firebase account, local progress, session, and pending sync queue were kept: ${error.message}`;return}
- try{await c.deleteAuthAccount()}
- catch(error){status.textContent=`Cloud family data was deleted, but Firebase account deletion failed. The signed-in session and pending sync queue were kept so a parent can retry safely: ${error.message}`;return}
- try{const ids=SYNC.queue.map(item=>item.eventId||item.id);acknowledgeSyncEvents(ids);SYNC.queue=SYNC.queue.filter(item=>!ids.includes(item.eventId||item.id));SYNC.lastSync=null;SYNC.provider='local-only';await saveSync();renderCloudAuth();status.textContent='Cloud family data and Firebase account were deleted. Local learner progress remains on this device.'}
- catch(error){status.textContent=`Cloud family data and Firebase account were deleted, but local sync cleanup failed. Local learner progress was kept: ${error.message}`}
+ const approved=await requestSensitiveAction({title:'Check cloud deletion availability?',description:'This client cannot delete cloud family documents or the Firebase authentication account. Confirm to view the current status. No local or cloud data will change.',confirmText:'Check deletion status',invoker:event.currentTarget,statusId:'mergeResult'});
+ if(!approved){status.textContent='Cloud deletion status check cancelled. No cloud or local state was changed.';return}
+ status.textContent='No cloud data or Firebase account was deleted. This build does not yet have the privileged deletion service required for that action. Local progress, cloud documents, the account, the signed-in session, and pending sync changes remain unchanged.'
 };
 
 $('saveLocalAccount').onclick=()=>{const email=$('localAccountEmail').value.trim();if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){$('localAccountStatus').textContent='Enter a valid email address.';return}SYNC.account={email,createdAt:SYNC.account?.createdAt||Date.now()};saveSync()};

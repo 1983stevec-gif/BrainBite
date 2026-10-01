@@ -121,14 +121,23 @@ test('animated Bite and real quality budgets load in both scenes', async ({ page
 });
 
 test('live WebGL scenes expose frame and scene-load budget evidence', async ({ page }) => {
+  const createLongTask = () => page.evaluate(() => {
+    const startedAt = performance.now();
+    while (performance.now() - startedAt < 80) {
+      // Keep the main thread busy long enough to emit a PerformanceLongTaskTiming entry.
+    }
+  });
   await page.goto('/?presentation=webgl');
   await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.home?.metrics?.sceneLoad?.count || 0)).toBe(1);
   await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.home?.metrics?.frame?.count || 0)).toBeGreaterThan(2);
   await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.home?.assetTiming?.count || 0)).toBe(3);
+  const homeLongTaskCount = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().home.metrics.longTask.count);
+  await createLongTask();
+  await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.home?.metrics?.longTask?.count || 0)).toBeGreaterThan(homeLongTaskCount);
   const homeReport = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().home);
   expect(homeReport.metrics.sceneLoad.count).toBe(1);
   expect(homeReport.metrics.frame.p95).not.toBeNull();
-  expect(homeReport.metrics.longTask).toBeDefined();
+  expect(homeReport.metrics.longTask.count).toBeGreaterThan(homeLongTaskCount);
   expect(homeReport.metrics.rendererGeometries.count).toBeGreaterThan(0);
   expect(homeReport.metrics.renderCalls.max).toBeLessThanOrEqual(200);
   expect(homeReport.assetTiming.count).toBeGreaterThan(0);
@@ -137,10 +146,13 @@ test('live WebGL scenes expose frame and scene-load budget evidence', async ({ p
   await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.battle?.metrics?.sceneLoad?.count || 0)).toBe(1);
   await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.battle?.metrics?.frame?.count || 0)).toBeGreaterThan(2);
   await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.battle?.assetTiming?.count || 0)).toBe(3);
+  const battleLongTaskCount = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().battle.metrics.longTask.count);
+  await createLongTask();
+  await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.battle?.metrics?.longTask?.count || 0)).toBeGreaterThan(battleLongTaskCount);
   const battleReport = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().battle);
   expect(battleReport.metrics.sceneLoad.count).toBe(1);
   expect(battleReport.metrics.frame.p99).not.toBeNull();
-  expect(battleReport.metrics.longTask).toBeDefined();
+  expect(battleReport.metrics.longTask.count).toBeGreaterThan(battleLongTaskCount);
   expect(battleReport.metrics.rendererGeometries.count).toBeGreaterThan(0);
   expect(battleReport.assetTiming.count).toBeGreaterThan(0);
   const runtimeReport = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().runtime);

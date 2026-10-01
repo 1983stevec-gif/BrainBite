@@ -762,7 +762,10 @@ test('profile names and parent-entered topics render as text, not markup', async
   expect(await page.evaluate(()=>window.x)).toBeUndefined();
 });
 
-test('Firebase sync is idempotent, propagates profile deletion, and preserves family isolation', async ({ browser }) => {
+// Client-contract coverage against an in-memory HTTPS protocol double; this does not
+// exercise Firebase transport or deployed rules. The executable Firebase rules check is
+// tests/firebase-security-rules.test.mjs under the Firestore emulator.
+test('Firebase client-contract double is idempotent, propagates profile deletion, and preserves family isolation', async ({ browser }) => {
   test.setTimeout(120_000);
   const canonicalAttemptCount = 3000;
   const docs = new Map();
@@ -863,7 +866,7 @@ test('Firebase sync is idempotent, propagates profile deletion, and preserves fa
     return { evidence: skill.evidence, provenance: skill.evidenceProvenance, provenanceSources: window.BrainBiteCore.evidenceProvenanceSources(skill), bytes: new TextEncoder().encode(JSON.stringify(STORE.profiles.find(profile => profile.id === id))).length };
   }, cloudProfileId);
   expect(cloudReady.evidence).toMatchObject({ attempts: totalCloudAttemptCount, independentSuccesses: totalCloudAttemptCount - 1, incorrectAttempts: 1 });
-  expect(cloudReady.provenanceSources).toHaveLength(2);
+  expect(cloudReady.provenanceSources).toHaveLength(reloadAttemptCount + 2);
   expect(cloudReady.bytes).toBeLessThan(512 * 1024);
   await pageConcurrent.close();
   await unlockParent(pageA);
@@ -905,7 +908,10 @@ test('Firebase sync is idempotent, propagates profile deletion, and preserves fa
   await Promise.all([a.close(), b.close(), intruder.close()]);
 });
 
-test('Firebase concurrent device pushes merge remote evidence before write', async ({ browser }) => {
+// Client-contract coverage against an in-memory HTTPS protocol double; this does not
+// exercise Firebase transport or deployed rules. The executable Firebase rules check is
+// tests/firebase-security-rules.test.mjs under the Firestore emulator.
+test('Firebase client-contract double merges concurrent device evidence before write', async ({ browser }) => {
   test.setTimeout(60_000);
   const documents=new Map(),conflictOnce=new Set();
   let version=0,conflictResponses=0,createPreconditions=0,updatePreconditions=0;
