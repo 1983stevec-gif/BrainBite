@@ -615,6 +615,20 @@ test('offline queue replays exactly once and rejects duplicates', () => {
   assert.equal(second.sent.length, 0);
 });
 
+test('offline queue retains events whose transport throws without blocking later events', () => {
+  let learner = defaultLearner('Network', 'profile-network');
+  for (const id of ['evt-ok-before', 'evt-transient', 'evt-ok-after']) {
+    learner = queueOfflineEvent(learner, { id, type: 'attempt', payload: { id } });
+  }
+  const replay = replayOfflineQueue(learner, event => {
+    if (event.id === 'evt-transient') throw new Error('offline');
+    return true;
+  });
+  assert.deepEqual(replay.sent, ['evt-ok-before', 'evt-ok-after']);
+  assert.deepEqual(replay.learner.offlineQueue.map(event => event.id), ['evt-transient']);
+  assert.deepEqual(replay.learner.sentEventIds, ['evt-ok-before', 'evt-ok-after']);
+});
+
 test('offline queue normalizes foreign event ownership to the active learner', () => {
   const eventId = '11111111-1111-4111-8111-111111111111';
   let learner = defaultLearner('Fia', 'profile-f');

@@ -24,7 +24,7 @@ the manifest returned by `getReviewManifest()` still omitted approvals/findings
 despite the earlier description below. The follow-up fixes those issues, validates
 reviewer metadata and repairs Windows smoke readiness/cleanup. Independent
 subagent reviews then exposed linked-JSON rejection and harness synchronization
-gaps, also fixed. Final local verification records **255/255 unit, 211/211 browser (zero
+gaps, also fixed. Final local verification records **267/267 unit, 220/220 browser (zero
 retries), 15/15 repeated targeted cases, and 11/11 smoke checks pass** after the final
 digest-gate acceptance fix. The current scoped recheck passes
 `node --test tests/content-review.test.mjs` (**25/25**) and
@@ -64,9 +64,9 @@ claimed.
 |---|---|---|---|
 | Focused content-review tests | `node --test tests/content-review.test.mjs` | **25/25** in the current scoped recheck | local console |
 | Content review gate | `npm run check:content-review` | PASS, 105 records and 0 digest mismatches | local console |
-| Current integrated unit run | `npm run test:unit` | **255/255**, zero failed/skipped | final local audit |
+| Current integrated unit run | `npm run test:unit` | **267/267**, zero failed/skipped | final local audit |
 | Current smoke inventory | `npm run smoke` | **11/11**, including Chrome+Edge Windows matrix | final local audit |
-| Current browser suite | Local audit run | **211/211, zero retries** | final local audit |
+| Current browser suite | Local audit run | **220/220, zero retries** | final local audit |
 | Historical local certification | `npm run certify:local` | **17/17 stages**, 210 browser cases, 11/11 smokes | historical `release-evidence/local-certification.json` |
 | Historical PR #2 remote CI | GitHub Actions | **211 browser tests, zero retries**, 11/11 smokes, clean tree, and Firestore job pass; historical only | Actions runs 36316190009 and 36316192782 |
 | Historical PR #2 native shell | `npm run native:verify` and `npm run native:verify:runtime` | 100 runtime files and zero TCP listeners; historical only | PR #2 records |

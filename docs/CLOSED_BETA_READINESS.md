@@ -62,8 +62,8 @@ The installer is unsigned and is an internal closed-beta artifact.
 |---|---|---|
 | Current focused content-review tests | `node --test tests/content-review.test.mjs` | **25/25** |
 | Current content-review validator | `npm run check:content-review` | **PASS**, 105 records, 0 digest mismatches |
-| Current integrated unit run | `npm run test:unit` | **255/255**, zero failed/skipped |
-| Current browser suite | Local audit run | **211/211, zero retries** |
+| Current integrated unit run | `npm run test:unit` | **267/267**, zero failed/skipped |
+| Current browser suite | Local audit run | **220/220, zero retries** |
 | Current smoke checks | Local audit run | **11/11**, including Chrome+Edge Windows matrix |
 | Historical repository validators | Prior Cycle 2 audit | content, content-review, static (10 checks), runtime, release, Firebase, launch, final, Firebase security, native package, and release evidence — all PASS |
 | Historical performance budgets | Prior Cycle 2 audit | 0 headless budget violations; device-only measurements remain unverified |

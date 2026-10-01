@@ -21,13 +21,28 @@ function fakeStorage(initial = {}) {
 }
 const store = name => ({ profiles: [{ id: 'p1', name }] });
 const nameOf = raw => JSON.parse(raw).profiles[0].name;
-// Mirrors app.js: parse, and treat anything without a profiles array as unreadable.
+// Mirrors app.js: legacy saves remain migration-readable, while modern boot
+// generations need a bounded identity/shape check before selection. Import validation
+// remains a separate app-level contract.
+const modernId = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const readerFor = storage => key => {
   const raw = storage.getItem(key);
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
-    return parsed && Array.isArray(parsed.profiles) ? parsed : null;
+    if (!parsed || !Array.isArray(parsed.profiles) || parsed.profiles.length === 0) return null;
+    if (Object.hasOwn(parsed, 'schemaVersion') && (!Number.isInteger(parsed.schemaVersion) || parsed.schemaVersion < 1 || parsed.schemaVersion > 9)) return null;
+    if (parsed.schemaVersion >= 8) {
+      if (!Number.isInteger(parsed.active) || parsed.active < 0 || parsed.active >= parsed.profiles.length) return null;
+      const ids = new Set();
+      if (Object.hasOwn(parsed, 'deletedProfiles') && !Array.isArray(parsed.deletedProfiles)) return null;
+      for (const profile of parsed.profiles) {
+        if (!profile || typeof profile !== 'object' || Array.isArray(profile) || typeof profile.id !== 'string' || !modernId.test(profile.id) || ids.has(profile.id) || typeof profile.name !== 'string' || !profile.name.trim()) return null;
+        ids.add(profile.id);
+      }
+      for (const tombstone of parsed.deletedProfiles || []) if (!tombstone || typeof tombstone.id !== 'string' || !modernId.test(tombstone.id) || ids.has(tombstone.id)) return null;
+    }
+    return parsed;
   } catch { return null; }
 };
 
@@ -85,6 +100,40 @@ test('readAll prefers the primary and falls back only when a copy is unreadable'
   assert.deepEqual(readAll(readerFor(onlyRecovery), DEFAULT_KEYS).map(entry => entry.profiles[0].name), ['recovery']);
 
   assert.deepEqual(readAll(readerFor(fakeStorage()), DEFAULT_KEYS), []);
+});
+
+test('malformed modern primary falls back to a healthy backup before rotation', () => {
+  const storage = fakeStorage({
+    [DEFAULT_KEYS.primary]: JSON.stringify({ schemaVersion: 9, active: 0, profiles: [{}], deletedProfiles: [] }),
+    [DEFAULT_KEYS.backup]: JSON.stringify({ schemaVersion: 9, active: 0, profiles: [{ id: 'backup-id', name: 'backup learner' }], deletedProfiles: [] }),
+    [DEFAULT_KEYS.recovery]: JSON.stringify({ schemaVersion: 9, active: 0, profiles: [{ id: 'recovery-id', name: 'recovery learner' }], deletedProfiles: [] }),
+  });
+  assert.deepEqual(readAll(readerFor(storage), DEFAULT_KEYS).map(entry => entry.profiles[0].name), ['backup learner']);
+  writeRotated(storage, DEFAULT_KEYS, { schemaVersion: 9, active: 0, profiles: [{ id: 'next-id', name: 'next learner' }], deletedProfiles: [] }, readerFor(storage));
+  assert.equal(nameOf(storage.getItem(DEFAULT_KEYS.primary)), 'next learner');
+  assert.equal(nameOf(storage.getItem(DEFAULT_KEYS.backup)), 'next learner');
+  assert.equal(nameOf(storage.getItem(DEFAULT_KEYS.recovery)), 'backup learner');
+});
+
+for (const [label, schemaVersion] of [['nonnumeric string', 'corrupt'], ['null', null], ['fraction', 7.5], ['future version', 10]]) {
+  test(`declared ${label} schema falls back to backup and survives rotation`, () => {
+    const storage = fakeStorage({
+      [DEFAULT_KEYS.primary]: JSON.stringify({ schemaVersion, active: 0, profiles: [{}], deletedProfiles: [] }),
+      [DEFAULT_KEYS.backup]: JSON.stringify({ schemaVersion: 9, active: 0, profiles: [{ id: 'backup-id', name: 'saved learner' }], deletedProfiles: [] }),
+    });
+    assert.deepEqual(readAll(readerFor(storage), DEFAULT_KEYS).map(entry => entry.profiles[0].name), ['saved learner']);
+    writeRotated(storage, DEFAULT_KEYS, { schemaVersion: 9, active: 0, profiles: [{ id: 'backup-id', name: 'rotated learner' }], deletedProfiles: [] }, readerFor(storage));
+    assert.equal(nameOf(storage.getItem(DEFAULT_KEYS.primary)), 'rotated learner');
+    assert.equal(nameOf(storage.getItem(DEFAULT_KEYS.backup)), 'rotated learner');
+    assert.equal(nameOf(storage.getItem(DEFAULT_KEYS.recovery)), 'saved learner');
+  });
+}
+
+test('legacy generations remain readable for migration', () => {
+  const storage = fakeStorage({
+    [DEFAULT_KEYS.primary]: JSON.stringify({ active: 0, profiles: [{ name: 'legacy learner' }] }),
+  });
+  assert.deepEqual(readAll(readerFor(storage), DEFAULT_KEYS).map(entry => entry.profiles[0].name), ['legacy learner']);
 });
 
 test('readEvery returns every readable generation oldest first', () => {

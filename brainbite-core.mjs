@@ -2489,7 +2489,16 @@ function replayOfflineQueue(learner, transport) {
   const remaining = [];
   for (const event of next.offlineQueue) {
     if (next.sentEventIds.includes(event.id)) continue;
-    const accepted = transport ? !!transport(clone(event)) : true;
+    let accepted = true;
+    if (transport) {
+      try {
+        accepted = !!transport(clone(event));
+      } catch {
+        // A transient transport failure must leave this event queued. Continue so
+        // an independent later event can still be delivered in the same replay.
+        accepted = false;
+      }
+    }
     if (accepted) {
       next.sentEventIds.push(event.id);
       sent.push(event.id);

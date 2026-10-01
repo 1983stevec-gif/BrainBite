@@ -16,6 +16,7 @@ const TIME_EXTENSION_MS=15*60*1000;
 const TIME_EXIT_PREFIX='bb-time-usage-v1-exit:';
 const TIME_EXIT_RECEIPT_LIMIT=128;
 const SECRET_KEYS=new Set(['parentPin','parentAuth','pinHash','pinSalt','password','idToken','refreshToken','accessToken']);
+const STORED_PROFILE_ID_PATTERN=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const $=id=>document.getElementById(id);
 const REGISTRY=window.BrainBiteRegistry;
 const CONTENT_REVIEW=window.BrainBiteContentReviewManifest;
@@ -596,8 +597,17 @@ function prepareTimeUsageLaunch(){
  entry=ensureProfileTimeUsage(TIME_USAGE,profileId,now);TIME_RUNTIME={profileId,sessionId:entry.sessionId,lastTickAt:now,lifecycleCaptured:false};return true
 }
 function gameplayIsVisible(){return !!G&&!G.timeExpired&&$('game')?.classList.contains('show')&&document.visibilityState!=='hidden'}
+function invalidateStaleGame(){
+ if(!G||G.profileId===P()?.id&&!isProfileDeleted(G.profileId))return false;
+ G=null;TIME_RUNTIME={profileId:null,sessionId:null,lastTickAt:0,lifecycleCaptured:false};TIME_PENDING_LAUNCH=null;
+ hideSnackCard();hideExplainer();hideBattleToast();applyWorldTheme('');
+ if($('game')?.classList.contains('show')||$('timeup')?.classList.contains('show'))show('home');
+ return true
+}
 function checkpointGameplayActivity({forceActive=false,reason='activity',bestEffortOnly=false}={}){
- if(!G||G.timeExpired||TIME_RUNTIME.profileId!==P().id)return !G?.timeExpired;
+ if(invalidateStaleGame())return false;
+ if(!G)return true;
+ if(G.timeExpired||TIME_RUNTIME.profileId!==G.profileId)return false;
  const now=Date.now(),active=(forceActive&&$('game')?.classList.contains('show'))||gameplayIsVisible(),elapsed=Math.max(0,now-TIME_RUNTIME.lastTickAt),delta=active?Math.min(TIME_CHECKPOINT_MS,elapsed):0;TIME_RUNTIME.lastTickAt=now;
  if(!delta){if(reason==='activity')queueTimeUsageMutation(P().id,(entry,commitNow)=>({...entry,lastActivityAt:commitNow,lastTickAt:commitNow,updatedAt:commitNow,lastSeenWallClock:Math.max(entry.lastSeenWallClock,commitNow)}));return true}
  if(bestEffortOnly){const entry=ensureProfileTimeUsage(TIME_USAGE,P().id,now),next=consumeTimeDelta(entry,delta,now);TIME_USAGE.profiles[P().id]=next;TIME_USAGE.updatedAt=Math.max(TIME_USAGE.updatedAt,next.updatedAt)}
@@ -658,6 +668,7 @@ function reportPersistenceFailure(error){
 function persistCanonicalState({renderAfter=false}={}){
  PERSISTENCE_CHAIN=PERSISTENCE_CHAIN.catch(()=>{}).then(()=>withPersistenceLock(()=>{
   STORE=mergeStores(STORE,readAllStoredStores());
+  invalidateStaleGame();
   SYNC=mergeSyncStates(SYNC,readStoredSync());
   writeStoreCopiesUnlocked(STORE);
   localStorage.setItem(SYNC_KEY,JSON.stringify(SYNC));
@@ -669,6 +680,7 @@ function initializeCanonicalState(){
  PERSISTENCE_CHAIN=PERSISTENCE_CHAIN.catch(()=>{}).then(()=>withPersistenceLock(()=>{
   const currentRaw=localStorage.getItem(KEY);
   if(currentRaw!==LOADED_STORE_RAW)STORE=mergeStores(STORE,readAllStoredStores());
+  invalidateStaleGame();
   SYNC=mergeSyncStates(SYNC,readStoredSync());
   writeStoreCopiesUnlocked(STORE);
   localStorage.setItem(SYNC_KEY,JSON.stringify(SYNC));
@@ -686,19 +698,25 @@ window.addEventListener('storage',event=>{
  }
  if(![KEY,BACK,RECOVERY_KEY,SYNC_KEY].includes(event.key))return;
  STORE=mergeStores(STORE,readAllStoredStores());
+ invalidateStaleGame();
  SYNC=mergeSyncStates(SYNC,readStoredSync());
  if(document.readyState!=='loading')render();
 });
 if(PERSISTENCE_CHANNEL)PERSISTENCE_CHANNEL.onmessage=event=>{
  if(!event.data?.store||!event.data?.sync)return;
  STORE=event.data.replace?migrateStore(structuredClone(event.data.store)):mergeStores(STORE,[event.data.store]);
+ invalidateStaleGame();
  SYNC=mergeSyncStates(SYNC,event.data.sync);
  if(document.readyState!=='loading')render();
 };
 function nextAttemptOrigin(){
  if(!UUID_PATTERN.test(String(SYNC.installationId||'')))SYNC.installationId=newCryptographicUuid();
+ // A different tab can persist a newer sequence after this page boots. Refresh the
+ // floor before every allocation so a late storage merge cannot reuse an origin
+ // sequence when this writer resumes recording attempts.
+ const persistedFloor=Math.max(Number(SYNC.attemptSequence)||0,persistedAttemptSequence(),installationSequenceFloor(SYNC.installationId));
  const current=Number(PAGE_ATTEMPT_SEQUENCE);
- if(!Number.isSafeInteger(current)||current<0)PAGE_ATTEMPT_SEQUENCE=Math.max(Number(SYNC.attemptSequence)||0,installationSequenceFloor(SYNC.installationId));
+ PAGE_ATTEMPT_SEQUENCE=Math.max(Number.isSafeInteger(current)&&current>=0?current:0,persistedFloor);
  if(PAGE_ATTEMPT_SEQUENCE>=Number.MAX_SAFE_INTEGER)throw new Error('Learning attempt sequence exhausted.');
  PAGE_ATTEMPT_SEQUENCE+=1;SYNC.attemptSequence=Math.max(Number(SYNC.attemptSequence)||0,PAGE_ATTEMPT_SEQUENCE);
  return {originId:`${SYNC.installationId}:${PAGE_WRITER_ID}`,originSequence:PAGE_ATTEMPT_SEQUENCE}
@@ -715,10 +733,29 @@ function queueSyncEvent(event){
  SYNC.queue=normalizeSyncQueue([...SYNC.queue,next],SYNC.acknowledgedEventIds,SYNC_IN_FLIGHT);
 }
 
+function isReadableModernStoredGeneration(store){
+ if(!store||typeof store!=='object'||Array.isArray(store)||!Number.isInteger(store.schemaVersion)||store.schemaVersion<8||store.schemaVersion>SCHEMA_VERSION)return false;
+ if(!Number.isInteger(store.active)||store.active<0||store.active>=store.profiles.length)return false;
+ if(Object.hasOwn(store,'deletedProfiles')&&!Array.isArray(store.deletedProfiles))return false;
+ const ids=new Set();
+ for(const profile of store.profiles){
+  if(!profile||typeof profile!=='object'||Array.isArray(profile)||typeof profile.id!=='string'||!STORED_PROFILE_ID_PATTERN.test(profile.id)||ids.has(profile.id)||typeof profile.name!=='string'||!profile.name.trim())return false;
+  ids.add(profile.id);
+ }
+ for(const tombstone of store.deletedProfiles||[]){
+  if(!tombstone||typeof tombstone!=='object'||Array.isArray(tombstone)||typeof tombstone.id!=='string'||!STORED_PROFILE_ID_PATTERN.test(tombstone.id)||ids.has(tombstone.id))return false;
+ }
+ return true;
+}
 function readStoredStore(raw){
  try{
    const parsed=JSON.parse(raw);
-   return parsed&&Array.isArray(parsed.profiles)?migrateStore(parsed):null;
+   if(!parsed||!Array.isArray(parsed.profiles)||parsed.profiles.length===0)return null;
+   // An absent schema stays migration-compatible; a declared schema must be a
+   // supported integer before migration can mask a healthy sibling generation.
+   if(Object.hasOwn(parsed,'schemaVersion')&&(!Number.isInteger(parsed.schemaVersion)||parsed.schemaVersion<1||parsed.schemaVersion>SCHEMA_VERSION))return null;
+   if(parsed.schemaVersion>=8&&!isReadableModernStoredGeneration(parsed))return null;
+   return migrateStore(parsed);
  }catch{
    return null;
  }
@@ -1040,7 +1077,9 @@ function mergeLearningCore(localCore,remoteCore,{preferRemote=false}={}){
  out.telemetry=mergeHistory(localCore.telemetry,remoteCore.telemetry,200);
  out.sentEventIds=[...new Set([...(localCore.sentEventIds||[]),...(remoteCore.sentEventIds||[])])];
  const sent=new Set(out.sentEventIds);
- out.offlineQueue=mergeHistory(localCore.offlineQueue,remoteCore.offlineQueue,200).filter(event=>!sent.has(event.id||event.eventId));
+ // Acknowledged events must not consume slots before the canonical 500-event bound.
+ // mergeHistory deduplicates by event identity and sorts deterministically by timestamp.
+ out.offlineQueue=mergeHistory((localCore.offlineQueue||[]).filter(event=>!sent.has(event?.id||event?.eventId)),(remoteCore.offlineQueue||[]).filter(event=>!sent.has(event?.id||event?.eventId)),500);
  out.skills={};
  for(const skillId of new Set([...Object.keys(localCore.skills||{}),...Object.keys(remoteCore.skills||{})])){
   const left=localCore.skills?.[skillId],right=remoteCore.skills?.[skillId];
@@ -1145,7 +1184,7 @@ function rememberProfileDeletion(profileId,deletedAt=Date.now()){
   if(existing)existing.deletedAt=Math.max(Number(existing.deletedAt)||0,Number(deletedAt)||0);
   else STORE.deletedProfiles.push({id:profileId,deletedAt:Number(deletedAt)||Date.now()});
   const removedIndex=STORE.profiles.findIndex(profile=>profile.id===profileId);
-  if(removedIndex>=0){STORE.profiles.splice(removedIndex,1);if(STORE.active>=STORE.profiles.length)STORE.active=Math.max(0,STORE.profiles.length-1)}
+  if(removedIndex>=0){STORE.profiles.splice(removedIndex,1);if(STORE.active>=STORE.profiles.length)STORE.active=Math.max(0,STORE.profiles.length-1);invalidateStaleGame()}
 }
 function testConflictMerge(){
  const a={name:'Kid',score:100,stars:3,completed:[1,2],mastery:{math:30},updatedAt:100};
@@ -1347,11 +1386,17 @@ class BrainBiteFirebaseREST {
   async pullProfiles(){
     if(!this.userId())throw new Error('Sign in first');
     const url=`https://firestore.googleapis.com/v1/projects/${encodeURIComponent(this.projectId)}/databases/(default)/documents/families/${encodeURIComponent(this.userId())}/profiles`;
-    const r=await this.fetchAuthorized(url);
-    if(r.status===404)return [];
-    if(!r.ok)throw new Error(`Cloud read failed (${r.status})`);
-    const d=await r.json();
-    return (d.documents||[]).map(doc=>({name:doc.name,progress:this.unwrapValue(doc.fields?.progress),client_updated_at:doc.fields?.clientUpdatedAt?.timestampValue,updated_at:doc.updateTime}))
+    const profiles=[];
+    let pageToken=null;
+    do{
+      const r=await this.fetchAuthorized(pageToken?`${url}?pageToken=${encodeURIComponent(pageToken)}`:url);
+      if(r.status===404)return profiles;
+      if(!r.ok)throw new Error(`Cloud read failed (${r.status})`);
+      const d=await r.json();
+      profiles.push(...(d.documents||[]).map(doc=>({name:doc.name,progress:this.unwrapValue(doc.fields?.progress),client_updated_at:doc.fields?.clientUpdatedAt?.timestampValue,updated_at:doc.updateTime})));
+      pageToken=d.nextPageToken||null;
+    }while(pageToken);
+    return profiles
   }
   async deleteFamily(){
     if(!this.userId())throw new Error('Sign in first');
@@ -1635,7 +1680,14 @@ function show(id){
  }
  const active=document.querySelector('.screen.show')?.id;
  if(active==='game'&&id!=='game'){checkpointGameplayActivity({forceActive:true,reason:'navigation'});applyWorldTheme('')}
- document.querySelectorAll('.screen').forEach(x=>x.classList.remove('show'));$(id).classList.add('show');syncNavigationState(id);return requested===id
+ document.querySelectorAll('.screen').forEach(x=>x.classList.remove('show'));$(id).classList.add('show');syncNavigationState(id);
+ // Keep dialog focus trapped, and leave typing input alone when the same game redraws.
+ if(active!==id&&$('sensitiveActionBackdrop')?.hidden!==false){
+  const heading=$(id).querySelector('h2,h1,h3');
+  if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true})}
+  else {$(id).tabIndex=-1;$(id).focus({preventScroll:true})}
+ }
+ return requested===id
 }
 function syncNavigationState(id=document.querySelector('.screen.show')?.id||'home'){
  const parentContext=(id==='parent'||PARENT_ONLY_SCREENS.has(id))&&hasParentAccess();
@@ -2508,16 +2560,16 @@ function resolveLiveActivity(value,meta={}){
  // was a distractor; WebGL keeps its historical false return for misses.
  return currentCorrect||!document.documentElement.classList.contains('presentation-webgl')
 }
-function renderProfiles(){const l=$('profileList');l.replaceChildren();STORE.profiles.forEach((p,i)=>{const d=document.createElement('div'),details=document.createElement('div'),name=document.createElement('b'),stars=document.createElement('div'),button=document.createElement('button');d.className='profile-row';name.textContent=p.name;stars.textContent=`${p.stars} stars`;button.textContent=i===STORE.active?'Active':'Switch';button.disabled=i===STORE.active;details.append(name,stars);d.append(details,button);button.onclick=()=>{if(i===STORE.active)return;STORE.active=i;lockParentAccess();save();show('home')};l.appendChild(d)})}
+function renderProfiles(){const l=$('profileList');l.replaceChildren();STORE.profiles.forEach((p,i)=>{const d=document.createElement('div'),details=document.createElement('div'),name=document.createElement('b'),stars=document.createElement('div'),button=document.createElement('button');d.className='profile-row';name.textContent=p.name;stars.textContent=`${p.stars} stars`;button.textContent=i===STORE.active?'Active':'Switch';button.disabled=i===STORE.active;details.append(name,stars);d.append(details,button);button.onclick=()=>{if(i===STORE.active)return;STORE.active=i;invalidateStaleGame();lockParentAccess();save();show('home')};l.appendChild(d)})}
 function renderChildProfiles(){
  const active=$('childActiveProfile'),list=$('childProfileList');if(!active||!list)return;active.textContent=P().name;list.replaceChildren();
- STORE.profiles.forEach((profile,index)=>{const row=document.createElement('div'),label=document.createElement('span'),button=document.createElement('button'),current=index===STORE.active;row.className='profile-row child-profile-row';label.textContent=`${profile.name} · ${profile.stars} stars`;button.textContent=current?'Active learner':'Switch learner';button.disabled=current;button.setAttribute('aria-label',current?`${profile.name}, active learner`:`Switch to ${profile.name}`);button.onclick=()=>{if(current)return;STORE.active=index;lockParentAccess();void save();show('home')};row.append(label,button);list.appendChild(row)});
+ STORE.profiles.forEach((profile,index)=>{const row=document.createElement('div'),label=document.createElement('span'),button=document.createElement('button'),current=index===STORE.active;row.className='profile-row child-profile-row';label.textContent=`${profile.name} · ${profile.stars} stars`;button.textContent=current?'Active learner':'Switch learner';button.disabled=current;button.setAttribute('aria-label',current?`${profile.name}, active learner`:`Switch to ${profile.name}`);button.onclick=()=>{if(current)return;STORE.active=index;invalidateStaleGame();lockParentAccess();void save();show('home')};row.append(label,button);list.appendChild(row)});
 }
 function setCaption(text){const el=$('captionText');if(!el)return;const on=!!P().settings.captions;el.textContent=text||'';el.hidden=!on||!text}
 function start(id,options={}){const m=REGISTRY.getMission(id);return m?launchMission(m,options):false}
 function launchMission(m,{allowLocked=false,progressionEligible=true,assisted=false,source='mission',homeworkMode=false,contentControl=null}={}){const canonical=REGISTRY.getMission(m?.id),missionUnlocked=!!canonical&&REGISTRY.isMissionUnlocked(progression(),canonical.id);if(!m)return false;if(progressionEligible&&!canonical)return false;if(!allowLocked&&!missionUnlocked){$('launchHint').textContent='Complete the earlier mission in this world first.';return false}const gate=contentControl||registryMissionGate(m);if(!gate?.approved)return showContentUnavailable('launchHint');if(!prepareTimeUsageLaunch()){TIME_PENDING_LAUNCH={mission:m,options:{allowLocked,progressionEligible,assisted,source,homeworkMode,contentControl:gate}};return false}TIME_PENDING_LAUNCH=null;if(progressionEligible&&missionUnlocked){P().progression=REGISTRY.normalizeProgression({...progression(),lastMissionId:canonical.id});save()}show('game');applyWorldTheme(m.world);$('prompt').textContent=m.prompt;$('worldLabel').textContent=worldMeta(m.world).title.toUpperCase();renderMinimap(m);$('prompt').lang=m.world==='spanish'?'es':'en';
  if(progressionEligible&&missionUnlocked&&['name','world'].includes(firstRunState(P()).stage)){setFirstRunStage('mission');renderFirstRun();save()}
- const webgl=document.documentElement.classList.contains('presentation-webgl'),bossBox=$('bossBox');bossBox.hidden=!m.boss;bossBox.style.display=m.boss?'':'none';$('bossName').textContent=m.bossName||'Boss';renderBossPortrait(m);const guidedHint=assisted?(m.curriculumChallenge?.supportMetadata?.scaffold||m.curriculumChallenge?.hintMetadata?.hint||''):'';$('feedback').textContent=assisted?`Guided support is on.${guidedHint?` ${guidedHint}`:' This attempt counts as assisted evidence.'}`:`Entering ${worldMeta(m.world).title}.`;G=makeGame(m);G.progressionEligible=!!(progressionEligible&&missionUnlocked);G.internalBubbleReefPreview=G.progressionEligible&&isInternalBubbleReefPreview();G.launchOptions={allowLocked:!!allowLocked,progressionEligible:!!progressionEligible,assisted:!!assisted,source,homeworkMode:!!homeworkMode,contentControl:gate};G.contentControl=gate;G.assisted=!!assisted;G.source=source;G.homeworkMode=!!homeworkMode;G.guidedHint=guidedHint;if(webgl){G.webglRemaining=[...new Set((m.correct||[]).map(String))];G.total=m.boss?Math.min(4,G.webglRemaining.length):G.webglRemaining.length;if(!m.boss)G.nibbler={slot:3,lastChosen:null};else startBossRun()}const nibblerStatus=$('nibblerStatus');if(nibblerStatus)nibblerStatus.textContent=G.nibbler?'A Nibbler is on pillar 4. Biting its pillar costs your combo, never a heart.':'';$('speakPrompt').hidden=false;setCaption(m.prompt);hideBattleToast();hideSnackCard();hideExplainer();clearEnteringStatusSoon();draw();return true}
+ const webgl=document.documentElement.classList.contains('presentation-webgl'),bossBox=$('bossBox');bossBox.hidden=!m.boss;bossBox.style.display=m.boss?'':'none';$('bossName').textContent=m.bossName||'Boss';renderBossPortrait(m);const guidedHint=assisted?(m.curriculumChallenge?.supportMetadata?.scaffold||m.curriculumChallenge?.hintMetadata?.hint||''):'';$('feedback').textContent=assisted?`Guided support is on.${guidedHint?` ${guidedHint}`:' This attempt counts as assisted evidence.'}`:`Entering ${worldMeta(m.world).title}.`;G=makeGame(m);G.profileId=P().id;G.progressionEligible=!!(progressionEligible&&missionUnlocked);G.internalBubbleReefPreview=G.progressionEligible&&isInternalBubbleReefPreview();G.launchOptions={allowLocked:!!allowLocked,progressionEligible:!!progressionEligible,assisted:!!assisted,source,homeworkMode:!!homeworkMode,contentControl:gate};G.contentControl=gate;G.assisted=!!assisted;G.source=source;G.homeworkMode=!!homeworkMode;G.guidedHint=guidedHint;if(webgl){G.webglRemaining=[...new Set((m.correct||[]).map(String))];G.total=m.boss?Math.min(4,G.webglRemaining.length):G.webglRemaining.length;if(!m.boss)G.nibbler={slot:3,lastChosen:null};else startBossRun()}const nibblerStatus=$('nibblerStatus');if(nibblerStatus)nibblerStatus.textContent=G.nibbler?'A Nibbler is on pillar 4. Biting its pillar costs your combo, never a heart.':'';$('speakPrompt').hidden=false;setCaption(m.prompt);hideBattleToast();hideSnackCard();hideExplainer();clearEnteringStatusSoon();draw();return true}
 function startCurriculumChallenge(challenge,{assisted=false,homeworkMode=false}={}){
  const c=core(),skill=c?.findCurriculumSkill?.(challenge?.skillId),validation=c?.validateGeneratedChallenge?.(challenge,skill||{});
  const gate=c&&skill&&validation?.approved?generatedChallengeGate(challenge,skill,validation):null;
@@ -2712,6 +2764,8 @@ function drawActivityBoard(b){
  delete b.dataset.typingEncounter;
  const family=activity.family,progress=new Set(activityProgress(challenge).map(value=>String(value)));
  const choices=activityChoices(challenge);
+ const focused=document.activeElement,focusedChoice=b.contains(focused)&&focused?.matches?.('button.activity-target');
+ const focusedIndex=focusedChoice?choices.findIndex(value=>String(value)===focused.dataset.activityChoice):-1;
  b.className=`board world-${G.m.world} activity-board activity-${family.toLowerCase().replace(/[^a-z]+/g,'-')}${G.m.boss?' boss-arena':''}`;
  b.dataset.activityFamily=family;
  b.dataset.activityCompleted=String(!!challenge.completed);
@@ -2728,6 +2782,12 @@ function drawActivityBoard(b){
   button.addEventListener('click',()=>resolveLiveActivity(value));
   row.appendChild(button);
  });
+ if(focusedChoice){
+  const enabled=[...row.querySelectorAll('button.activity-target:not(:disabled)')];
+  const next=enabled.find(button=>choices.findIndex(value=>String(value)===button.dataset.activityChoice)>=focusedIndex)||enabled[0];
+  if(next)next.focus({preventScroll:true});
+  else {b.tabIndex=-1;b.focus({preventScroll:true})}
+ }
  return true
 }
 function draw(){window.dispatchEvent(new CustomEvent('bb:game-draw'));renderMinimap(G?.m);$('lives').textContent=G.lives;$('combo').textContent=G.combo;const comboBanner=$('comboBanner');if(comboBanner)comboBanner.textContent=`x${G.combo}`;const stars=document.querySelectorAll('#game .battle-stars span');if(stars?.length){const lit=Math.min(3,Math.floor(G.combo/3));stars.forEach((s,i)=>{s.innerHTML=i<lit?'&#9733;':'&#9734;';s.style.color=i<lit?'#f5c518':'#9aa3b5'})}$('targets').textContent=`${G.eaten}/${G.total}`;$('bossHealth').value=G.boss;$('bossHealth').max=100;const phase=G.bossRun?G.bossRun.phase+1:G.boss>66?1:G.boss>33?2:3;$('bossPhase').textContent=G.m.boss?`${G.m.bossName} - Phase ${phase} of ${BOSS_PHASES}`:`Phase ${phase} of ${BOSS_PHASES}`;const healthFill=$('healthFill');if(healthFill)healthFill.style.width=`${Math.max(0,Math.min(100,(G.lives/3)*100))}%`;const healthText=$('healthText');if(healthText)healthText.textContent=`${Math.max(0,G.lives)} / 3`;const healthBox=document.querySelector('#game .battle-health');if(healthBox)healthBox.setAttribute('aria-label',`Lives: ${Math.max(0,G.lives)} of 3`);setCaption(G?.m?.prompt);const b=$('board');const battleSurface=document.querySelector('#game .battle-shell');if(G.activity&&!isMatchFractionCompatibilityPath()&&drawActivityBoard(b)){if(battleSurface)battleSurface.dataset.answerSurface='dom';window.BrainBitePresentation?.setBattleChoices?.([]);return}if(battleSurface)battleSurface.dataset.answerSurface='three-d';b.className=`board world-${G.m.world}${G.m.boss?' boss-arena':''}`;b.innerHTML='';for(let y=0;y<5;y++)for(let x=0;x<5;x++){const c=G.cells[ix(x,y)]||{eaten:true,value:''},d=document.createElement('div');d.className='cell';d.setAttribute('role','gridcell');if(x===G.p.x&&y===G.p.y)d.classList.add('player');if(x===G.e.x&&y===G.e.y)d.classList.add('enemy');if(G.m.boss&&G.m.world==='spanish'){const n=window.BrainBiteRunBuilder?.ringPosition?.((G.ringStep||0)+1);if(n&&n.x===x&&n.y===y)d.classList.add('enemy-next')}if(G.mist.some(m=>m.x===x&&m.y===y))d.classList.add('mistake');if(!c.eaten)d.textContent=c.value;b.appendChild(d)}}

@@ -2123,9 +2123,15 @@ test('Phase 3.1 Practice Lab locked missions complete as non-progression practic
   await page.evaluate(() => {
     // In the Classic board, each tap consumes one cell; preserve duplicate answer values
     // so repeated correct cells are consumed before the test reads the completion session.
+    // Keep unrelated randomized enemy collisions out of this practice-completion check.
+    G.e = { x: -1000, y: -1000 };
     const correctCells = G.cells.filter(cell => !cell.eaten && cell.correct).map(cell => String(cell.value));
     for (const value of correctCells) window.BrainBiteGame.tryAnswer(value);
   });
+  const mission = await page.evaluate(() => ({ eaten: G.eaten, total: G.total, lives: G.lives }));
+  expect(mission.total).toBeGreaterThan(0);
+  expect(mission.eaten).toBe(mission.total);
+  expect(mission.lives).toBeGreaterThan(0);
 
   const completed = await page.evaluate(() => {
     const p = P();
@@ -2600,6 +2606,161 @@ test('Phase 3.1 guided homework and independent curriculum practice record canon
   expect(canonicalHomework).toMatchObject({ subject: 'reading', grade: '4', topic: 'inference', homework: true, validated: true });
   await page.getByRole('button', { name: 'Parents', exact: true }).click();
   await expect(page.locator('#homeworkSummary')).toContainText('reading grade 4 · inference · homework');
+});
+
+test('profile reconciliation exits a live mission before remote learner deletion can credit the survivor', async ({ page, context }) => {
+  const firstId = await page.evaluate(async () => {
+    const firstId = P().id;
+    STORE.profiles.push(blank('Survivor Learner'));
+    STORE.active = 0;
+    await save();
+    return firstId;
+  });
+  const remote = await context.newPage();
+  await remote.goto('/?match=0&webgl=0');
+  await remote.waitForFunction(() => Boolean(window.BrainBiteGame?.getState));
+  await page.evaluate(() => window.BrainBiteGame.startMission(1));
+  await expect(page.locator('#game.show')).toBeVisible();
+  const survivorId = await remote.evaluate(() => STORE.profiles.find(profile => profile.name === 'Survivor Learner').id);
+  await remote.evaluate(({ firstId }) => {
+    rememberProfileDeletion(firstId, Date.now());
+    STORE.active = STORE.profiles.findIndex(profile => profile.id !== firstId);
+    return save();
+  }, { firstId });
+  await expect.poll(() => page.evaluate(() => ({ screen: document.querySelector('.screen.show')?.id, game: !!G, activeId: P()?.id })))
+    .toEqual({ screen: 'home', game: false, activeId: survivorId });
+  const staleAnswer = await page.evaluate(() => {
+    const snapshot = () => ({ score: P().score, mastery: structuredClone(P().mastery), sessions: P().sessions.length,
+      attempts: P().learningCore?.skills?.['math-4-fractions']?.evidence?.attempts || 0,
+      time: window.BrainBiteTimeUsage.read(P().id) });
+    const before = snapshot();
+    const accepted = window.BrainBiteGame.tryAnswer('12');
+    return { accepted, before, after: snapshot() };
+  });
+  expect(staleAnswer.accepted).toBe(false);
+  expect(staleAnswer.after).toEqual(staleAnswer.before);
+  expect(staleAnswer.before.score).toBe(0);
+  expect(staleAnswer.before.attempts).toBe(0);
+  await remote.close();
+});
+
+test('offline learning queues merge by identity within the canonical 500-event bound', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    const event = id => ({ id, type: 'LearningAttemptRecorded', timestamp: Number(id.replace(/\\D/g, '')) || 0, payload: { value: id } });
+    const left = { offlineQueue: Array.from({ length: 180 }, (_, index) => event(`left-${index}`)), sentEventIds: [] };
+    const right = { offlineQueue: Array.from({ length: 180 }, (_, index) => event(`right-${index}`)), sentEventIds: [] };
+    const merged = mergeLearningCore(left, right);
+    const acknowledged = { offlineQueue: [event('acknowledged'), ...Array.from({ length: 499 }, (_, index) => event(`pending-${index}`))], sentEventIds: ['acknowledged'] };
+    const fresh = mergeLearningCore(acknowledged, { offlineQueue: [event('fresh')], sentEventIds: [] });
+    return { disjoint: merged.offlineQueue, pressure: fresh.offlineQueue };
+  });
+  expect(result.disjoint).toHaveLength(360);
+  expect(new Set(result.disjoint.map(event => event.id)).size).toBe(360);
+  expect(result.pressure).toHaveLength(500);
+  expect(result.pressure.some(event => event.id === 'acknowledged')).toBe(false);
+  expect(result.pressure.some(event => event.id === 'fresh')).toBe(true);
+});
+
+test('malformed nonempty primary storage generation recovers backup and rotates without overwriting it', async ({ page }) => {
+  await page.waitForFunction(() => Boolean(window.BrainBiteCore));
+  const backup = await page.evaluate(async () => {
+    await PERSISTENCE_CHAIN;
+    const saved = structuredClone(STORE);
+    saved.profiles[0].name = 'Healthy Backup Learner';
+    localStorage.setItem('bb-core-v3', JSON.stringify({ schemaVersion: 9, active: 0, profiles: [{}], deletedProfiles: [] }));
+    localStorage.setItem('bb-core-v3-back', JSON.stringify(saved));
+    localStorage.setItem('bb-core-v3-recovery', JSON.stringify(saved));
+    return saved.profiles[0].id;
+  });
+  await page.reload();
+  await expect(page.locator('#profileName')).toHaveText('Healthy Backup Learner');
+  await page.evaluate(async () => { P().name = 'Rotated Healthy Learner'; await save(); });
+  const generations = await page.evaluate(() => Object.fromEntries(['bb-core-v3', 'bb-core-v3-back', 'bb-core-v3-recovery'].map(key => [key, JSON.parse(localStorage.getItem(key)).profiles[0]])));
+  expect(generations['bb-core-v3']).toMatchObject({ id: backup, name: 'Rotated Healthy Learner' });
+  expect(generations['bb-core-v3-back']).toMatchObject({ id: backup, name: 'Healthy Backup Learner' });
+});
+
+for (const [label, schemaVersion] of [['nonnumeric string', 'corrupt'], ['null', null], ['fraction', 7.5], ['future version', 10]]) {
+  test(`declared ${label} schema in primary recovers healthy backup on reload and rotation`, async ({ page }) => {
+    await page.waitForFunction(() => Boolean(window.BrainBiteCore));
+    const backupId = await page.evaluate(async schemaVersion => {
+      await PERSISTENCE_CHAIN;
+      const saved = structuredClone(STORE);
+      saved.profiles[saved.active].name = 'Healthy Declared-Schema Backup';
+      localStorage.setItem('bb-core-v3', JSON.stringify({ schemaVersion, active: 0, profiles: [{}], deletedProfiles: [] }));
+      localStorage.setItem('bb-core-v3-back', JSON.stringify(saved));
+      localStorage.setItem('bb-core-v3-recovery', JSON.stringify(saved));
+      return saved.profiles[saved.active].id;
+    }, schemaVersion);
+    await page.reload();
+    await expect(page.locator('#profileName')).toHaveText('Healthy Declared-Schema Backup');
+    const recoveredId = await page.evaluate(() => P().id);
+    expect(recoveredId).toBe(backupId);
+    await page.evaluate(async () => { P().name = 'Rotated Declared-Schema Backup'; await save(); await PERSISTENCE_CHAIN; });
+    const generations = await page.evaluate(() => Object.fromEntries(['bb-core-v3', 'bb-core-v3-back', 'bb-core-v3-recovery'].map(key => [key, JSON.parse(localStorage.getItem(key)).profiles[0]])));
+    expect(generations['bb-core-v3']).toMatchObject({ id: backupId, name: 'Rotated Declared-Schema Backup' });
+    expect(generations['bb-core-v3-back']).toMatchObject({ id: backupId, name: 'Healthy Declared-Schema Backup' });
+  });
+}
+
+test('Firebase profile pull follows every page and preserves live profiles and tombstones', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    localStorage.setItem('bb-firebase-session', JSON.stringify({ idToken: 'token', refreshToken: 'refresh', localId: 'family-pages', email: 'parent@example.com' }));
+    const client = new BrainBiteFirebaseREST('brainbite-test', 'AIza-test-public-web-key-123456789');
+    const live = id => ({ name: `projects/brainbite-test/databases/(default)/documents/families/family-pages/profiles/${id}`, fields: { progress: client.wrapValue({ id, name: id }) }, updateTime: new Date().toISOString() });
+    const tombstone = { name: 'projects/brainbite-test/databases/(default)/documents/families/family-pages/profiles/deleted', fields: { progress: client.wrapValue({ id: 'deleted', deleted: true, deletedAt: 123 }) }, updateTime: new Date().toISOString() };
+    const requests = [];
+    const originalFetch = window.fetch;
+    window.fetch = async url => {
+      requests.push(String(url));
+      const token = new URL(String(url)).searchParams.get('pageToken');
+      const body = token === 'page-2' ? { documents: [tombstone, live('last-live')] } : { documents: [live('first-live')], nextPageToken: 'page-2' };
+      return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+    try {
+      const profiles = await client.pullProfiles();
+      return { requests, profiles: profiles.map(row => row.progress) };
+    } finally { window.fetch = originalFetch; }
+  });
+  expect(result.requests).toHaveLength(2);
+  expect(result.requests[0]).not.toContain('pageToken');
+  expect(result.requests[1]).toContain('pageToken=page-2');
+  expect(result.profiles).toEqual([{ id: 'first-live', name: 'first-live' }, { id: 'deleted', deleted: true, deletedAt: 123 }, { id: 'last-live', name: 'last-live' }]);
+});
+
+test('navigation and DOM activity redraws keep keyboard focus on meaningful targets', async ({ page }) => {
+  await page.getByRole('button', { name: 'Parents', exact: true }).focus();
+  await page.getByRole('button', { name: 'Parents', exact: true }).press('Enter');
+  await expect(page.locator('#parent.show')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.activeElement?.closest('.screen.show')?.id)).toBe('parent');
+  await page.evaluate(() => show('home'));
+  await page.locator('#parentNav').press('Enter');
+  await expect.poll(() => page.evaluate(() => document.activeElement?.matches('#parent h2') || false)).toBe(true);
+  await page.evaluate(() => { show('home'); const route = window.BrainBiteCore.createApprovedCurriculumChallenge('math-1-addition', { seed: 31, family: 'Target Smash' }); window.BrainBiteGame.startCurriculumChallenge(route.challenge, { assisted: false }); });
+  await expect(page.locator('#game.show')).toBeVisible();
+  const wrong = await page.evaluate(() => {
+    const challenge = G.activity.challenge;
+    const correct = String(challenge.answers[0]);
+    const wrong = String(challenge.distractors[0]);
+    challenge.answers = [correct, '14'];
+    challenge.distractors = [wrong, '15'];
+    challenge.choices = [wrong, correct, '14', '15'].map((value, index) => ({ id: `test-${index}`, value, correct: challenge.answers.includes(value), x: index % 3, y: Math.floor(index / 3) }));
+    challenge.selected = [];
+    challenge.completed = false;
+    draw();
+    return wrong;
+  });
+  const wrongButton = page.locator(`#board button.activity-target[data-activity-choice="${wrong}"]`);
+  await wrongButton.focus();
+  await wrongButton.press('Enter');
+  await expect(page.locator('#feedback')).toContainText('Not');
+  await expect.poll(() => page.evaluate(() => document.activeElement?.matches('#board button.activity-target') ? document.activeElement.dataset.activityChoice : null)).not.toBe(null);
+  const firstCorrect = page.locator('#board button.activity-target[data-activity-choice="12"]');
+  await firstCorrect.focus();
+  await firstCorrect.press('Space');
+  await expect(firstCorrect).toBeDisabled();
+  await expect.poll(() => page.evaluate(() => document.activeElement?.matches('#board button.activity-target:not(:disabled)') || false)).toBe(true);
+  await expect(page.locator('#game.show')).toBeVisible();
 });
 
 test('Phase 2.2 child play works before PIN setup and an expired limit blocks launch without mutation', async ({ page }) => {
