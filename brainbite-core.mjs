@@ -1174,6 +1174,16 @@ function createSkillState(skillId, definition = {}) {
   };
 }
 
+const EVIDENCE_KEYS = Object.freeze([
+  'attempts',
+  'independentSuccesses',
+  'assistedSuccesses',
+  'hintsUsed',
+  'incorrectAttempts',
+  'rapidAttempts',
+  'responseTimeMsTotal',
+]);
+
 function masteryStateFor(score, confidence, evidence) {
   if (score >= 85 && confidence >= 0.72 && evidence.independentSuccesses >= 2 && evidence.incorrectAttempts <= 1) return 'Mastered';
   if (score >= 65) return 'Strong';
@@ -1195,8 +1205,15 @@ function normalizeSkillState(skillState, definition = {}) {
     missing: Array.isArray(skillState.prerequisiteState?.missing) ? clone(skillState.prerequisiteState.missing) : [...base.prerequisiteState.missing],
   };
   out.rewardIds = Array.isArray(skillState.rewardIds) ? clone(skillState.rewardIds) : [];
-  out.masteryScore = Math.round(computeMasteryScore(out));
-  out.confidence = computeConfidence(out.evidence);
+  const hasEvidence = EVIDENCE_KEYS.some(key => (Number(out.evidence[key]) || 0) > 0);
+  // Pre-evidence saves only recorded the scalar. Keep that real legacy progress,
+  // but make any available evidence authoritative so forged scalars cannot win.
+  out.masteryScore = hasEvidence
+    ? Math.round(computeMasteryScore(out))
+    : clamp(Number(skillState.masteryScore) || 0, 0, 100);
+  out.confidence = hasEvidence
+    ? computeConfidence(out.evidence)
+    : out.masteryScore > 0 ? clamp(out.masteryScore / 200, 0, 0.4) : computeConfidence(out.evidence);
   out.masteryState = masteryStateFor(out.masteryScore, out.confidence, out.evidence);
   out.evidenceProvenance = evidenceProvenanceFor(skillState);
   return out;
@@ -1221,16 +1238,6 @@ function computeMasteryScore(skillState) {
   const responseBonus = evidence.attempts ? clamp(evidence.responseTimeMsTotal / evidence.attempts, 0, 15000) < 3500 ? 4 : 0 : 0;
   return clamp(correctWeight - penaltyWeight + responseBonus, 0, 100);
 }
-
-const EVIDENCE_KEYS = Object.freeze([
-  'attempts',
-  'independentSuccesses',
-  'assistedSuccesses',
-  'hintsUsed',
-  'incorrectAttempts',
-  'rapidAttempts',
-  'responseTimeMsTotal',
-]);
 
 // Metadata-free callers stay bounded here; exact divergent merges require distinct stable origins and sequences.
 const LOCAL_UNSCOPED_EVIDENCE_SOURCE = 'local-unscoped';
@@ -1621,9 +1628,6 @@ function mergeSkillStates(leftValue, rightValue, { preferRight = false } = {}) {
     met: [...new Set([...(left.prerequisiteState?.met || []), ...(right.prerequisiteState?.met || [])])],
     missing: [...new Set([...(left.prerequisiteState?.missing || []), ...(right.prerequisiteState?.missing || [])])],
   };
-  merged.masteryScore = Math.round(computeMasteryScore(merged));
-  merged.confidence = computeConfidence(merged.evidence);
-  merged.masteryState = masteryStateFor(merged.masteryScore, merged.confidence, merged.evidence);
   return normalizeSkillState(merged);
 }
 

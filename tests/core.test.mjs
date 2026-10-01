@@ -1158,6 +1158,27 @@ test('a forged mastery scalar cannot survive a merge with its own evidence', () 
   assert.notEqual(merged.masteryScore, 100);
 });
 
+test('a legacy skill with a recorded score and no evidence keeps its progress', () => {
+  const lastPracticedAt = 1_700_000_000_000;
+  const nextReviewAt = lastPracticedAt + 60 * 60 * 1000;
+  const legacy = {
+    ...createSkillState('fractions'),
+    masteryScore: 64,
+    confidence: 1,
+    masteryState: 'Mastered',
+    lastPracticedAt,
+    nextReviewAt,
+    legacyImported: true,
+  };
+
+  const normalized = normalizeSkillState(legacy);
+  assert.equal(normalized.masteryScore, 64);
+  assert.equal(normalized.confidence, 0.32);
+  assert.equal(normalized.masteryState, 'Developing');
+  assert.equal(normalized.lastPracticedAt, lastPracticedAt);
+  assert.equal(normalized.nextReviewAt, nextReviewAt);
+});
+
 test('BrainBase activity markup escapes a hostile imported prompt', () => {
   const hostilePrompt = '<img src=x onerror=alert(1)>';
   const learner = defaultLearner('Markup', 'profile-markup');

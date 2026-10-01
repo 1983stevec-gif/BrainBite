@@ -1,6 +1,6 @@
 {
   "schema": "brainbite.package-manifest.v1",
-  "generatedAt": "2026-10-01T17:22:04.773Z",
+  "generatedAt": "2026-10-01T17:49:50.033Z",
   "files": {
     "app.js": {
       "sha256": "ecdd168d795ef898913ebeb7ecdbb0ccbbc91ca6a9a0aef55d53f3b430fe8fb7",
@@ -79,8 +79,8 @@
       "bytes": 991
     },
     "brainbite-core.mjs": {
-      "sha256": "e69cb68913f1f20535950bd675fa90fd43a2ab6d157f4b64748878800cf5538d",
-      "bytes": 160593
+      "sha256": "db5678d55547e7f3d74805974b71c1a7d6d475267a459d38ffa019d78c5ebed7",
+      "bytes": 160817
     },
     "content/boss-phases.js": {
       "sha256": "e559b3d11dc605c5f489b68a07b2f13736c031f7cd99f35c724473a27666abe8",
@@ -367,7 +367,7 @@
       "bytes": 3059
     },
     "service-worker.js": {
-      "sha256": "5d75f34fba34b22ed5e2d5af80c9d779cd0988ace847e28a95ec31a62c137cbc",
+      "sha256": "ef4c3ff7c7741a66b0c827104b8ac13fb838936e39350494ce7cfe925453ca8b",
       "bytes": 4951
     },
     "styles.css": {
