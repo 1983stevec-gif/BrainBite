@@ -19,6 +19,9 @@ const TIME_EXIT_RECEIPT_LIMIT=128;
 const SECRET_KEYS=new Set(['parentPin','parentAuth','pinHash','pinSalt','password','idToken','refreshToken','accessToken']);
 const STORED_PROFILE_ID_PATTERN=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const $=id=>document.getElementById(id);
+function readLocalStorage(key){try{return localStorage.getItem(key)}catch{return null}}
+function requestPersistentStorage(){try{const storage=navigator.storage;if(typeof storage?.persist!=='function')return Promise.resolve(false);return Promise.resolve(storage.persist()).catch(()=>false)}catch{return Promise.resolve(false)}}
+const PERSISTENT_STORAGE_REQUEST=requestPersistentStorage();
 const REGISTRY=window.BrainBiteRegistry;
 const CONTENT_REVIEW=window.BrainBiteContentReviewManifest;
 const CONTENT_CONTROL=window.BrainBiteContentControl;
@@ -46,15 +49,14 @@ async function grantBubbleReefPreviewReward({profileId,missionId,progression:com
  if(!rewards||contribution?.missionId!==missionId)return {status:'not-applicable',granted:false};
  const profile=STORE.profiles.find(candidate=>candidate.id===profileId);
  if(!profile)return {status:'profile-unavailable',granted:false};
+ Object.assign(profile,core().projectProfileCurrency(profile));
  const existing=profile.bubbleReefRewards?.profileId===profileId
   ?profile.bubbleReefRewards
   :rewards.createBubbleReefRewardState(profileId);
  const result=rewards.grantBubbleReefContribution(existing,{progression:completedProgression,awardedAt});
  profile.bubbleReefRewards=result.state;
- if(result.granted&&!canonicalRewardGranted){
-  const reward=result.state.rewards.find(item=>item.id===result.receipt?.rewardId);
-  profile.stars+=Number(reward?.stars)||0;
-  profile.spark+=Number(reward?.spark)||0;
+ if(result.granted){
+  Object.assign(profile,core().recordCurrencyPreview(profile,{canonicalRewardGranted}));
  }
  profile.updatedAt=Date.now();
  await persistCanonicalState({renderAfter:true});
@@ -93,6 +95,11 @@ function generatedChallengeGate(challenge,skill,validation){
   skill,
  })
 }
+function practiceContentStatus(routed,validation,gate){
+ const quarantined=!!(routed?.quarantined||validation?.quarantined?.length||gate?.reasons?.some(reason=>['quarantine-active','runtime-content-quarantine-active'].includes(reason)));
+ const pending=!quarantined&&gate?.record?.educatorReview?.status==='pending-educator'&&gate?.reasons?.includes('educator-review-required');
+ return {quarantined,message:quarantined?'This practice item is unavailable because it was quarantined after a content check. Please choose another activity.':pending?'This practice item is awaiting educator review and is not available yet. Please choose another activity.':CONTENT_UNAVAILABLE_MESSAGE};
+}
 function blank(name='Kid 1'){return {id:(crypto.randomUUID?.()||('p-'+Date.now()+'-'+Math.random())),name,score:0,stars:0,spark:0,progression:REGISTRY.createProgression(),learningCore:null,bestCombo:0,missionStars:{},bite:'Nib',unlockedBites:['Nib'],cosmetics:[],equippedCosmetic:null,programmableBits:{},activeProgrammableBitId:null,mastery:{math:10,words:10,spanish:10},skills:{},mistakes:[],practice:[],snap:[],sessions:[],settings:{reducedMotion:false,cameraMotionReduction:false,largeTargets:false,highContrast:false,captions:false,dyslexicFont:false,textScale:'1',qualityTier:'balanced',soundOn:true,musicOn:false,volume:80,vibrationOn:true,enemySpeed:'normal'},controls:{dailyMinutes:30,maxSessionMinutes:20,requireParentForPractice:false}}}
 let LOADED_STORE_RAW=null;
 // M2 native save mirror. Set by load() before the first write, so the restore check sees
@@ -104,6 +111,7 @@ const SCHEMA_VERSION=9;
 
 window.BrainBiteGame={
   getState(){return G},
+  redrawPresentation(){if(G)draw()},
   getActivityState(){return G?.activity?.challenge||null},
   getActivityFamily(){return G?.activity?.family||G?.m?.activityFamily||null},
   getContentControl(){return {mode:currentContentGateMode(),manifestVersion:CONTENT_REVIEW.getReviewManifest().version,manifestLoaded:CONTENT_CONTROL.manifestAvailable}},
@@ -272,7 +280,7 @@ function synthCue(name){if(!P().settings.soundOn)return;const steps=SYNTH_CUES[n
 const INTEGRATION_KEY='bb-core-v9-integrations';
 function integrationState(){
  try{
-  const stored=JSON.parse(localStorage.getItem(INTEGRATION_KEY)||'null'),cloud=stored?.cloud||{};
+  const stored=JSON.parse(readLocalStorage(INTEGRATION_KEY)||'null'),cloud=stored?.cloud||{};
   return {cloud:{provider:cloud.provider==='firebase'?'firebase':'none',url:String(cloud.url||''),key:String(cloud.key||'')}}
  }catch{return {cloud:{provider:'none',url:'',key:''}}}
 }
@@ -364,7 +372,7 @@ function installationSequenceFloor(installationId){
  return Math.max(0,floor)
 }
 function syncState(){
- let stored={};try{const parsed=JSON.parse(localStorage.getItem(SYNC_KEY)||'null');if(parsed&&typeof parsed==='object'&&!Array.isArray(parsed))stored=parsed}catch{}
+ let stored={};try{const parsed=JSON.parse(readLocalStorage(SYNC_KEY)||'null');if(parsed&&typeof parsed==='object'&&!Array.isArray(parsed))stored=parsed}catch{}
  const installationId=UUID_PATTERN.test(String(stored.installationId||''))?stored.installationId:newCryptographicUuid();
  const storedSequence=Number(stored.attemptSequence);
  const attemptSequence=Math.max(Number.isSafeInteger(storedSequence)&&storedSequence>=0?storedSequence:0,installationSequenceFloor(installationId));
@@ -381,11 +389,11 @@ const PERSISTENCE_GENERATION_KEY='bb-core-v3-write-generation';
 let PERSISTENCE_CHANNEL=null;try{PERSISTENCE_CHANNEL=new BroadcastChannel('brainbite:canonical-local-state:v1')}catch{}
 let PERSISTENCE_CHAIN=Promise.resolve();
 let PERSISTENCE_DB_PROMISE=null;
-function readStoredSync(){try{const value=JSON.parse(localStorage.getItem(SYNC_KEY)||'null');return value&&typeof value==='object'&&!Array.isArray(value)?value:null}catch{return null}}
+function readStoredSync(){try{const value=JSON.parse(readLocalStorage(SYNC_KEY)||'null');return value&&typeof value==='object'&&!Array.isArray(value)?value:null}catch{return null}}
 function persistedAttemptSequence(){const value=Number(readStoredSync()?.attemptSequence);return Number.isSafeInteger(value)&&value>=0?value:0}
 function waitForPersistenceTurn(delay=8){return new Promise(resolve=>setTimeout(resolve,delay))}
 function fallbackPersistenceGeneration(){
- let value=null;try{value=JSON.parse(localStorage.getItem(PERSISTENCE_GENERATION_KEY)||'null')}catch{}
+ let value=null;try{value=JSON.parse(readLocalStorage(PERSISTENCE_GENERATION_KEY)||'null')}catch{}
  const generation=Number(value?.generation);
  return {generation:Number.isSafeInteger(generation)&&generation>=0?generation:0,nonce:typeof value?.nonce==='string'?value.nonce:'',owner:typeof value?.owner==='string'?value.owner:''};
 }
@@ -393,7 +401,7 @@ function fallbackPersistenceClaims(now=Date.now()){
  const claims=[];
  for(let index=0;index<localStorage.length;index++){
   const key=localStorage.key(index);if(!key?.startsWith(PERSISTENCE_LEASE_PREFIX))continue;
-  let claim=null;try{claim=JSON.parse(localStorage.getItem(key)||'null')}catch{}
+  let claim=null;try{claim=JSON.parse(readLocalStorage(key)||'null')}catch{}
   if(!claim||claim.owner!==key.slice(PERSISTENCE_LEASE_PREFIX.length)||Number(claim.expiresAt)<=now){try{localStorage.removeItem(key)}catch{};index--;continue}
   const ticket=Number(claim.ticket);
   if(claim.choosing===true||(Number.isSafeInteger(ticket)&&ticket>0))claims.push({...claim,key,ticket:Number.isSafeInteger(ticket)?ticket:0});
@@ -462,7 +470,7 @@ async function withIndexedDbPersistenceLock(action){
 }
 async function withPersistenceLock(action){
  if(globalThis.navigator?.locks?.request)return navigator.locks.request(PERSISTENCE_LOCK_NAME,{mode:'exclusive'},action);
- if(globalThis.indexedDB)try{return await withIndexedDbPersistenceLock(action)}catch(error){if(error?.name!=='InvalidStateError'&&error?.name!=='UnknownError')throw error}
+ if(globalThis.indexedDB)try{return await withIndexedDbPersistenceLock(action)}catch(error){if(!['InvalidStateError','UnknownError','SecurityError','QuotaExceededError','AbortError','NotAllowedError'].includes(error?.name))throw error}
  return withFallbackPersistenceLease(action);
 }
 
@@ -511,7 +519,7 @@ function readPendingExitContributions(){
  const contributions=[];
  for(let index=0;index<localStorage.length;index++){
   const key=localStorage.key(index);if(!key?.startsWith(TIME_EXIT_PREFIX))continue;
-  let value=null;try{value=JSON.parse(localStorage.getItem(key)||'null')}catch{}
+  let value=null;try{value=JSON.parse(readLocalStorage(key)||'null')}catch{}
   const id=String(value?.id||''),profileId=String(value?.profileId||''),dayKey=String(value?.dayKey||''),deltaMs=timeInteger(value?.deltaMs,TIME_CHECKPOINT_MS),at=timeInteger(value?.at);
   if(id&&key===`${TIME_EXIT_PREFIX}${id}`&&profileId&&/^(?:\d{4})-(?:\d{2})-(?:\d{2})$/.test(dayKey)&&deltaMs&&at!==null)contributions.push({key,id,profileId,dayKey,sessionId:value.sessionId==null?null:String(value.sessionId).slice(0,100),deltaMs,at});
   else{try{localStorage.removeItem(key)}catch{}index--}
@@ -530,7 +538,7 @@ function reconcilePendingExitContributions(ledger){
 }
 let TIME_USAGE_WARNING='';
 function loadTimeUsageLedger(){
- const primary=parseTimeUsageCopy(localStorage.getItem(TIME_USAGE_KEY)),backup=parseTimeUsageCopy(localStorage.getItem(TIME_USAGE_BACKUP_KEY));
+ const primary=parseTimeUsageCopy(readLocalStorage(TIME_USAGE_KEY)),backup=parseTimeUsageCopy(readLocalStorage(TIME_USAGE_BACKUP_KEY));
  let ledger;
  if(primary.status==='valid'&&backup.status==='valid')ledger=mergeTimeUsageLedgers(primary.value,backup.value);
  else if(primary.status==='valid')ledger=primary.value;
@@ -569,7 +577,7 @@ function queueTimeUsageMutation(profileId,mutation){
  const apply=ledger=>{const now=Date.now(),entry=ensureProfileTimeUsage(ledger,profileId,now),next=normalizeProfileTimeUsage(mutation({...entry},now),profileId);if(!next)throw new Error('Invalid time usage update.');ledger.profiles[profileId]=next;ledger.updatedAt=Math.max(ledger.updatedAt,next.updatedAt);return ledger};
  TIME_USAGE=apply(mergeTimeUsageLedgers(TIME_USAGE,loadTimeUsageLedger()));
  PERSISTENCE_CHAIN=PERSISTENCE_CHAIN.catch(()=>{}).then(()=>withPersistenceLock(()=>{
-  const primary=parseTimeUsageCopy(localStorage.getItem(TIME_USAGE_KEY)),backup=parseTimeUsageCopy(localStorage.getItem(TIME_USAGE_BACKUP_KEY));
+  const primary=parseTimeUsageCopy(readLocalStorage(TIME_USAGE_KEY)),backup=parseTimeUsageCopy(readLocalStorage(TIME_USAGE_BACKUP_KEY));
   const persisted=mergeTimeUsageLedgers(primary.value||emptyTimeUsageLedger(),backup.value||emptyTimeUsageLedger()),reconciled=reconcilePendingExitContributions(persisted);TIME_USAGE=writeTimeUsageCopiesUnlocked(apply(reconciled.ledger));for(const key of reconciled.removableKeys)try{localStorage.removeItem(key)}catch{}
  })).catch(error=>{reportPersistenceFailure(error);return {error}});
  return PERSISTENCE_CHAIN
@@ -640,8 +648,9 @@ function mergeSyncStates(localValue,persistedValue){
 const DIAGNOSTIC_KEY='bb-diagnostics-v1';
 const DIAGNOSTIC_LIMIT=50;
 let DIAGNOSTICS=[];
+let SAVE_HEALTH_FAILURE='';
 function redactDiagnosticText(value,limit){return String(value||'').replace(/\b(authorization|proxy-authorization)\s*:\s*(?:(?:Basic|Bearer)\s+)?[A-Za-z0-9._~+\/=\-]+/gi,'$1: [REDACTED]').replace(/\bBearer\s+[A-Za-z0-9._~+\/=\-]+/gi,'Bearer [REDACTED]').replace(/(["']?)(authorization|proxy-authorization|password|passwd|passcode|pin|(?:[a-z0-9_-]*(?:token|secret|credential))|api[_-]?key|client[_-]?secret)\1\s*([:=])\s*(?:"[^"]*"|'[^']*'|[^\s,;&}]+)/gi,(_,quote,key,separator)=>`${quote}${key}${quote}${separator} [REDACTED]`).replace(/(?:[A-Za-z0-9_-]{8,}\.){2}[A-Za-z0-9_-]{8,}|[A-Za-z0-9_~+\/=\-]{32,}/g,'[REDACTED]').slice(0,limit)}
-try{const stored=JSON.parse(localStorage.getItem(DIAGNOSTIC_KEY)||'[]');if(Array.isArray(stored))DIAGNOSTICS=stored.slice(-DIAGNOSTIC_LIMIT).map(entry=>({...entry,type:redactDiagnosticText(entry?.type,40),message:redactDiagnosticText(entry?.message,240),context:redactDiagnosticText(entry?.context,120)}))}catch{DIAGNOSTICS=[]}
+try{const stored=JSON.parse(readLocalStorage(DIAGNOSTIC_KEY)||'[]');if(Array.isArray(stored))DIAGNOSTICS=stored.slice(-DIAGNOSTIC_LIMIT).map(entry=>({...entry,type:redactDiagnosticText(entry?.type,40),message:redactDiagnosticText(entry?.message,240),context:redactDiagnosticText(entry?.context,120)}))}catch{DIAGNOSTICS=[]}
 function recordDiagnostic(type,message,context=''){
  try{
   const entry={type:redactDiagnosticText(type||'issue',40),message:redactDiagnosticText(message,240),context:redactDiagnosticText(context,120),ts:Date.now()};
@@ -654,11 +663,13 @@ function recordDiagnostic(type,message,context=''){
 function recentDiagnostics(){return DIAGNOSTICS.map(entry=>({...entry}))}
 window.addEventListener('error',event=>recordDiagnostic('runtime-error',event?.message||'unknown error',`${event?.filename||''}:${event?.lineno||0}`));
 window.addEventListener('unhandledrejection',event=>recordDiagnostic('unhandled-rejection',event?.reason?.message||String(event?.reason||'unknown'),'promise'));
+function renderSaveHealth(){const health=$('saveHealth');if(health)health.textContent=SAVE_HEALTH_FAILURE||`Save healthy · Backup ${readLocalStorage(BACK)?'available':'not created yet'}`}
+function reportPersistenceSuccess(){SAVE_HEALTH_FAILURE='';renderSaveHealth()}
 function reportPersistenceFailure(error){
  const reason=error?.name==='QuotaExceededError'?'device storage is full':'storage is unavailable';
  globalThis.__BRAINBITE_PERSISTENCE_ERROR__={name:error?.name||'Error',message:String(error?.message||error||reason),at:Date.now()};
  recordDiagnostic('persistence',error?.message||reason,error?.name||'Error');
- const health=document.getElementById('saveHealth');if(health)health.textContent=`Save failed: ${reason}. Your current session is still open.`;
+ SAVE_HEALTH_FAILURE=`Save failed: ${reason}. Your current session is still open.`;renderSaveHealth();
  console.error('[BrainBite] Local save failed.',error)
 }
 function persistCanonicalState({renderAfter=false}={}){
@@ -668,13 +679,14 @@ function persistCanonicalState({renderAfter=false}={}){
   SYNC=mergeSyncStates(SYNC,readStoredSync());
   writeStoreCopiesUnlocked(STORE);
   localStorage.setItem(SYNC_KEY,JSON.stringify(SYNC));
+   reportPersistenceSuccess();
   PERSISTENCE_CHANNEL?.postMessage({store:STORE,sync:SYNC});
  })).catch(error=>{reportPersistenceFailure(error);return {error}});
  return PERSISTENCE_CHAIN.then(()=>{if(renderAfter)render();return {store:STORE,sync:SYNC}});
 }
 function initializeCanonicalState(){
  PERSISTENCE_CHAIN=PERSISTENCE_CHAIN.catch(()=>{}).then(()=>withPersistenceLock(()=>{
-  const currentRaw=localStorage.getItem(KEY);
+  const currentRaw=readLocalStorage(KEY);
   if(currentRaw!==LOADED_STORE_RAW)STORE=mergeStores(STORE,readAllStoredStores());
   invalidateStaleGame();
   SYNC=mergeSyncStates(SYNC,readStoredSync());
@@ -682,6 +694,7 @@ function initializeCanonicalState(){
   writeStoreCopiesUnlocked(STORE);
   localStorage.setItem(SYNC_KEY,JSON.stringify(SYNC));
   LOADED_STORE_RAW=JSON.stringify(STORE);
+   reportPersistenceSuccess();
   PERSISTENCE_CHANNEL?.postMessage({store:STORE,sync:SYNC});
  })).catch(error=>{reportPersistenceFailure(error);return {error}});
  return PERSISTENCE_CHAIN;
@@ -757,13 +770,13 @@ function readStoredStore(raw){
    return null;
  }
 }
-function readStoredCopy(key){return readStoredStore(localStorage.getItem(key))}
+function readStoredCopy(key){return readStoredStore(readLocalStorage(key))}
 
 function preserveUnreadableStoreCopies(){
  if(readAllStoredStores().length)return false;
- const generations={};for(const key of [KEY,BACK,RECOVERY_KEY]){const raw=localStorage.getItem(key);if(raw!==null)generations[key]=raw}
+ const generations={};for(const key of [KEY,BACK,RECOVERY_KEY]){const raw=readLocalStorage(key);if(raw!==null)generations[key]=raw}
  if(!Object.keys(generations).length)return false;
- const existingRaw=localStorage.getItem(UNREADABLE_STORE_QUARANTINE_KEY);let snapshots=[];
+ const existingRaw=readLocalStorage(UNREADABLE_STORE_QUARANTINE_KEY);let snapshots=[];
  if(existingRaw!==null)try{const existing=JSON.parse(existingRaw);snapshots=existing?.version===1&&Array.isArray(existing.snapshots)?existing.snapshots:[{unreadableQuarantine:existingRaw}]}catch{snapshots=[{unreadableQuarantine:existingRaw}]}
  const signature=JSON.stringify(generations);if(snapshots.some(snapshot=>JSON.stringify(snapshot?.generations)===signature))return false;
  snapshots.push({generations});localStorage.setItem(UNREADABLE_STORE_QUARANTINE_KEY,JSON.stringify({version:1,snapshots}));return true
@@ -803,8 +816,8 @@ function reconcileCanonicalStateWithCore(){
  const c=core();if(!c||CANONICAL_RECONCILED_WITH_CORE)return false;
  CANONICAL_RECONCILED_WITH_CORE=true;CANONICAL_RECONCILE_RUNS+=1;
  // Nothing to reconcile while every slot already holds the same payload.
- const raw=[RECOVERY_KEY,BACK,KEY].map(key=>localStorage.getItem(key));
- if(new Set(raw.filter(value=>value!==null)).size<2)return false;
+ const raw=[RECOVERY_KEY,BACK,KEY].map(key=>readLocalStorage(key));
+ if(new Set(raw.filter(value=>value!==null)).size<2&&STORE.profiles.every(profile=>profile.currencyLedger))return false;
  const recovered=mergeStores(STORE,readEveryStoredCopy());
  const byId=new Map(recovered.profiles.map(profile=>[String(profile.id),profile]));
  // The freshly loaded store stays authoritative for names, settings, and progression.
@@ -822,23 +835,24 @@ function reconcileCanonicalStateWithCore(){
  // lock, then converge again behind any pending write so a late rotation cannot
  // re-introduce a stale generation.
  convergeStoreCopiesUnlocked(STORE);
- PERSISTENCE_CHAIN=PERSISTENCE_CHAIN.catch(()=>{}).then(()=>withPersistenceLock(()=>{
-  STORE=mergeStores(STORE,readAllStoredStores());
-  convergeStoreCopiesUnlocked(STORE);
-  localStorage.setItem(SYNC_KEY,JSON.stringify(SYNC));
-  LOADED_STORE_RAW=JSON.stringify(STORE);
+  PERSISTENCE_CHAIN=PERSISTENCE_CHAIN.catch(()=>{}).then(()=>withPersistenceLock(()=>{
+   STORE=mergeStores(STORE,readAllStoredStores());
+   convergeStoreCopiesUnlocked(STORE);
+   localStorage.setItem(SYNC_KEY,JSON.stringify(SYNC));
+   LOADED_STORE_RAW=JSON.stringify(STORE);
+   reportPersistenceSuccess();
  })).catch(error=>{reportPersistenceFailure(error);return {error}});
  PERSISTENCE_CHANNEL?.postMessage({store:STORE,sync:SYNC});
  return true;
 }
 
 function createManualBackupUnlocked(){
- const primaryRaw=localStorage.getItem(KEY),backupRaw=localStorage.getItem(BACK);
+ const primaryRaw=readLocalStorage(KEY),backupRaw=readLocalStorage(BACK);
  const primary=readStoredStore(primaryRaw)||migrateStore(structuredClone(STORE));
  const previousBackup=readStoredStore(backupRaw);
  const payload=JSON.stringify(primary);
  if(previousBackup)localStorage.setItem(RECOVERY_KEY,JSON.stringify(previousBackup));
- else if(!readStoredStore(localStorage.getItem(RECOVERY_KEY)))localStorage.setItem(RECOVERY_KEY,payload);
+ else if(!readStoredStore(readLocalStorage(RECOVERY_KEY)))localStorage.setItem(RECOVERY_KEY,payload);
  localStorage.setItem(BACK,payload);
  return primary;
 }
@@ -846,7 +860,7 @@ function createManualBackupUnlocked(){
 function replaceStoreCopiesUnlocked(store){
  const replacement=migrateStore(structuredClone(store));
  const payload=JSON.stringify(replacement);
- const existingRecovery=readStoredStore(localStorage.getItem(RECOVERY_KEY));
+ const existingRecovery=readStoredStore(readLocalStorage(RECOVERY_KEY));
  localStorage.setItem(RECOVERY_KEY,JSON.stringify(existingRecovery||replacement));
  localStorage.setItem(BACK,payload);
  localStorage.setItem(KEY,payload);
@@ -867,7 +881,8 @@ function replaceCanonicalState(store,{renderAfter=true}={}){
   STORE=replaceStoreCopiesUnlocked(preserveCurrentProfileDeletions(store));
   SYNC=mergeSyncStates(SYNC,readStoredSync());
   localStorage.setItem(SYNC_KEY,JSON.stringify(SYNC));
-  LOADED_STORE_RAW=localStorage.getItem(KEY);
+  LOADED_STORE_RAW=readLocalStorage(KEY);
+  reportPersistenceSuccess();
   PERSISTENCE_CHANNEL?.postMessage({store:STORE,sync:SYNC,replace:true});
  }));
  return PERSISTENCE_CHAIN.then(()=>{if(renderAfter)render();return {store:STORE,sync:SYNC}})
@@ -882,7 +897,7 @@ function createPreOperationRollback(operation){
 async function replaceCanonicalStateSafely(operation,replacementFactory){
  const original={
   store:structuredClone(STORE),sync:structuredClone(SYNC),loadedRaw:LOADED_STORE_RAW,
-  copies:new Map([KEY,BACK,RECOVERY_KEY,SYNC_KEY].map(key=>[key,localStorage.getItem(key)])),
+  copies:new Map([KEY,BACK,RECOVERY_KEY,SYNC_KEY].map(key=>[key,readLocalStorage(key)])),
  };
  createPreOperationRollback(operation);
  try{
@@ -944,6 +959,7 @@ function validateImportedStoreIdentity(raw){
  for(const profile of raw.profiles){
   if(!profile||typeof profile!=='object'||Array.isArray(profile))throw new Error('The selected file has an invalid learner profile.');
   validateImportedLearningState(profile);
+  if(core()&&profile.currencyLedger!==undefined)core().normalizeProfileCurrency(profile);
   const hasId=Object.hasOwn(profile,'id')&&profile.id!==null&&profile.id!==undefined&&profile.id!=='';
   if(!hasId){if(modern)throw new Error('The selected file has a missing profile ID.');continue}
   if(typeof profile.id!=='string'||!idPattern.test(profile.id))throw new Error('The selected file has an unsafe profile ID.');
@@ -997,7 +1013,9 @@ function mergeStores(localStore,persistedStores=[]){
  if(!merged.profiles.length)merged.profiles=[blank()];
  const activeId=profiles.has(String(localActiveId))?localActiveId:persistedActiveId;
  merged.active=Math.max(0,merged.profiles.findIndex(profile=>profile.id===activeId));
- return migrateStore(merged);
+ const canonical=migrateStore(merged);
+ if(core())canonical.profiles=canonical.profiles.map(profile=>core().projectProfileCurrency(profile));
+ return canonical;
 }
 
 function writeStoreCopies(){return persistCanonicalState({renderAfter:false})}
@@ -1086,6 +1104,8 @@ async function pushAllToFirebase(){
 async function pullAllFromFirebase(){
   const c=cloudClient();if(!c||!c.configured())throw new Error('Configure Firebase first');
   const remote=await c.pullProfiles();
+  // Validate the whole incoming batch before changing live learner state.
+  for(const row of remote){const candidate=sanitizeRemoteProfile(row.progress);if(!candidate||candidate.deleted||isProfileDeleted(candidate.id))continue;const existing=STORE.profiles.find(profile=>profile.id===candidate.id);if(existing&&core())core().mergeProfileCurrency(existing,candidate,{cloud:true});}
   for(const row of remote){
     const rp=sanitizeRemoteProfile(row.progress);if(!rp||!rp.id)continue;
     if(rp.deleted){
@@ -1161,6 +1181,7 @@ function mergeBubbleReefRewardState(local, remote) {
 }
 
 function mergeProfiles(local,remote,{remoteCloud=false}={}){
+ const currency=core()&&local.id&&remote.id?core().mergeProfileCurrency(local,remote,{cloud:remoteCloud}):null;
   if(core()){
    local=structuredClone(local);remote=structuredClone(remote);
    projectLearningCore(local,ensureProfileLearningCore(local));
@@ -1175,7 +1196,9 @@ function mergeProfiles(local,remote,{remoteCloud=false}={}){
  out.score=Math.max(local.score||0,remote.score||0);
  out.stars=Math.max(local.stars||0,remote.stars||0);
  out.spark=Math.max(local.spark||0,remote.spark||0);
+ if(currency){out.currencyLedger=currency.currencyLedger;out.score=currency.score;out.stars=currency.stars;out.spark=currency.spark;}
  out.progression=REGISTRY.mergeProgression(local,remote,{preferRemote:remoteTs>localTs});
+ out.missionStars={};for(const missionId of out.progression.completedMissionIds){const rating=Math.max(Number(local.missionStars?.[missionId])||0,Number(remote.missionStars?.[missionId])||0);if(rating>0)out.missionStars[missionId]=rating}
  out.learningCore=mergeLearningCore(local.learningCore,remote.learningCore,{preferRemote:remoteTs>localTs});
  delete out.completed;delete out.unlockedMath;delete out.unlockedWords;delete out.unlockedSpanish;delete out.lastMission;
  out.unlockedBites=[...new Set([...(local.unlockedBites||[]),...(remote.unlockedBites||[])])];
@@ -1212,7 +1235,7 @@ function mergeHistory(local=[],remote=[],limit=100){
   return [...unique.values()].sort((a,b)=>(a.ts||a.timestamp||0)-(b.ts||b.timestamp||0)).slice(-limit);
 }
 function isProfileDeleted(profileId){return !!profileId&&(STORE.deletedProfiles||[]).some(item=>item.id===profileId)}
-function awardProgressionScore(points){const awarded=G?.progressionEligible?points:0;if(awarded)P().score+=awarded;if(G)G.earned=(Number(G.earned)||0)+awarded;showBattleToast(awarded)}
+function awardProgressionScore(points){let awarded=G?.progressionEligible?points:0;if(awarded){try{if(!core())throw new Error('Rewards are still loading. Please try again.');Object.assign(P(),core().recordCurrencyScore(P(),{...nextAttemptOrigin(),points:awarded}));}catch(error){awarded=0;reportPersistenceFailure(error);}}if(G)G.earned=(Number(G.earned)||0)+awarded;showBattleToast(awarded)}
 // The reward toast only ever reports what was actually earned, and only after an answer.
 let battleToastTimer=null;
 function showBattleToast(points){const toast=document.querySelector('#game .battle-toast');if(!toast)return;$('battleRewardTitle').textContent=G?.m?.boss?'Boss hit!':'Great job!';$('battleRewardText').textContent=points>0?`+${points} BrainBites`:'Nice bite!';toast.hidden=false;const stars=$('battleProfileStars');if(stars)stars.textContent=P().score;clearTimeout(battleToastTimer);battleToastTimer=setTimeout(hideBattleToast,2500)}
@@ -1300,8 +1323,9 @@ function cloudProgrammableBits(value){const result={};for(const [key,raw] of Obj
 function cloudLessonProgress(value){const result={};for(const [key,raw] of Object.entries(cloudObject(value)).slice(0,128)){const id=cloudId(key),source=cloudObject(raw);if(!id)continue;result[id]={masteryScore:cloudNumber(source.masteryScore,0,100),completedAt:cloudTimestamp(source.completedAt)}}return result}
 function cloudBubbleReefRewards(value,profileId){const source=cloudObject(value);if(source.profileId!==profileId)return {};const contributionId='bubble-reef-base-current-restored',rewardId=`${contributionId}:bubble-reef-current-cache`,contribution=(Array.isArray(source.contributions)?source.contributions:[]).find(item=>item?.id===contributionId),reward=(Array.isArray(source.rewards)?source.rewards:[]).find(item=>item?.id===rewardId),awardedAt=cloudTimestamp(reward?.awardedAt);if(!contribution||!reward||!awardedAt)return {};const out={schemaVersion:1,profileId,contributionLedger:{},contributions:[{id:contributionId,type:'base-contribution',worldProfileId:'bubble-reef',routeId:'bubble-reef-preview-route',missionId:8,persistent:true,contributedAt:cloudTimestamp(contribution.contributedAt)||awardedAt}],rewards:[{id:rewardId,contributionId,rewardId:'bubble-reef-current-cache',type:'mission-reward',unique:true,stars:3,spark:3,awardedAt}]};out.contributionLedger[contributionId]={contributionId,rewardId,awardedAt};return out}
 function cloudProfileProjection(profile={}){
- const clean=cloudObject(profile),id=cloudId(clean.id),bits=cloudProgrammableBits(clean.programmableBits),cosmetics=cloudIdArray(clean.cosmetics,{max:128,itemMax:32,allowed:CLOUD_COSMETICS}),equipped=cloudText(clean.equippedCosmetic,{max:32,allowed:CLOUD_COSMETICS});
+ const raw=cloudObject(profile),clean=raw.currencyLedger!==undefined?core().projectProfileCurrency(raw):raw,id=cloudId(clean.id),bits=cloudProgrammableBits(clean.programmableBits),cosmetics=cloudIdArray(clean.cosmetics,{max:128,itemMax:32,allowed:CLOUD_COSMETICS}),equipped=cloudText(clean.equippedCosmetic,{max:32,allowed:CLOUD_COSMETICS});
  return {
+  ...(clean.currencyLedger!==undefined?{currencyLedger:core().normalizeProfileCurrency(clean)}:{}),
   id,name:cloudText(clean.name,{max:40,fallback:'Kid'}),score:cloudNumber(clean.score,0,1_000_000_000,0,{integer:true}),stars:cloudNumber(clean.stars,0,1_000_000_000,0,{integer:true}),spark:cloudNumber(clean.spark,0,1_000_000_000,0,{integer:true}),
   progression:REGISTRY.normalizeProgression(clean.progression),learningCore:compactLearningCore(clean.learningCore),bestCombo:cloudNumber(clean.bestCombo,0,1_000_000,0,{integer:true}),bite:cloudText(clean.bite,{max:16,allowed:CLOUD_BITES,fallback:'Nib'}),
   unlockedBites:cloudIdArray(clean.unlockedBites,{max:CLOUD_BITES.size,itemMax:16,allowed:CLOUD_BITES}),cosmetics,
@@ -1342,7 +1366,7 @@ function validateEnvelope(x){
 class BrainBiteFirebaseREST {
   constructor(projectId,apiKey){this.projectId=projectId||'';this.apiKey=apiKey||'';this.session=this.loadSession()}
   configured(){return /^[a-z0-9-]{6,}$/.test(this.projectId)&&this.apiKey.length>=20}
-  loadSession(){try{return JSON.parse(localStorage.getItem('bb-firebase-session')||'null')}catch{return null}}
+  loadSession(){try{return JSON.parse(readLocalStorage('bb-firebase-session')||'null')}catch{return null}}
   saveSession(s){this.session=s;if(s)localStorage.setItem('bb-firebase-session',JSON.stringify(s));else localStorage.removeItem('bb-firebase-session')}
   async signUp(email,password){
     const r=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${encodeURIComponent(this.apiKey)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password,returnSecureToken:true})});
@@ -1483,7 +1507,7 @@ let parentUnlocked=false,parentUnlockedUntil=0,parentAccessExpiryTimer=null,pare
 function bytesToB64(bytes){let binary='';for(const byte of bytes)binary+=String.fromCharCode(byte);return btoa(binary)}
 function b64ToBytes(value){const binary=atob(String(value||''));return Uint8Array.from(binary,character=>character.charCodeAt(0))}
 function readParentAuth(){
- try{const value=JSON.parse(localStorage.getItem(PARENT_AUTH_KEY)||'null');if(!value||value.version!==1||value.algorithm!=='PBKDF2-SHA-256'||Number(value.iterations)<PARENT_AUTH_ITERATIONS||!value.saltB64||!value.verifierB64)return null;return {version:1,algorithm:'PBKDF2-SHA-256',iterations:Number(value.iterations),saltB64:String(value.saltB64),verifierB64:String(value.verifierB64),failedAttempts:Math.max(0,Number(value.failedAttempts)||0),lockedUntil:Math.max(0,Number(value.lockedUntil)||0),updatedAt:Number(value.updatedAt)||0}}catch{return null}
+ try{const value=JSON.parse(readLocalStorage(PARENT_AUTH_KEY)||'null');if(!value||value.version!==1||value.algorithm!=='PBKDF2-SHA-256'||Number(value.iterations)<PARENT_AUTH_ITERATIONS||!value.saltB64||!value.verifierB64)return null;return {version:1,algorithm:'PBKDF2-SHA-256',iterations:Number(value.iterations),saltB64:String(value.saltB64),verifierB64:String(value.verifierB64),failedAttempts:Math.max(0,Number(value.failedAttempts)||0),lockedUntil:Math.max(0,Number(value.lockedUntil)||0),updatedAt:Number(value.updatedAt)||0}}catch{return null}
 }
 function writeParentAuth(value){localStorage.setItem(PARENT_AUTH_KEY,JSON.stringify(value))}
 async function deriveParentVerifier(pin,salt,iterations=PARENT_AUTH_ITERATIONS){
@@ -1532,6 +1556,7 @@ async function requireParentAuthorization({inputId='timeUpParentPin',statusId='t
  unlockParentAccess();return true
 }
 function renderParentGate(){
+ const gate=$('parentGate');if(gate&&!gate.querySelector('[data-parent-return]')){const back=document.createElement('button');back.type='button';back.dataset.parentReturn='';back.className='parent-exit';back.textContent='Back to kid hub';back.onclick=()=>{$('parentPinInput').value='';$('confirmParentPin').value='';lockParentAccess();show('home');render()};gate.appendChild(back);}
  const setup=!readParentAuth();$('parentGatePrompt').textContent=setup?'Set up a 6-10 digit family PIN to protect parent areas on this device.':'Enter the family PIN to open parent areas.';
  $('confirmParentPinLabel').hidden=!setup;$('unlockParent').textContent=setup?'Set PIN':'Unlock';
 }
@@ -1636,6 +1661,7 @@ function migrateStore(x){
    if(!p.cosmetics)p.cosmetics=[];if(p.equippedCosmetic===undefined)p.equippedCosmetic=null;
    if(!p.skills)p.skills={};if(!p.sessions)p.sessions=[];
    p.name=String(p.name||'Kid').trim().slice(0,40)||'Kid';p.score=Math.max(0,Number(p.score)||0);p.stars=Math.max(0,Number(p.stars)||0);p.spark=Math.max(0,Number(p.spark)||0);
+   if(core()&&p.currencyLedger!==undefined)Object.assign(p,core().projectProfileCurrency(p));
    p.progression=REGISTRY.normalizeProgression(p);
    delete p.completed;delete p.unlockedMath;delete p.unlockedWords;delete p.unlockedSpanish;delete p.lastMission;
    for(const key of ['unlockedBites','cosmetics','mistakes','practice','snap','sessions'])if(!Array.isArray(p[key]))p[key]=[];
@@ -1664,8 +1690,8 @@ function migrateStore(x){
  return x;
 }
 
-function load(){LOADED_STORE_RAW=localStorage.getItem(KEY);const copies=readAllStoredStores();WEB_STORE_MISSING_AT_BOOT=copies.length===0;return mergeStores(null,copies)}
-function save(){const startedAt=globalThis.performance?.now?.();if(P()){if(core())projectLearningCore(P(),ensureProfileLearningCore(P()));P().updatedAt=Date.now()}queueSyncEvent({type:'store-update',profileId:P()?.id||null,payload:{active:STORE.active,schemaVersion:STORE.schemaVersion},schemaVersion:STORE.schemaVersion,ts:Date.now()});render();return persistCanonicalState().then(result=>{if(startedAt!=null)window.BrainBitePresentation?.recordSave?.(Math.max(0,globalThis.performance.now()-startedAt));return result})}
+function load(){LOADED_STORE_RAW=readLocalStorage(KEY);const copies=readAllStoredStores();WEB_STORE_MISSING_AT_BOOT=copies.length===0;return mergeStores(null,copies)}
+function save(){const startedAt=globalThis.performance?.now?.();if(P()){if(core()){Object.assign(P(),core().projectProfileCurrency(P()));projectLearningCore(P(),ensureProfileLearningCore(P()));}P().updatedAt=Date.now()}queueSyncEvent({type:'store-update',profileId:P()?.id||null,payload:{active:STORE.active,schemaVersion:STORE.schemaVersion},schemaVersion:STORE.schemaVersion,ts:Date.now()});render();return persistCanonicalState().then(result=>{if(startedAt!=null)window.BrainBitePresentation?.recordSave?.(Math.max(0,globalThis.performance.now()-startedAt));return result})}
 const PARENT_ONLY_SCREENS=new Set(['profiles','recovery','account','integrations','controls','diagnostics','release','qa','advanced']);
 const RETIRED_SCREEN_IDS=new Set(['snap']);
 const WORLD_SCREENS=new Set(['worlds','math','words','spanish']);
@@ -1868,14 +1894,14 @@ function biteArtForName(name){
  const map={Nib:'assets/art/nib.svg',Zip:'assets/art/zip.svg',Bloop:'assets/art/bloop.svg',Scout:'assets/art/scout.svg'};
  return map[name]||map.Nib;
 }
-function profileLevel(){
- return Math.max(1,Math.floor((P().score||0)/300)+1);
-}
-function profileXp(){
+const LEVEL_XP=300;
+function profileLevelState(){
  const score=Math.max(0,P().score||0);
- const current=score%300;
- return {current,max:300,percent:Math.max(0,Math.min(100,Math.round(current/3)))};
+ const current=score%LEVEL_XP;
+ return {level:Math.floor(score/LEVEL_XP)+1,current,max:LEVEL_XP,remaining:LEVEL_XP-current,percent:Math.max(0,Math.min(100,Math.round((current/LEVEL_XP)*100)))};
 }
+function profileLevel(){return profileLevelState().level}
+function profileXp(){const {current,max,percent}=profileLevelState();return {current,max,percent}}
 // Honest daily streak (G6.5): a day counts only when a mission or practice was finished on
 // that calendar day in local time. A gap is never "lost", it is "Welcome back!".
 function localDayKey(ts){const d=new Date(ts);return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`}
@@ -1890,10 +1916,8 @@ function streakState(now=Date.now()){
 }
 function streakCount(){return streakState().run}
 function nextRewardState(){
- const score=Math.max(0,P().score||0);
- const remainder=score%500;
- const remaining=remainder===0?500:500-remainder;
- return {remaining,percent:Math.max(0,Math.min(100,Math.round((remainder/500)*100)))};
+ const {remaining,percent}=profileLevelState();
+ return {remaining,percent};
 }
 function currentGoalState(){
  const profile=P();
@@ -2012,7 +2036,7 @@ function unlockBites(){
 function renderBites(){
  const c=$('biteCards');if(!c)return;c.innerHTML='';
  BITES.forEach(b=>{const on=P().unlockedBites.includes(b.name),d=document.createElement('div');d.className='panel bite-card-option'+(P().bite===b.name?' selected':'')+(on?'':' locked');d.innerHTML=`<h3>${b.emoji} ${b.name}</h3><p>${on?'Unlocked':`Unlock at ${b.unlockStars} stars`}</p><button ${on?'':'disabled'}>${P().bite===b.name?'Selected':'Select'}</button>`;if(on)d.querySelector('button').onclick=()=>{P().bite=b.name;save()};c.appendChild(d)});
- $('sparkCount').textContent=P().spark||0;const s=$('shopList');s.innerHTML='';SHOP.forEach(i=>{const owned=P().cosmetics.includes(i.id),d=document.createElement('div');d.className='shop-row';d.innerHTML=`<div><b>${i.name}</b><div>${i.cost} Spark</div></div><button>${P().equippedCosmetic===i.id?'Equipped':owned?'Equip':'Buy'}</button>`;d.querySelector('button').onclick=()=>{if(P().equippedCosmetic===i.id)return;if(owned){P().equippedCosmetic=i.id;save();return}if(P().spark<i.cost){alert('Not enough Spark yet.');return}P().spark-=i.cost;P().cosmetics.push(i.id);P().equippedCosmetic=i.id;save()};s.appendChild(d)})
+ $('sparkCount').textContent=P().spark||0;const s=$('shopList');s.innerHTML='';SHOP.forEach(i=>{const owned=P().cosmetics.includes(i.id),d=document.createElement('div');d.className='shop-row';d.innerHTML=`<div><b>${i.name}</b><div>${i.cost} Spark</div></div><button>${P().equippedCosmetic===i.id?'Equipped':owned?'Equip':'Buy'}</button>`;d.querySelector('button').onclick=()=>{if(P().equippedCosmetic===i.id)return;if(owned){P().equippedCosmetic=i.id;save();return}if(P().spark<i.cost){alert('Not enough Spark yet.');return}try{Object.assign(P(),core().recordCurrencyPurchase(P(),i.id));}catch(error){alert(error.message);return}P().cosmetics.push(i.id);P().equippedCosmetic=i.id;save()};s.appendChild(d)})
  renderBitEditor();
  renderBitLessons();
 }
@@ -2194,7 +2218,7 @@ function diagnosticBundle(){
 
 const LAB_KEY='brainbite-v2-lab';
 function labAllowed(){return globalThis.__BRAINBITE_LAB__===true&&currentContentGateMode()==='internal-review'}
-function labState(){try{return JSON.parse(localStorage.getItem(LAB_KEY)||'null')||{skillId:'number-facts',family:'target-smash',difficulty:'normal',preset:'practicing',krakenPhase:'intro'}}catch{return {skillId:'number-facts',family:'target-smash',difficulty:'normal',preset:'practicing',krakenPhase:'intro'}}}
+function labState(){try{return JSON.parse(readLocalStorage(LAB_KEY)||'null')||{skillId:'number-facts',family:'target-smash',difficulty:'normal',preset:'practicing',krakenPhase:'intro'}}catch{return {skillId:'number-facts',family:'target-smash',difficulty:'normal',preset:'practicing',krakenPhase:'intro'}}}
 let LAB=labState();
 function saveLab(){if(!labAllowed())return false;localStorage.setItem(LAB_KEY,JSON.stringify(LAB));renderLab();return true}
 function core(){return window.BrainBiteCore||null}
@@ -2295,7 +2319,7 @@ function migrateFoundationCache(){
  const activeProfileId=P()?.id,candidates=[];
  for(const key of keys){
   try{
-   const raw=localStorage.getItem(key);if(!raw)continue;
+   const raw=readLocalStorage(key);if(!raw)continue;
    const parsed=JSON.parse(raw);if(!parsed?.learners||typeof parsed.learners!=='object'||!Object.keys(parsed.learners).length)continue;
    candidates.push(filterDeletedFoundationLearners(c.normalizeFoundationState(parsed,STORE)))
   }catch{}
@@ -2355,7 +2379,7 @@ function fillLearnerSelect(select,learners,activeId){if(!select)return;const fra
 function renderLab(){if(!$('labInspect'))return;const nav=document.querySelector('[data-screen="qa"]');if(nav)nav.hidden=!labAllowed();if(!labAllowed()){$('qa').hidden=true;return}$('qa').hidden=false;const snapshot=currentLabState();if(!snapshot){$('labActiveLearner').textContent='BrainBiteCore loading…';$('labInspect').textContent='BrainBite foundation is not ready yet.';return}const {c,foundation,learner}=snapshot;const skillId=$('labSkill').value||LAB.skillId||'number-facts';const skill=learner.skills?.[skillId]||c.createSkillState(skillId);const review=skill.reviewHistory?.at?.(-1)||skill.reviewHistory?.[skill.reviewHistory.length-1]||null;$('labActiveLearner').textContent=`${learner.name} (${learner.profileId})`;$('labStage').textContent=`Stage: ${learner.stage} · Hub: ${learner.hub.variant}${learner.hub.expansionUnlocked?' · Expansion unlocked':''}`;$('labQueue').textContent=`Offline queue: ${learner.offlineQueue.length} · Sent: ${learner.sentEventIds.length}`;$('labMastery').textContent=`${skillId}: ${skill.masteryState} · score ${skill.masteryScore} · confidence ${(skill.confidence*100).toFixed(0)}%`;$('labReview').textContent=review?`Next review ${new Date(skill.nextReviewAt||review.nextReviewAt).toLocaleString()}`:'No review scheduled.';$('labHub').textContent=learner.hub.variant==='upgraded'?'Upgraded hub with expansion unlocked':'Starter hub';$('labRewards').textContent=`${learner.rewards.length} reward(s) · ${learner.rewards.map(r=>r.name).join(', ')||'None'}`;fillLearnerSelect($('labLearnerSelect'),foundation.learners,foundation.activeLearnerId);const summary={profileId:learner.profileId,name:learner.name,stage:learner.stage,hub:learner.hub,skill:{skillId,masteryState:skill.masteryState,masteryScore:skill.masteryScore,confidence:skill.confidence,evidence:skill.evidence,reviewHistory:skill.reviewHistory.slice(-4),nextReviewAt:skill.nextReviewAt},rewards:learner.rewards,offlineQueue:learner.offlineQueue,sentEventIds:learner.sentEventIds,contentCheck:c.validateContentBundle(c.createVerticalSliceContent())};const pre=document.createElement('pre');pre.className='lab-json';pre.textContent=JSON.stringify(summary,null,2);$('labInspect').innerHTML='';$('labInspect').appendChild(pre);const content=c.validateContentBundle(c.createVerticalSliceContent());$('labContentCheck').innerHTML=`<div class="${content.valid?'diag-ok':'diag-warn'}">${content.valid?'Content bundle valid':'Content bundle quarantined'}${content.quarantined.length?`: ${content.quarantined.join(', ')}`:''}</div>`;LAB.skillId=skillId;LAB.family=$('labFamily').value||LAB.family;LAB.difficulty=$('labDifficulty').value||LAB.difficulty;LAB.preset=$('labSkillPreset').value||LAB.preset;LAB.krakenPhase=$('labKrakenPhase').value||LAB.krakenPhase}
 
 const QA_STORAGE='brainbite-v2-qa';
-function qaState(){try{return JSON.parse(localStorage.getItem(QA_STORAGE)||'{}')}catch{return {}}}
+function qaState(){try{return JSON.parse(readLocalStorage(QA_STORAGE)||'{}')}catch{return {}}}
 let QA=qaState();
 function saveQA(){localStorage.setItem(QA_STORAGE,JSON.stringify(QA));renderQA()}
 function renderQA(){
@@ -2450,6 +2474,10 @@ function render(){
  const homeAvatar=$('homeAvatar');if(homeAvatar)homeAvatar.src=biteArtForName(profile.bite);
  const nib=$('nib');if(nib)nib.src=biteArtForName(profile.bite);
  const homeProfileName=$('homeProfileName');if(homeProfileName)homeProfileName.textContent=profile.name;
+ const heroMission=REGISTRY.getMission(progression(profile).lastMissionId)||MISSIONS[0];
+ const homeHeroWorld=$('homeHeroWorld');if(homeHeroWorld)homeHeroWorld.textContent=worldMeta(heroMission.world).title;
+ const homeHeroMission=$('homeHeroMission');if(homeHeroMission)homeHeroMission.textContent=`Explore ${worldMeta(heroMission.world).title} with Bite.`;
+ const homePlayMission=$('homePlayMission');if(homePlayMission)homePlayMission.textContent=heroMission.title;
  const homeLevel=$('homeLevel');if(homeLevel)homeLevel.textContent=`Level ${profileLevel()}`;
  const homeXpText=$('homeXpText');if(homeXpText)homeXpText.textContent=`${xp.current} / ${xp.max} XP`;
  const homeXpBar=$('homeXpBar');if(homeXpBar)homeXpBar.style.width=`${xp.percent}%`;
@@ -2457,8 +2485,8 @@ function render(){
  const homeBrainifacts=$('homeBrainifacts');if(homeBrainifacts)homeBrainifacts.textContent=profile.spark||0;
  const homeGoalTitle=$('homeGoalTitle');if(homeGoalTitle)homeGoalTitle.textContent=`Solve ${goal.total} missions`;
  const homeGoalBar=$('homeGoalBar');if(homeGoalBar)homeGoalBar.style.width=`${goal.progress}%`;
- const homeGoalText=$('homeGoalText');if(homeGoalText)homeGoalText.textContent=`${goal.remaining} more mission${goal.remaining===1?'':'s'} in ${goal.world} for a reward!`;
- const homeGoalReward=$('homeGoalReward');if(homeGoalReward)homeGoalReward.textContent=`${Math.max(50,goal.remaining*25)} Star`;
+ const homeGoalText=$('homeGoalText');if(homeGoalText)homeGoalText.textContent=`${goal.remaining} more mission${goal.remaining===1?'':'s'} in ${goal.world} to complete this goal.`;
+ const homeGoalReward=$('homeGoalReward');if(homeGoalReward){homeGoalReward.textContent='';const rewardLine=homeGoalReward.closest('.goal-reward');if(rewardLine)rewardLine.hidden=true}
  const homeRewardTitle=$('homeRewardTitle');if(homeRewardTitle)homeRewardTitle.textContent=`Gain ${reward.remaining} more XP`;
  const homeRewardBar=$('homeRewardBar');if(homeRewardBar)homeRewardBar.style.width=`${reward.percent}%`;
  const homeRewardText=$('homeRewardText');if(homeRewardText)homeRewardText.textContent='Earn BrainBites to reach the next level!';
@@ -2471,7 +2499,7 @@ function render(){
  const battleGoalTitle=$('battleGoalTitle');if(battleGoalTitle)battleGoalTitle.textContent=G?.m?.boss?`Defeat ${G.m.bossName}`:`Clear ${G?.m?.title||'the mission'}`;
  const battleGoalBar=$('battleGoalBar');if(battleGoalBar)battleGoalBar.style.width=G?`${Math.max(0,Math.min(100,Math.round((G.eaten/Math.max(1,G.total))*100)))}%`:'0%';
  const battleGoalText=$('battleGoalText');if(battleGoalText)battleGoalText.textContent=G?.m?.boss?'Finish the arena phase to push the boss back.':'Choose the correct tile to keep moving through the jungle.';
- renderWorldShowcase();WORLDS.forEach(w=>renderList(w.id+'List',w.id));$('parentMath').textContent=Math.round(P().mastery.math)+'%';$('parentWords').textContent=Math.round(P().mastery.words)+'%';$('parentSpanish').textContent=Math.round(P().mastery.spanish)+'%';renderMistakeRows();renderProfiles();renderChildProfiles();unlockBites();renderBites();renderParent();renderDiagnostics();renderSync();renderControls();renderIntegrations();renderRelease();renderQA();applySettings();renderLaunchHint();renderFirstRun();$('saveHealth').textContent=`Save healthy · Backup ${localStorage.getItem(BACK)?'available':'not created yet'}`}
+ renderWorldShowcase();WORLDS.forEach(w=>renderList(w.id+'List',w.id));$('parentMath').textContent=Math.round(P().mastery.math)+'%';$('parentWords').textContent=Math.round(P().mastery.words)+'%';$('parentSpanish').textContent=Math.round(P().mastery.spanish)+'%';renderMistakeRows();renderProfiles();renderChildProfiles();unlockBites();renderBites();renderParent();renderDiagnostics();renderSync();renderControls();renderIntegrations();renderRelease();renderQA();applySettings();renderLaunchHint();renderFirstRun();renderSaveHealth()}
 function unlocked(m){return !!m&&REGISTRY.isMissionUnlocked(progression(),m.id)}
 function renderList(id,world){const l=$(id);l.innerHTML='';const meta=worldMeta(world);const count=prog(world);const worldDefinition=REGISTRY.getWorld(world);const bosses=MISSIONS.filter(m=>m.world===world&&m.boss).length;const completed=progression().completedMissionIds;const clearedBosses=MISSIONS.filter(m=>m.world===world&&m.boss&&completed.includes(m.id)).length;l.innerHTML=`<div class="world-banner world-${world}"><img src="${meta.art}" alt="${meta.title}"><div><p class="world-tag">${meta.tag}</p><h3>${meta.title}</h3><p>${meta.summary}</p><p class="world-progress">${count}/${worldDefinition.missionIds.length} missions &middot; ${clearedBosses}/${bosses} bosses cleared</p></div></div>`;renderWorldMap(world,l);MISSIONS.filter(m=>m.world===world).forEach(m=>{const on=unlocked(m),done=completed.includes(m.id),gate=on?registryMissionGate(m):null,available=!!(on&&gate?.approved),d=document.createElement('div');d.className='mission-row '+world+(on?'':' locked')+(available?'':' unavailable')+(m.boss?' boss':'')+(done?' done':'');d.innerHTML=`<div><div class="mission-topline"><b>${m.id}. ${m.title}</b><span class="mission-badge">${m.boss?'Boss':'Mission'}</span>${(()=>{const n=Number(P().missionStars?.[m.id])||0;return n?`<span class="mission-stars" role="img" aria-label="${n} of 3 stars">${'\u2605'.repeat(n)}${'\u2606'.repeat(3-n)}</span>`:''})()}</div><div class="mission-skill">${m.skill}</div></div><button aria-label="${done?'Replay':available?'Play':'Unavailable'} mission ${m.id}: ${m.title}" ${available?'':'disabled'}>${done?'Replay':available?'Play':on?'Unavailable':'Locked'}</button>`;if(available)d.querySelector('button').onclick=()=>start(m.id);l.appendChild(d)})}
 function isMatchFractionCompatibilityPath(){
@@ -2869,7 +2897,7 @@ function bossTick(){
 
 function enemy(){let step=P().settings.enemySpeed==='slow'?2:1;if(G.moves%step)return;let x=G.e.x,y=G.e.y,dx=Math.sign(G.p.x-x),dy=Math.sign(G.p.y-y);if(Math.abs(G.p.x-x)>Math.abs(G.p.y-y))x+=dx;else y+=dy;G.e={x,y}}
 function hit(){if(G.e.x===G.p.x&&G.e.y===G.p.y){G.lives--;G.combo=0;G.e={x:0,y:0};$('feedback').textContent='Bonk! Keep going.';fileCue('hit');handleOutOfLives()}}
-function complete(){if(!checkpointGameplayActivity({reason:'complete'}))return false;const session={mission:G.m.id,world:G.m.world,skillId:G.m.skill,combo:G.max,accuracy:G.correct?Math.round(100*G.correct/Math.max(1,G.correct+G.wrong)):null,moves:G.moves,durationSec:Math.max(1,Math.round((Date.now()-(G.startedAt||Date.now()))/1000)),practice:G.progressionEligible===false,homework:!!G.homeworkMode,source:G.source||'mission',ts:Date.now()};if(G.progressionEligible===false){recordLearningSession(session);save();fileCue('clear');$('feedback').textContent='Practice complete!';setCaption('Practice complete.');setTimeout(()=>{show('home');render()},600);return true}const profile=P(),before=progression(),wasComplete=before.completedMissionIds.includes(G.m.id),next=REGISTRY.completeMission(before,G.m.id);if(!wasComplete&&!next.completedMissionIds.includes(G.m.id)){$('feedback').textContent='This mission is still locked.';return false}profile.progression=next;if(!wasComplete){profile.stars+=3;profile.spark+=(G.m.boss?10:3)}profile.bestCombo=Math.max(profile.bestCombo,G.max);const missionStars=missionStarRating(G);profile.missionStars={...(profile.missionStars||{})};profile.missionStars[G.m.id]=Math.max(Number(profile.missionStars[G.m.id])||0,missionStars);fileCue(G.m.boss?'boss':'clear');recordLearningSession(session);save();if(G.internalBubbleReefPreview)void grantBubbleReefPreviewReward({profileId:profile.id,missionId:G.m.id,progression:next,awardedAt:session.ts,canonicalRewardGranted:!wasComplete});$('feedback').textContent=G.m.boss?`${G.m.bossName} defeated!`:'Mission complete!';setCaption(G.m.boss?`${G.m.bossName} defeated.`:'Mission complete.');const clear={missionId:G.m.id,world:G.m.world,title:G.m.boss?`${G.m.bossName} defeated!`:'Mission complete!',stars:missionStars,earned:Number(G.earned)||0};setTimeout(()=>{const match=document.documentElement.classList.contains('presentation-match');const target=match?'home':G.m.world;show(target);render();showClearBanner(target,clear)},600);return true}
+function complete(){if(!checkpointGameplayActivity({reason:'complete'}))return false;const session={mission:G.m.id,world:G.m.world,skillId:G.m.skill,combo:G.max,accuracy:G.correct?Math.round(100*G.correct/Math.max(1,G.correct+G.wrong)):null,moves:G.moves,durationSec:Math.max(1,Math.round((Date.now()-(G.startedAt||Date.now()))/1000)),practice:G.progressionEligible===false,homework:!!G.homeworkMode,source:G.source||'mission',ts:Date.now()};if(G.progressionEligible===false){recordLearningSession(session);save();fileCue('clear');$('feedback').textContent='Practice complete!';setCaption('Practice complete.');setTimeout(()=>{show('home');render()},600);return true}const profile=P(),before=progression(),wasComplete=before.completedMissionIds.includes(G.m.id),next=REGISTRY.completeMission(before,G.m.id);if(!wasComplete&&!next.completedMissionIds.includes(G.m.id)){$('feedback').textContent='This mission is still locked.';return false}if(!wasComplete){try{if(!core())throw new Error('Rewards are still loading. Please try again.');Object.assign(profile,core().recordCurrencyMission(profile,G.m.id));}catch(error){reportPersistenceFailure(error);$('feedback').textContent='Please ask a parent to check save recovery before continuing.';return false}}profile.progression=next;profile.bestCombo=Math.max(profile.bestCombo,G.max);const missionStars=missionStarRating(G);profile.missionStars={...(profile.missionStars||{})};profile.missionStars[G.m.id]=Math.max(Number(profile.missionStars[G.m.id])||0,missionStars);fileCue(G.m.boss?'boss':'clear');recordLearningSession(session);save();if(G.internalBubbleReefPreview)void grantBubbleReefPreviewReward({profileId:profile.id,missionId:G.m.id,progression:next,awardedAt:session.ts,canonicalRewardGranted:!wasComplete});$('feedback').textContent=G.m.boss?`${G.m.bossName} defeated!`:'Mission complete!';setCaption(G.m.boss?`${G.m.bossName} defeated.`:'Mission complete.');const clear={missionId:G.m.id,world:G.m.world,title:G.m.boss?`${G.m.bossName} defeated!`:'Mission complete!',stars:missionStars,earned:Number(G.earned)||0};setTimeout(()=>{const match=document.documentElement.classList.contains('presentation-match');const target=match?'home':G.m.world;show(target);render();showClearBanner(target,clear)},600);return true}
 function applySettings(){let s=P().settings;$('reducedMotion').checked=s.reducedMotion;$('cameraMotionReduction').checked=s.cameraMotionReduction;$('largeTargets').checked=s.largeTargets;$('highContrast').checked=s.highContrast;$('captions').checked=s.captions;$('dyslexicFont').checked=s.dyslexicFont;$('textScale').value=s.textScale||'1';$('qualityTier').value=s.qualityTier||'balanced';$('enemySpeed').value=s.enemySpeed;$('soundOn').checked=s.soundOn;$('musicOn').checked=s.musicOn;if($('vibrationOn'))$('vibrationOn').checked=s.vibrationOn!==false;if($('vibrationRow'))$('vibrationRow').hidden=!window.BrainBitePlatform?.isNativeShell?.();$('volume').value=String(Number.isFinite(Number(s.volume))?s.volume:80);$('volumeValue').textContent=`${$('volume').value}%`;syncMusic();const root=document.documentElement;root.classList.toggle('reduced-motion',s.reducedMotion);root.classList.toggle('camera-motion-reduction',s.cameraMotionReduction);root.classList.toggle('large-targets',s.largeTargets);root.classList.toggle('high-contrast',s.highContrast);root.classList.toggle('captions-on',s.captions);root.classList.toggle('dyslexic-font',s.dyslexicFont);root.classList.toggle('quality-ultra',s.qualityTier==='ultra');root.classList.toggle('quality-high',s.qualityTier==='high');root.classList.toggle('quality-balanced',!s.qualityTier||s.qualityTier==='balanced');root.classList.toggle('quality-performance',s.qualityTier==='performance');root.classList.toggle('quality-mobile',s.qualityTier==='mobile');root.classList.toggle('low-end-device',lowEndDevice());root.style.setProperty('--bb-text-scale',String(Number(s.textScale)||1))}
 document.querySelectorAll('[data-screen]').forEach(button=>button.addEventListener('click',()=>show(button.dataset.screen)));
 $('unlockParent').onclick=async()=>{if(parentUnlockInFlight)return;const pin=$('parentPinInput').value,confirmPin=$('confirmParentPin').value;parentUnlockInFlight=true;$('unlockParent').disabled=true;try{if(!readParentAuth()){if(pin!==confirmPin)throw new Error('PIN confirmation does not match.');await createParentAuth(pin);unlockParentAccess();$('parentGateMsg').textContent='Family PIN set. Parent areas are unlocked.'}else{const result=await verifyParentPin(pin);if(result.locked)throw new Error(`Too many attempts. Try again after ${new Date(result.lockedUntil).toLocaleTimeString()}.`);if(!result.ok)throw new Error(`Incorrect PIN. ${result.remaining} attempt(s) remaining.`);unlockParentAccess();$('parentGateMsg').textContent='Parent areas unlocked.'}$('parentGate').hidden=true;$('parentContent').hidden=false;syncNavigationState('parent')}catch(error){$('parentGateMsg').textContent=error.message}finally{parentUnlockInFlight=false;$('unlockParent').disabled=false;$('parentPinInput').value='';$('confirmParentPin').value='';renderParentGate()}};
@@ -2922,10 +2950,10 @@ $('deleteActiveProfile').onclick=async event=>{
 $('backupBtn').onclick=()=>{if(!parentShellRequired('saveHealth'))return;try{createManualBackupUnlocked();render();$('saveHealth').textContent='Backup created from the current valid save'}catch(error){$('saveHealth').textContent=`Backup failed: ${error?.name==='QuotaExceededError'?'device storage is full':'storage unavailable'}`}};
 $('restoreBtn').onclick=async event=>{
  const status=$('saveHealth');if(!parentShellRequired('saveHealth'))return;
- if(!readStoredStore(localStorage.getItem(BACK))&&!readStoredStore(localStorage.getItem(RECOVERY_KEY))){status.textContent='No valid backup';return}
+ if(!readStoredStore(readLocalStorage(BACK))&&!readStoredStore(readLocalStorage(RECOVERY_KEY))){status.textContent='No valid backup';return}
  const approved=await requestSensitiveAction({title:'Restore saved progress?',description:'Current progress will be replaced by the newest valid backup. A separate rollback snapshot of the current progress will be kept.',confirmText:'Restore backup',invoker:event.currentTarget,statusId:'saveHealth'});
  if(!approved){status.textContent='Restore cancelled. Current progress was not changed.';return}
- try{await replaceCanonicalStateSafely('restore',()=>{const recovered=readStoredStore(localStorage.getItem(BACK))||readStoredStore(localStorage.getItem(RECOVERY_KEY));if(!recovered)throw new Error('No valid backup');return recovered});status.textContent='Backup restored. The previous progress remains available as the pre-operation rollback snapshot.'}
+ try{await replaceCanonicalStateSafely('restore',()=>{const recovered=readStoredStore(readLocalStorage(BACK))||readStoredStore(readLocalStorage(RECOVERY_KEY));if(!recovered)throw new Error('No valid backup');return recovered});status.textContent='Backup restored. The previous progress remains available as the pre-operation rollback snapshot.'}
  catch(error){status.textContent=`Restore failed; current progress was kept${error.rollbackStorageFailed?', but device storage could not be fully restored':''}: ${error.message}`}
 };
 $('exportBtn').onclick=()=>{if(!parentShellRequired('saveHealth'))return;const env=exportEnvelope(),b=new Blob([JSON.stringify(env,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='brainbite-progress-v2.json';a.click();URL.revokeObjectURL(a.href)};
@@ -2967,9 +2995,10 @@ $('buildPractice').onclick=()=>{
    const validation=plan&&c?c.validateGeneratedChallenge(plan,skill):null;
    const gate=plan&&validation?.approved?generatedChallengeGate(plan,skill,validation):null;
    const approved=!!(plan&&validation?.approved&&gate?.approved);
+   const contentStatus=practiceContentStatus(routed,validation,gate);
    const type=homework?'homework':'adaptive-practice';
-   recordPracticeItem({subject:s,topic:t,grade,difficulty,homework,type,curriculumSkillId:skill?.id||null,contentId:plan?.id||null,contentIdentity:gate?.telemetry?.contentIdentity||null,manifestStatus:gate?.telemetry?.manifestStatus||null,gateMode:gate?.telemetry?.gateMode||currentContentGateMode(),sessionReason:sessionItem?.reason||'current-learning',ts:Date.now(),validated:approved,quarantined:!approved});
-   if(!approved){$('practiceResult').textContent='This practice item did not pass content review and was quarantined.';save();return}
+   recordPracticeItem({subject:s,topic:t,grade,difficulty,homework,type,curriculumSkillId:skill?.id||null,contentId:plan?.id||null,contentIdentity:gate?.telemetry?.contentIdentity||null,manifestStatus:gate?.telemetry?.manifestStatus||null,gateMode:gate?.telemetry?.gateMode||currentContentGateMode(),sessionReason:sessionItem?.reason||'current-learning',ts:Date.now(),validated:approved,quarantined:contentStatus.quarantined});
+   if(!approved){$('practiceResult').textContent=contentStatus.message;save();return}
    const result=`${homework?'Homework':'Adaptive practice'} plan ready for <b>${skill.name}</b> (${skill.grade}).`;
    $('practiceResult').innerHTML=`${result} <span class="small">Content score: ${c.scoreContentQuality(plan,skill).score}</span> <button id="guidedPractice">${homework?'Start guided homework':'Start with support'}</button> <button id="independentPractice">Try independently</button>`;
    document.getElementById('guidedPractice').onclick=()=>window.BrainBiteGame.startCurriculumChallenge(plan,{assisted:true,homeworkMode:homework});
@@ -3149,7 +3178,7 @@ $('labQueueOffline').onclick=()=>{if(!parentShellRequired())return;const c=core(
 $('labReplayOffline').onclick=()=>{if(!parentShellRequired())return;const c=core();if(!c)return;applyLabFoundation(foundation=>{const learner=foundation.learners[foundation.activeLearnerId];const replay=c.replayOfflineQueue(learner,()=>true);foundation.learners[foundation.activeLearnerId]=replay.learner})};
 $('labSaveSnapshot').onclick=()=>{if(!parentShellRequired())return;const c=core();if(!c)return;applyLabFoundation(foundation=>c.createRecoverySnapshot(foundation))};
 $('labCorruptSave').onclick=()=>{if(!parentShellRequired()||!labAllowed())return;const foundation=loadFoundation();if(!foundation)return;persistFoundation(foundation);localStorage.setItem(KEY,'{broken');renderLab()};
-$('labRestoreRecovery').onclick=()=>{if(!parentShellRequired()||!labAllowed())return;const recovered=readStoredStore(localStorage.getItem(BACK))||readStoredStore(localStorage.getItem(RECOVERY_KEY));if(!recovered)return;STORE=preserveCurrentProfileDeletions(recovered);writeStoreCopies(STORE);render();renderLab()};
+$('labRestoreRecovery').onclick=()=>{if(!parentShellRequired()||!labAllowed())return;const recovered=readStoredStore(readLocalStorage(BACK))||readStoredStore(readLocalStorage(RECOVERY_KEY));if(!recovered)return;STORE=preserveCurrentProfileDeletions(recovered);writeStoreCopies(STORE);render();renderLab()};
 $('labRefreshBrainBase').onclick=()=>{renderBrainBase(loadFoundation());renderLab()};
 $('labSkill').onchange=renderLab;
 $('labFamily').onchange=renderLab;
@@ -3242,7 +3271,7 @@ async function restoreFromNativeMirror(){
  }catch{result='error'}
  finally{
   NATIVE_MIRROR_STATE='ready';
-  mirrorStoreToNative(localStorage.getItem(KEY));
+  mirrorStoreToNative(readLocalStorage(KEY));
  }
  return result;
 }

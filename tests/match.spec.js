@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 
 /** Batch 9 MATCH path — keeps visual presentation functional in CI */
 test.describe('MATCH presentation', () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
   test.beforeEach(async ({ page }) => {
     await page.goto('/?match=1&bust=' + Date.now());
     await page.evaluate(async () => {
@@ -177,5 +178,129 @@ test.describe('MATCH presentation', () => {
       return sheen ? getComputedStyle(sheen).animationName : '';
     });
     expect(anim === 'none' || anim === '').toBeTruthy();
+  });
+
+  async function expectReachable(page, locator, { touch = false } = {}) {
+    await locator.scrollIntoViewIfNeeded();
+    await expect(locator).toBeVisible();
+    const rect = await locator.boundingBox();
+    const viewport = page.viewportSize();
+    expect(rect.x).toBeGreaterThanOrEqual(-1);
+    expect(rect.x + rect.width).toBeLessThanOrEqual(viewport.width + 1);
+    expect(rect.y).toBeGreaterThanOrEqual(-1);
+    expect(rect.y + rect.height).toBeLessThanOrEqual(viewport.height + 1);
+    if (touch) {
+      expect(rect.width).toBeGreaterThanOrEqual(44);
+      expect(rect.height).toBeGreaterThanOrEqual(44);
+      await locator.click({ trial: true });
+    }
+  }
+
+  async function expectLiveDomBattle(page) {
+    await expect.poll(() => page.evaluate(() => window.BrainBitePresentation.mode)).toBe('dom');
+    await expect(page.locator('.match-layer')).toHaveCount(0);
+    const live = await page.evaluate(() => ({
+      prompt: window.BrainBiteGame.getState().m.prompt,
+      choices: Array.from({ length: 25 }, (_, index) => { const cell = window.BrainBiteGame.getState().cells[index]; return !cell || cell.eaten ? '' : String(cell.value); }),
+    }));
+    await expect(page.locator('#prompt')).toHaveText(live.prompt);
+    await expectReachable(page, page.locator('#prompt'));
+    const answers = page.locator('#board [role="gridcell"]');
+    await expect(answers).toHaveCount(live.choices.length);
+    expect(await answers.allTextContents()).toEqual(live.choices);
+    for (let index = 0; index < live.choices.length; index++) {
+      await expectReachable(page, answers.nth(index));
+    }
+    for (const direction of ['u', 'd', 'l', 'r']) {
+      await expectReachable(page, page.locator(`[data-d="${direction}"]`), { touch: true });
+    }
+    await expectReachable(page, page.locator('#exitBtn'), { touch: true });
+  }
+
+  for (const width of [390, 320]) {
+    test(`portrait ${width} keeps MATCH preference with reachable Classic play and live answers`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.reload({ waitUntil: 'load' });
+      await expect.poll(() => page.evaluate(() => window.BrainBitePresentation.mode)).toBe('dom');
+      await expect(page.locator('html')).not.toHaveClass(/presentation-match/);
+      expect(await page.evaluate(() => localStorage.getItem('bb-presentation'))).toBe('match');
+      await expect(page.locator('#parentPresentationControl select')).toHaveValue('match');
+      await expectReachable(page, page.locator('#continueBtn'), { touch: true });
+      await page.screenshot({ path: `.ui-captures/audit-2026-10-03/match-home-after-${width}.png`, fullPage: true });
+      await expectReachable(page, page.locator('#parentNav'), { touch: true });
+      await page.locator('#parentNav').click();
+      await expect(page.locator('#parentGate')).toBeVisible();
+      await page.locator('#parentPinInput').fill('123456');
+      await page.locator('#confirmParentPin').fill('123456');
+      await page.locator('#unlockParent').click();
+      await expect(page.locator('#parentContent')).toBeVisible();
+      await expectReachable(page, page.locator('#parentExitToChild'), { touch: true });
+      await page.locator('#parentExitToChild').click();
+      await page.locator('#continueBtn').focus();
+      await page.keyboard.press('Enter');
+      await expect(page.locator('#game.show')).toBeVisible();
+      await expectLiveDomBattle(page);
+      await page.locator('#prompt').scrollIntoViewIfNeeded();
+      await page.screenshot({ path: `.ui-captures/audit-2026-10-03/match-battle-after-${width}.png`, fullPage: true });
+      const beforeKey = await page.evaluate(() => ({ ...window.BrainBiteGame.getState().p }));
+      await page.keyboard.press(beforeKey.y > 0 ? 'ArrowUp' : 'ArrowDown');
+      const afterKey = await page.evaluate(() => ({ ...window.BrainBiteGame.getState().p }));
+      expect(afterKey).not.toEqual(beforeKey);
+      await page.locator(`[data-d="${afterKey.x > 0 ? 'l' : 'r'}"]`).click();
+      expect(await page.evaluate(() => ({ ...window.BrainBiteGame.getState().p }))).not.toEqual(afterKey);
+      await page.locator('#exitBtn').click();
+      await expect(page.locator('#home.show')).toBeVisible();
+      expect(await page.evaluate(() => localStorage.getItem('bb-presentation'))).toBe('match');
+      if (width === 390) {
+        await page.setViewportSize({ width: 375, height: 667 });
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await page.screenshot({ path: '.ui-captures/audit-2026-10-03/dom-home-final-375.png' });
+      }
+    });
+  }
+
+  test('desktop to portrait and back disposes plates without losing the mission or profile', async ({ page }) => {
+    await page.locator('.hs-portal').click();
+    await page.locator('.hs-pillar-2').click();
+    const before = await page.evaluate(() => {
+      const state = window.BrainBiteGame.getState();
+      return { id: state.m.id, profileId: state.profileId, correct: state.correct, eaten: state.eaten, lives: state.lives };
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expectLiveDomBattle(page);
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await expect(page.locator('.match-battle .match-plate')).toBeVisible();
+    await expect(page.locator('.match-layer')).toHaveCount(1);
+    await expect(page.locator('.hs-pillar')).toHaveCount(4);
+    const after = await page.evaluate(() => {
+      const state = window.BrainBiteGame.getState();
+      return { id: state.m.id, profileId: state.profileId, correct: state.correct, eaten: state.eaten, lives: state.lives };
+    });
+    expect(after).toEqual(before);
+    expect(await page.evaluate(() => localStorage.getItem('bb-presentation'))).toBe('match');
+    await page.screenshot({ path: '.ui-captures/audit-2026-10-03/match-battle-after-1280.png' });
+    await page.locator('.hs-pause').click();
+    await expect(page.locator('.match-home .match-plate')).toBeVisible();
+    await page.screenshot({ path: '.ui-captures/audit-2026-10-03/match-home-after-1280.png' });
+  });
+
+  test('production ignores explicit and stored MATCH preview while preserving live mission across resize', async ({ page }) => {
+    for (const query of ['?presentation=match&release=1', '?release=1']) {
+      await page.goto('/' + query);
+      await expect.poll(() => page.evaluate(() => window.BrainBitePresentation.mode)).toBe('dom');
+      expect(await page.evaluate(() => window.BrainBiteGame.getContentControl().mode)).toBe('production');
+      await expect(page.locator('.match-layer')).toHaveCount(0);
+      await expect(page.locator('#parentPresentationControl option[value="match"]')).toHaveCount(0);
+      expect(await page.evaluate(() => localStorage.getItem('bb-presentation'))).toBe('match');
+      await page.locator('#continueBtn').click();
+      const profileId = await page.evaluate(() => window.BrainBiteGame.getState().profileId);
+      await page.setViewportSize({ width: 390, height: 844 });
+      await expectLiveDomBattle(page);
+      expect(await page.evaluate(() => window.BrainBiteGame.getState().profileId)).toBe(profileId);
+      await page.locator('#exitBtn').click();
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await expect(page.locator('#home.show')).toBeVisible();
+      await expect(page.locator('.match-layer')).toHaveCount(0);
+    }
   });
 });

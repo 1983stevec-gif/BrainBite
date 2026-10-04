@@ -1,4 +1,5 @@
 import * as THREE from '../vendor/three/three.module.js';
+import { makeStoneMaterial } from './surface-textures.mjs';
 
 function makeArchGeometry(width, height) {
   const radius = width / 2;
@@ -149,15 +150,28 @@ export function addJungleBanks(scene) {
   const transform = new THREE.Object3D();
   const stone = new THREE.InstancedMesh(
     new THREE.BoxGeometry(1, 1, 1),
-    new THREE.MeshStandardMaterial({ color: 0x7c8260, roughness: 0.96 }), 168,
+    typeof document === 'undefined' ? new THREE.MeshStandardMaterial({ color: 0x7c8260, roughness: 0.96 }) : makeStoneMaterial({ color: 0xc2c298 }), 168,
   );
   const moss = new THREE.InstancedMesh(
     new THREE.IcosahedronGeometry(1, 1),
     new THREE.MeshStandardMaterial({ color: 0x477843, roughness: 0.94 }), 48,
   );
+  const leafShape = new THREE.Shape();
+  leafShape.moveTo(0, -0.1);
+  leafShape.bezierCurveTo(-0.7, 0.3, -0.68, 1.25, 0, 2);
+  leafShape.bezierCurveTo(0.68, 1.25, 0.7, 0.3, 0, -0.1);
+  const leafGeometry = new THREE.ShapeGeometry(leafShape, 5);
+  const leafColors = [];
+  const leafPositions = leafGeometry.getAttribute('position');
+  for (let i = 0; i < leafPositions.count; i++) {
+    const tip = Math.max(0, leafPositions.getY(i) / 2);
+    const color = new THREE.Color(0x25543b).lerp(new THREE.Color(0x9fc957), tip);
+    leafColors.push(color.r, color.g, color.b);
+  }
+  leafGeometry.setAttribute('color', new THREE.Float32BufferAttribute(leafColors, 3));
   const leaves = new THREE.InstancedMesh(
-    new THREE.SphereGeometry(1, 8, 6),
-    new THREE.MeshStandardMaterial({ color: 0x34774b, roughness: 0.88 }), 168,
+    leafGeometry,
+    new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, side: THREE.DoubleSide, roughness: 0.88 }), 168,
   );
   const rowSpans = [17.2, 16.2, 14.7, 12.7, 10.4, 7.4];
   const stoneColor = new THREE.Color();
@@ -198,12 +212,12 @@ export function addJungleBanks(scene) {
     const plant = Math.floor(i / 7), angle = i % 7 * Math.PI * 2 / 7;
     const side = plant % 2 ? 1 : -1;
     transform.position.set(side * (5.6 + Math.sin(plant) * 0.55) + Math.cos(angle) * 0.28,
-      0.52, -5.6 + Math.floor(plant / 2) * 0.88 + Math.sin(angle) * 0.28);
-    transform.rotation.set(Math.sin(angle) * 0.7, angle, Math.cos(angle) * 0.7);
-    transform.scale.set(0.16, 0.8, 0.27);
+      0.14, -5.6 + Math.floor(plant / 2) * 0.88 + Math.sin(angle) * 0.28);
+    transform.rotation.set(Math.sin(angle) * 0.55, angle, Math.cos(angle) * 0.55);
+    transform.scale.set(0.52, 0.62 + (plant % 3) * 0.12, 1);
     transform.updateMatrix();
     leaves.setMatrixAt(i, transform.matrix);
-    leaves.setColorAt(i, new THREE.Color().setHSL(0.25 + (plant % 3) * 0.03, 0.46, 0.32 + (i % 4) * 0.035));
+    leaves.setColorAt(i, new THREE.Color().setHSL(0.23 + (plant % 3) * 0.025, 0.12, 0.7 + (i % 4) * 0.03));
   }
   stone.instanceMatrix.needsUpdate = true;
   moss.instanceMatrix.needsUpdate = true;
@@ -220,20 +234,18 @@ export function makeWaterMaterial() {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 256;
   const context = canvas.getContext('2d');
-  const depth = context.createLinearGradient(0, 0, 256, 256);
-  depth.addColorStop(0, '#123f48');
-  depth.addColorStop(0.5, '#167580');
-  depth.addColorStop(1, '#205657');
-  context.fillStyle = depth;
+  // A constant base wraps without a colour seam; a repeated diagonal gradient
+  // made large checkerboard patches across the battle river.
+  context.fillStyle = '#197d87';
   context.fillRect(0, 0, 256, 256);
   for (let row = -1; row < 17; row++) {
     context.beginPath();
     for (let x = 0; x <= 256; x += 4) {
       const y = row * 17 + Math.sin(x * Math.PI / 64 + row * 1.8) * 5
-        + Math.sin(x * Math.PI / 27 + row * 2.3) * 2;
+        + Math.sin(x * Math.PI / 32 + row * 2.3) * 2;
       if (x === 0) context.moveTo(x, y); else context.lineTo(x, y);
     }
-    context.strokeStyle = row % 3 === 0 ? 'rgba(147,230,204,0.25)' : 'rgba(92,195,183,0.14)';
+    context.strokeStyle = row % 3 === 0 ? 'rgba(192,249,221,0.38)' : 'rgba(117,222,218,0.22)';
     context.lineWidth = row % 3 === 0 ? 0.8 : 1.4;
     context.stroke();
   }
@@ -241,7 +253,7 @@ export function makeWaterMaterial() {
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.repeat.set(4, 4);
-  return new THREE.MeshStandardMaterial({ map: texture, roughness: 0.36, metalness: 0.22 });
+  return new THREE.MeshStandardMaterial({ map: texture, roughness: 0.25, metalness: 0.28, emissive: 0x0b4249, emissiveIntensity: 0.15 });
 }
 
 export function fitSceneCamera(camera, aspect, { span, height, target, distance }) {

@@ -262,7 +262,7 @@ for(const [layout,width,height] of [['desktop',1280,853],['short laptop',1280,60
   });
 }
 
-test('desktop portal stays clear of side HUD panels after resize',async({page})=>{
+test('desktop portal stays inside its hero and clear of live controls after resize',async({page})=>{
   await page.emulateMedia({reducedMotion:'reduce'});
   await page.setViewportSize({width:1280,height:853});
   await page.goto('/?presentation=webgl');
@@ -273,14 +273,22 @@ test('desktop portal stays clear of side HUD panels after resize',async({page})=
     await page.setViewportSize({width,height});
     await expect.poll(()=>page.evaluate(()=>{
       const button=document.querySelector('.webgl-home-portal').getBoundingClientRect();
-      const rail=document.querySelector('#home .home-rail').getBoundingClientRect();
+      const hero=document.querySelector('#home .home-stage').getBoundingClientRect();
+      const copy=document.querySelector('#home .adventure-hero-copy').getBoundingClientRect();
+      const play=document.querySelector('#continueBtn').getBoundingClientRect();
       const sidebar=document.querySelector('#home .home-right').getBoundingClientRect();
+      const doesNotOverlap=rect=>button.right<=rect.left||button.left>=rect.right||button.bottom<=rect.top||button.top>=rect.bottom;
       const hit=document.elementFromPoint(button.x+button.width/2,button.y+button.height/2);
-      return button.left>rail.right && button.right<sidebar.left && Boolean(hit?.closest('.webgl-home-portal'));
+      return button.left>=hero.left && button.right<=hero.right
+        && button.top>=hero.top && button.bottom<=hero.bottom
+        && button.width>=44 && button.height>=44
+        && doesNotOverlap(copy) && doesNotOverlap(play) && doesNotOverlap(sidebar)
+        && Boolean(hit?.closest('.webgl-home-portal'));
     })).toBe(true);
   }
   await portal.click();
   await expect(page.locator('#game canvas.webgl-canvas')).toHaveCount(1);
+  await expect.poll(()=>page.evaluate(()=>window.BrainBiteGame.getState()?.m?.id)).toBe(1);
 });
 
 test('phone HUD stays compact without hiding subject navigation or answer controls',async({page})=>{
@@ -526,7 +534,7 @@ test('a wrong answer shows a visual explanation and the retry counts as assisted
 });
 
 // ---- UI Phase 1.5 ------------------------------------------------------------------
-test('the 1024x682 target size gets the floating desktop HUD, not the stacked layout',async({page})=>{
+test('the 1024x682 target size keeps the adventure scene, destinations and HUD usable',async({page})=>{
   await page.setViewportSize({width:1024,height:682});
   await page.goto('/?presentation=webgl');
   await expect(page.locator('#home canvas.webgl-canvas')).toHaveCount(1);
@@ -535,12 +543,22 @@ test('the 1024x682 target size gets the floating desktop HUD, not the stacked la
   expect(box.y+box.height).toBeLessThanOrEqual(682+1);
   const menu=await page.locator('#home .home-rail').boundingBox();
   const rail=await page.locator('#home .home-right').boundingBox();
-  expect(menu.x+menu.width).toBeLessThan(512);
-  expect(rail.x).toBeGreaterThan(512);
-  expect(await page.evaluate(()=>document.documentElement.scrollHeight)).toBeLessThanOrEqual(682+1);
+  expect(menu.y).toBeGreaterThanOrEqual(box.y+box.height);
+  expect(menu.x+menu.width).toBeLessThanOrEqual(rail.x);
+  expect(rail.x+rail.width).toBeLessThanOrEqual(1024);
+  for(const button of await page.locator('#home .adventure-destinations button').all()){
+    await expect(button).toBeVisible();
+    await expect(button).toBeEnabled();
+    const target=await button.boundingBox();
+    expect(target.height).toBeGreaterThanOrEqual(44);
+    expect(target.y+target.height).toBeLessThanOrEqual(682);
+  }
+  await expect(page.locator('footer a[href="privacy.html"]')).toBeVisible();
   await page.evaluate(()=>window.BrainBiteGame.startMission(1));
   const map=await page.locator('#game .minimap-card').boundingBox();
-  expect(map.y).toBeGreaterThan(682/2);
+  expect(map.y).toBeGreaterThanOrEqual(0);
+  expect(map.x+map.width).toBeLessThanOrEqual(1024);
+  expect(map.y+map.height).toBeLessThanOrEqual(682);
 });
 
 // ---- UI Phase 2 + gameplay G2/G6.1 --------------------------------------------------
@@ -757,7 +775,7 @@ test('the route map is an illustrated path with a pin, checks, a boss badge and 
 
 test('home menu and utility orbs use the illustrated icon sprite, hidden from assistive tech',async({page})=>{
   await page.goto('/?presentation=webgl');
-  await expect(page.locator('#home .home-rail .rail-icon svg.ui-icon')).toHaveCount(6);
+  await expect(page.locator('#home .adventure-main .rail-icon svg.ui-icon')).toHaveCount(6);
   await expect(page.locator('#home .orb-glyph svg.ui-icon')).toHaveCount(3);
   for(const name of ['Continue Adventure','Practice Lab','Worlds','BrainBase','My Bites','Code']){
     await expect(page.getByRole('button',{name,exact:true}).first()).toBeVisible();

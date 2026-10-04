@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import { projectProfileCurrency, recordCurrencyPreview } from '../brainbite-core.mjs';
 import { createRequire } from 'node:module';
 import { chromium } from '@playwright/test';
 import { createBrainBiteServer } from '../scripts/serve.mjs';
@@ -57,6 +58,7 @@ function normalize(value) {
 function createGrantHarness(profiles) {
   const context = vm.createContext({
     fixtureStore: { profiles },
+    currencyCore: { projectProfileCurrency, recordCurrencyPreview },
     rewards: {
       BUBBLE_REEF_BASE_CONTRIBUTION,
       createBubbleReefRewardState,
@@ -67,6 +69,7 @@ function createGrantHarness(profiles) {
   });
   vm.runInContext(`
     const STORE = fixtureStore;
+    const core = () => currencyCore;
     const bubbleReefRewards = async () => rewards;
     const persistCanonicalState = async options => persistenceCalls.push(structuredClone(options));
     ${extractFunction('grantBubbleReefPreviewReward')}

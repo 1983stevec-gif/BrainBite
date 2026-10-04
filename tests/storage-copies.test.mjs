@@ -205,6 +205,7 @@ test('total validation failure quarantines every raw generation before blank rot
   const blankWriteAt = initialization.indexOf('writeStoreCopiesUnlocked(STORE);');
   assert.ok(quarantineAt >= 0 && quarantineAt < blankWriteAt, 'boot must quarantine unreadable bytes before writing blank state');
   const preserve = new Function('localStorage', 'KEY', 'BACK', 'RECOVERY_KEY', 'UNREADABLE_STORE_QUARANTINE_KEY', 'readAllStoredStores', `
+    ${appFunctionSource('readLocalStorage')}
     ${appFunctionSource('preserveUnreadableStoreCopies')}
     return preserveUnreadableStoreCopies;
   `)(storage, DEFAULT_KEYS.primary, DEFAULT_KEYS.backup, DEFAULT_KEYS.recovery, quarantineKey, () => readAll(reader, DEFAULT_KEYS));

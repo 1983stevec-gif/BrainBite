@@ -218,6 +218,77 @@ five documents, and a pending restore timer is cleared on disposal.
 Deferred to the owner: `releaseGltfCache()` policy, time-limit scope (per profile or device),
 first-run consent, and the partially-built-factory disposer.
 
+## Round 4 — audit of 2026-10-01 (loop continues)
+
+Two more read-only assignments — the progression/reward loop and storage survival — audited
+against the real modules at the current tip.
+
+### R6 — the progression and reward loop
+
+1. **High — a merge loses mission-completion rewards.** `mergeProfiles()` unions completed
+   missions but merges `score`, `stars` and `spark` with independent maxima and does not merge
+   `missionStars` at all, so the newer replica's map silently wins. Reproduced: two replicas
+   completing different missions from the same balance merge to 3 stars and 3 sparks instead of
+   the earned 6 and 6, with one rating lost. Reachable from a cloud pull and from
+   local-generation reconciliation.
+2. **Medium — a stale replica makes a freshly practised skill immediately due again**, because
+   `mergeSkillStates()` picks the minimum positive `nextReviewAt` even when it keeps the latest
+   `lastPracticedAt`. Reproduced: merging `at-1` with `at+12min` yields `at-1`. This defeats the
+   purpose of the schedule and can loop.
+3. **Medium — spacing never grows past three hours**, because the interval formula tops out at
+   tier 3 with confidence 1 → 180 minutes. Mastered knowledge is rescheduled within three hours.
+   Deferred: the intended cadence is a pedagogy decision.
+4. **Medium — adaptive selection always takes the first N of a band's insertion order**, so a
+   same-band skill behind another is never offered (reproduced: five skills, target three,
+   `s1,s2,s3` every time), and prerequisites do not gate selection. Deferred: selection fairness
+   policy.
+5. **Low — the pre-operation rollback snapshot is written but has no consumer in the product**;
+   recovery replaces progression wholesale (coherently — no mixed state). Deferred: an undo
+   control is a product decision.
+
+Rewards that are already correct: ordinary replay grants once; Bubble Reef's contribution ledger
+is idempotent and profile-scoped; boss rewards use `rewardLedger`; the registry cannot strand a
+valid child (all 1,024 completion subsets in each world checked).
+
+### R7 — storage survival
+
+1. **High — total eviction silently becomes a brand-new learner.** With no readable generation
+   the app initialises a default, and nothing requests persistent storage or distinguishes loss
+   from first use. Same-origin eviction also removes the cached shell, so offline start fails
+   too.
+2. **High — a refused autosave leaves the learner's work in memory while the UI carries on**;
+   mission completion does not await the save, and a later `render()` resets `#saveHealth` to
+   "Save healthy" even when nothing was durable. Rotation itself stays coherent (reproduced:
+   the oldest write dies and the old primary still survives).
+3. **High — boot aborts when storage reads are denied.** Unguarded `localStorage.getItem` calls
+   (including at `app.js:102`, `:532`, `:1667`) throw `SecurityError` before the persistence
+   plumbing exists, leaving static HTML; and the IndexedDB lock fallback only catches
+   `InvalidStateError`/`UnknownError`, so a private-mode `SecurityError` prevents every save.
+4. **Medium — the unreadable-quarantine key has no cap**: one incident can roughly double the
+   space of the three generations, and repeated distinct incidents accumulate indefinitely.
+   Deferred: the retention policy needs an owner decision.
+5. **Medium — steady-state boot writes `3N + M` even when nothing changed**, and there is no
+   size preflight, budget or compaction. Deferred to the owner.
+6. **Low — the three world art SVGs are not precached** (`assets/art/number-nebula.svg`,
+   `wordwood.svg`, `language-portals.svg`), so a genuinely cold offline start after install
+   shows broken world cards and a minimap background. The offline smoke masks this by warming
+   the shell with an extra online reload.
+
+## Round 4 improvements selected
+
+| # | Improvement | Files | Acceptance |
+|---|---|---|---|
+| 16 | Merge `missionStars` so a stale replica cannot erase a rating | `app.js`, release specs | Both replicas' ratings survive |
+| 17 | Review schedule follows the latest evidence rather than the oldest due date | `brainbite-core.mjs`, core tests | Merging a stale branch can no longer make a fresh skill due |
+| 18 | Guarded storage reads at boot, and the IndexedDB fallback catches all recoverable failures | `app.js`, release specs | Denied reads reach a safe in-memory state instead of aborting |
+| 19 | Request persistent storage where the platform offers it | `app.js` | Called on boot when unavailable; no-op elsewhere |
+| 20 | Do not reset `#saveHealth` until a save has really succeeded | `app.js`, release specs | A refused save is not reported healthy |
+| 21 | Precache the three world-art SVGs and cover the cold offline boundary | `service-worker.js`, webgl-asset spec | Art is present offline without a warming reload |
+
+Deferred to the owner: the reward-ledger design, review cadence, adaptive rotation and
+prerequisite policy, undo-restore, the quarantine cap and retention rule, the store-size budget
+and compaction, and the broader eviction-warning workflow.
+
 ## Not claimed
 
 Device, screen-reader, Spanish, legal, production Firebase, publishing, signing, and educator

@@ -23,21 +23,28 @@ async function run(channel) {
   }
   try {
     const page = await browser.newPage();
+    const phase = message => console.log(`[${channel || 'chromium'}] ${message}`);
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
 
+    phase('opening app');
     await page.goto(`${base}/?match=0&webgl=0&bust=${Date.now()}`, { waitUntil: 'load', timeout: 45000 });
+    phase('clearing worker and cache');
     await page.evaluate(async () => {
       for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
       for (const k of await caches.keys()) await caches.delete(k);
     });
     await page.reload({ waitUntil: 'load', timeout: 45000 });
+    phase('checking manifest and worker readiness');
 
     const manifestRes = await page.request.get(`${base}/manifest.webmanifest`);
     const manifest = await manifestRes.json();
     const iconsOk = (manifest.icons || []).every((icon) => fs.existsSync(path.join(root, icon.src)));
+    await page.waitForFunction(async () => {
+      const registration = await navigator.serviceWorker.getRegistration();
+      return Boolean(registration?.active && navigator.serviceWorker.controller);
+    }, null, { timeout: 45000 });
     const sw = await page.evaluate(async () => {
-      await navigator.serviceWorker.ready;
       const reg = await navigator.serviceWorker.getRegistration();
       return { ready: !!reg, controlling: !!navigator.serviceWorker.controller };
     });

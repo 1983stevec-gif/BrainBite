@@ -10,170 +10,249 @@ service cloud.firestore {
     }
 
     function validFamilyDocument(data, familyId) {
-      return data.keys().hasOnly(['ownerId', 'updatedAt'])
+      return data.keys().size() == 2
         && data.ownerId is string
         && data.ownerId == familyId
         && data.updatedAt is timestamp;
     }
 
     function validProgression(data) {
-      return data is map
-        && data.keys().hasOnly(['version', 'completedMissionIds', 'unlockedMissionIds', 'lastMissionId'])
-        && data.version is int && data.version >= 1 && data.version <= 100
-        && data.completedMissionIds is list && data.completedMissionIds.size() <= 30
-        && data.unlockedMissionIds is list && data.unlockedMissionIds.size() <= 30
-        && data.lastMissionId is int && data.lastMissionId >= 1 && data.lastMissionId <= 30;
+      return [
+        data is map,
+        data.keys().size() == 4,
+        data.version is int,
+        data.version >= 1,
+        data.version <= 100,
+        data.completedMissionIds is list,
+        data.completedMissionIds.size() <= 30,
+        data.unlockedMissionIds is list,
+        data.unlockedMissionIds.size() <= 30,
+        data.lastMissionId is int,
+        data.lastMissionId >= 1,
+        data.lastMissionId <= 30
+      ].hasOnly([true]);
     }
 
     function validMastery(data) {
-      return data is map
-        && data.keys().hasOnly(['math', 'words', 'spanish'])
-        && data.math is number && data.math >= 0 && data.math <= 100
-        && data.words is number && data.words >= 0 && data.words <= 100
-        && data.spanish is number && data.spanish >= 0 && data.spanish <= 100;
+      return [
+        data is map,
+        data.keys().size() == 3,
+        data.math is number,
+        data.math >= 0,
+        data.math <= 100,
+        data.words is number,
+        data.words >= 0,
+        data.words <= 100,
+        data.spanish is number,
+        data.spanish >= 0,
+        data.spanish <= 100
+      ].hasOnly([true]);
     }
 
     function validSettings(data) {
-      return data is map
-        && data.keys().hasOnly([
-          'reducedMotion', 'cameraMotionReduction', 'largeTargets', 'highContrast',
-          'captions', 'dyslexicFont', 'textScale', 'qualityTier', 'soundOn',
-          'musicOn', 'enemySpeed'
-        ])
-        && data.reducedMotion is bool
-        && data.cameraMotionReduction is bool
-        && data.largeTargets is bool
-        && data.highContrast is bool
-        && data.captions is bool
-        && data.dyslexicFont is bool
-        && data.textScale is string && data.textScale.size() <= 8
-        && data.qualityTier is string && data.qualityTier.size() <= 24
-        && data.soundOn is bool
-        && data.musicOn is bool
-        && data.enemySpeed is string && data.enemySpeed.size() <= 24;
+      return [
+        data is map,
+        data.keys().size() == 11,
+        data.reducedMotion is bool,
+        data.cameraMotionReduction is bool,
+        data.largeTargets is bool,
+        data.highContrast is bool,
+        data.captions is bool,
+        data.dyslexicFont is bool,
+        data.textScale is string,
+        data.textScale.size() <= 8,
+        data.qualityTier is string,
+        data.qualityTier.size() <= 24,
+        data.soundOn is bool,
+        data.musicOn is bool,
+        data.enemySpeed is string,
+        data.enemySpeed.size() <= 24
+      ].hasOnly([true]);
     }
 
     function validControls(data) {
-      return data is map
-        && data.keys().hasOnly([
-          'dailyMinutes', 'maxSessionMinutes', 'requireParentForSnap',
-          'requireParentForPractice'
-        ])
-        && data.dailyMinutes is int && data.dailyMinutes >= 1 && data.dailyMinutes <= 240
-        && data.maxSessionMinutes is int
-        && data.maxSessionMinutes >= 1 && data.maxSessionMinutes <= 120
-        && data.maxSessionMinutes <= data.dailyMinutes
-        && data.requireParentForSnap is bool
-        && data.requireParentForPractice is bool;
+      return [
+        data is map,
+        data.keys().size() == 4,
+        data.dailyMinutes is int,
+        data.dailyMinutes >= 1,
+        data.dailyMinutes <= 240,
+        data.maxSessionMinutes is int,
+        data.maxSessionMinutes >= 1,
+        data.maxSessionMinutes <= 120,
+        data.maxSessionMinutes <= data.dailyMinutes,
+        data.requireParentForSnap is bool,
+        data.requireParentForPractice is bool
+      ].hasOnly([true]);
     }
 
     function validLearningCoreHub(data) {
-      return data is map
-        && data.keys().hasOnly([
-          'variant', 'expansionUnlocked', 'visibleChangeCount', 'upgrades'
-        ])
-        && data.variant is string && data.variant.size() <= 32
-        && data.expansionUnlocked is bool
-        && data.visibleChangeCount is number
-        && data.visibleChangeCount >= 0 && data.visibleChangeCount <= 1000000
-        && data.upgrades is list && data.upgrades.size() <= 64;
+      return [
+        data is map,
+        data.keys().size() == 4,
+        data.variant is string,
+        data.variant.size() <= 32,
+        data.expansionUnlocked is bool,
+        data.visibleChangeCount is number,
+        data.visibleChangeCount >= 0,
+        data.visibleChangeCount <= 1000000,
+        data.upgrades is list,
+        data.upgrades.size() <= 64
+      ].hasOnly([true]);
     }
 
     function validLearningCore(data) {
-      return data is map
-        && data.keys().hasOnly([
-          'version', 'stage', 'completedStages', 'skills', 'mastery', 'rewards',
-          'rewardLedger', 'hub'
-        ])
-        && data.version is int && data.version >= 1 && data.version <= 100
-        && data.stage is string && data.stage.size() <= 32
-        && data.completedStages is list && data.completedStages.size() <= 32
-        && data.skills is map && data.skills.size() <= 200
-        && data.mastery is map && data.mastery.size() <= 200
-        && data.rewards is list && data.rewards.size() <= 200
-        && data.rewardLedger is map && data.rewardLedger.size() <= 200
-        && validLearningCoreHub(data.hub);
+      return [
+        data is map,
+        data.keys().size() == 8,
+        data.version is int,
+        data.version >= 1,
+        data.version <= 100,
+        data.stage is string,
+        data.stage.size() <= 32,
+        data.completedStages is list,
+        data.completedStages.size() <= 32,
+        data.skills is map,
+        data.skills.size() <= 200,
+        data.mastery is map,
+        data.mastery.size() <= 200,
+        data.rewards is list,
+        data.rewards.size() <= 200,
+        data.rewardLedger is map,
+        data.rewardLedger.size() <= 200,
+        validLearningCoreHub(data.hub)
+      ].hasOnly([true]);
     }
 
     function validOptionalProfileCollections(data) {
-      return data.programmableBits is map && data.programmableBits.size() <= 64
-        && data.codeLabProjects is map && data.codeLabProjects.size() <= 50
-        && data.codeBridgeLessons is map && data.codeBridgeLessons.size() <= 100
-        && data.programmableBitLessons is map && data.programmableBitLessons.size() <= 100
-        && data.bubbleReefRewards is map && data.bubbleReefRewards.size() <= 8;
+      return [
+        data.programmableBits is map,
+        data.programmableBits.size() <= 64,
+        data.codeLabProjects is map,
+        data.codeLabProjects.size() <= 50,
+        data.codeBridgeLessons is map,
+        data.codeBridgeLessons.size() <= 100,
+        data.programmableBitLessons is map,
+        data.programmableBitLessons.size() <= 100,
+        data.bubbleReefRewards is map,
+        data.bubbleReefRewards.size() <= 8
+      ].hasOnly([true]);
     }
 
     function validOptionalProfileScalars(data) {
       return data.equippedCosmetic is string && data.equippedCosmetic.size() <= 64
-        && data.activeProgrammableBitId is string
-        && data.activeProgrammableBitId.size() <= 32
+        && data.activeProgrammableBitId is string && data.activeProgrammableBitId.size() <= 32
         && data.updatedAt is number && data.updatedAt >= 0;
+    }
+
+    // Packed writer counters are bounded opaque JSON here. Runtime ingress
+    // validates every writer ID, sequence, total and aggregate before merging.
+    function validCurrencyLedger(data, profileId) {
+      return [
+        data is map,
+        data.keys().size() == 7,
+        data.version is int,
+        data.version == 1,
+        data.profileId == profileId,
+        data.legacy is map,
+        data.legacy.keys().size() == 3,
+        data.legacy.score is int,
+        data.legacy.score >= 0,
+        data.legacy.score <= 1000000000,
+        data.legacy.stars is int,
+        data.legacy.stars >= 0,
+        data.legacy.stars <= 1000000000,
+        data.legacy.spark is int,
+        data.legacy.spark >= 0,
+        data.legacy.spark <= 1000000000,
+        data.missions is string,
+        data.missions.matches('[0le]{30}'),
+        data.preview is string,
+        data.preview.matches('[0le]'),
+        data.purchases is string,
+        data.purchases.matches('[0le]{4}'),
+        data.writers is string,
+        data.writers.size() <= 131072
+      ].hasOnly([true]);
+    }
+
+    function validCurrencyTransition(previous, next) {
+      return next.displayName == ''
+        || !('currencyLedger' in previous.progress)
+        || ('currencyLedger' in next.progress);
     }
 
     function validLiveProgress(data, profileId, displayName) {
       let keys = data.keys();
-      return data is map
-        && keys.hasOnly([
-          'id', 'name', 'score', 'stars', 'spark', 'progression', 'learningCore',
-          'bestCombo', 'bite', 'unlockedBites', 'cosmetics', 'equippedCosmetic',
-          'programmableBits', 'activeProgrammableBitId', 'mastery', 'skills',
-          'mistakes', 'practice', 'snap', 'sessions', 'settings', 'controls',
-          'updatedAt', 'codeLabProjects', 'codeBridgeLessons',
-          'programmableBitLessons', 'bubbleReefRewards'
-        ])
-        && data.id == profileId
-        && data.name == displayName
-        && data.score is number && data.score >= 0 && data.score <= 1000000000
-        && data.stars is number && data.stars >= 0 && data.stars <= 1000000000
-        && data.spark is number && data.spark >= 0 && data.spark <= 1000000000
-        && data.bestCombo is number && data.bestCombo >= 0 && data.bestCombo <= 1000000
-        && data.bite is string && data.bite.size() >= 1 && data.bite.size() <= 40
-        && data.unlockedBites is list && data.unlockedBites.size() <= 32
-        && data.cosmetics is list && data.cosmetics.size() <= 128
-        && data.skills is map && data.skills.size() <= 200
-        && data.mistakes is list && data.mistakes.size() <= 100
-        && data.practice is list && data.practice.size() <= 100
-        && data.snap is list && data.snap.size() == 0
-        && data.sessions is list && data.sessions.size() <= 100
-        && validProgression(data.progression)
-        && validMastery(data.mastery)
-        && validSettings(data.settings)
-        && validControls(data.controls)
-        && validLearningCore(data.learningCore)
-        && validOptionalProfileCollections(data)
-        && validOptionalProfileScalars(data);
+      return [
+        data is map,
+        keys.size() == (('currencyLedger' in data) ? 28 : 27),
+        data.id == profileId,
+        data.name == displayName,
+        data.score is number,
+        data.score >= 0,
+        data.score <= 1000000000,
+        data.stars is number,
+        data.stars >= 0,
+        data.stars <= 1000000000,
+        data.spark is number,
+        data.spark >= 0,
+        data.spark <= 1000000000,
+        data.bestCombo is number,
+        data.bestCombo >= 0,
+        data.bestCombo <= 1000000,
+        data.bite is string,
+        data.bite.size() >= 1,
+        data.bite.size() <= 40,
+        data.unlockedBites is list,
+        data.unlockedBites.size() <= 32,
+        data.cosmetics is list,
+        data.cosmetics.size() <= 128,
+        data.skills is map,
+        data.skills.size() <= 200,
+        data.mistakes is list,
+        data.mistakes.size() <= 100,
+        data.practice is list,
+        data.practice.size() <= 100,
+        data.snap is list,
+        data.snap.size() == 0,
+        data.sessions is list,
+        data.sessions.size() <= 100,
+        validProgression(data.progression),
+        validMastery(data.mastery),
+        validSettings(data.settings),
+        validControls(data.controls),
+        validLearningCore(data.learningCore),
+        validOptionalProfileCollections(data),
+        validOptionalProfileScalars(data)
+      ].hasOnly([true]);
     }
 
     function validTombstone(data, profileId) {
       return data is map
-        && data.keys().hasOnly(['id', 'deleted', 'deletedAt'])
+        && data.keys().size() == 3
         && data.id == profileId
         && data.deleted is bool && data.deleted == true
         && data.deletedAt is int && data.deletedAt >= 0;
     }
 
     function validProfileDocument(data, profileId, familyId) {
-      return data.keys().hasOnly([
-          'ownerId', 'displayName', 'clientProfileId', 'progress', 'clientUpdatedAt'
-        ])
-        && data.ownerId is string && data.ownerId == familyId
-        && validIdentifier(data.clientProfileId)
-        && data.clientProfileId == profileId
-        && data.progress is map
-        && data.displayName is string && data.displayName.size() <= 40
-        && data.clientUpdatedAt is timestamp
-        && ((data.displayName.size() >= 1
+      return [
+        data.keys().size() == 5,
+        data.ownerId is string,
+        data.ownerId == familyId,
+        validIdentifier(data.clientProfileId),
+        data.clientProfileId == profileId,
+        data.progress is map,
+        data.displayName is string,
+        data.displayName.size() <= 40,
+        data.clientUpdatedAt is timestamp,
+        ((data.displayName.size() >= 1
             && validLiveProgress(data.progress, profileId, data.displayName))
           || (data.displayName == ''
             && validTombstone(data.progress, profileId)
-            && data.clientUpdatedAt.toMillis() == data.progress.deletedAt));
-    }
-
-    function validProfileUpdate(previous, next, profileId, familyId) {
-      // The exact envelope validator limits edits to displayName, progress, and clientUpdatedAt.
-      return next.ownerId == previous.ownerId
-        && next.clientProfileId == previous.clientProfileId
-        && validProfileDocument(next, profileId, familyId);
+            && data.clientUpdatedAt.toMillis() == data.progress.deletedAt))
+      ].hasOnly([true]);
     }
 
     function isStoredTombstone(data) {
@@ -207,10 +286,15 @@ service cloud.firestore {
         allow list: if signedInAs(familyId);
 
         allow create: if signedInAs(familyId)
-          && validProfileDocument(request.resource.data, profileId, familyId);
+          && validProfileDocument(request.resource.data, profileId, familyId)
+          && (!('currencyLedger' in request.resource.data.progress) || validCurrencyLedger(request.resource.data.progress.currencyLedger, profileId));
 
         allow update: if signedInAs(familyId)
-          && validProfileUpdate(resource.data, request.resource.data, profileId, familyId)
+          && resource.data.ownerId == familyId
+          && resource.data.clientProfileId == profileId
+          && validProfileDocument(request.resource.data, profileId, familyId)
+          && validCurrencyTransition(resource.data, request.resource.data)
+          && (!('currencyLedger' in request.resource.data.progress) || validCurrencyLedger(request.resource.data.progress.currencyLedger, profileId))
           && ((!isStoredTombstone(resource.data))
             || request.resource.data == resource.data);
 

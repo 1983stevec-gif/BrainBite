@@ -1,4 +1,4 @@
-import { shouldEnableWebgl, shouldEnableMatch } from './capability.mjs';
+import { shouldEnableWebgl, shouldEnableMatch, wantsMatch, requestedPresentation } from './capability.mjs';
 
 import { createPerformanceBudget } from './performance-budget.mjs';
 
@@ -16,6 +16,9 @@ let battlePending = false;
 let lastBattleEvidence = { correct: 0, wrong: 0 };
 let screenSyncPromise = null;
 let screenSyncQueued = false;
+let matchSelected = false;
+let matchFailed = false;
+let resizeListening = false;
 const runtimePerformanceBudget = createPerformanceBudget();
 const MAX_NAVIGATION_SAMPLES = 50;
 
@@ -114,11 +117,18 @@ async function loadMatchFactories() {
 export const PresentationAdapter = {
   get enabled() { return mode !== 'dom'; },
   get mode() { return mode; },
+  get requestedMode() { return requestedPresentation(); },
   async init() {
+    matchSelected = wantsMatch();
+    matchFailed = false;
     if (shouldEnableMatch()) mode = 'match';
     else if (shouldEnableWebgl()) mode = 'webgl';
     else mode = 'dom';
     setModeClass();
+    if (!resizeListening) {
+      window.addEventListener('resize', () => { void this.syncFromScreen(); });
+      resizeListening = true;
+    }
     console.info(`[BrainBite] presentation mode: ${mode}`);
     return mode !== 'dom';
   },
@@ -278,6 +288,7 @@ export const PresentationAdapter = {
   },
   fallbackToDom(error) {
     if (mode === 'dom') return;
+    if (matchSelected) matchFailed = true;
     mode = 'dom';
     this.disposeHome(); this.disposeBattle(); setModeClass();
     document.documentElement.classList.remove('presentation-match-passthrough');
@@ -292,6 +303,27 @@ export const PresentationAdapter = {
         screenSyncQueued = false;
         const activeScreen = document.querySelector('.screen.show')?.id || null;
         await runtimeTelemetry.syncScreen(activeScreen, async () => {
+          if (matchSelected && !matchFailed) {
+            const nextMode = shouldEnableMatch() ? 'match' : 'dom';
+            if (nextMode !== mode) {
+              const hadPresentationFocus = document.activeElement?.closest?.('.match-layer');
+              this.disposeHome();
+              this.disposeBattle();
+              mode = nextMode;
+              setModeClass();
+              document.documentElement.classList.remove('presentation-match-passthrough');
+              // Rebuild the existing answer surface under the new root class;
+              // do not restart the mission or touch the selected preference.
+              window.BrainBiteGame?.redrawPresentation?.();
+              if (hadPresentationFocus && mode === 'dom') {
+                const target = activeScreen === 'game'
+                  ? document.querySelector('#board button:not(:disabled)') || document.getElementById('exitBtn')
+                  : document.getElementById('continueBtn');
+                target?.focus?.({ preventScroll: true });
+              }
+              window.dispatchEvent(new Event('bb:presentation-responsive'));
+            }
+          }
           if (mode === 'dom') return;
           const homeOn = document.getElementById('home')?.classList.contains('show');
           const gameOn = document.getElementById('game')?.classList.contains('show');

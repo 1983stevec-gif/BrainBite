@@ -8,6 +8,7 @@ import { createCharacterAnimation } from './character-animation.mjs';
 import { createQualityController } from './graphics-quality.mjs';
 import { createPerformanceBudget } from './performance-budget.mjs';
 import { createProgrammableBit } from './programmable-bit.mjs';
+import { makeStoneMaterial, makeTimberMaterial, makeWaterfallMaterial } from './surface-textures.mjs';
 
 // How long to wait for the browser to restore a lost WebGL context before falling back
 // to the DOM presentation. Long enough for a driver reset, short enough to stay snappy.
@@ -77,16 +78,16 @@ const DISC_Y = 3.45;
 // phones frame the four discs edge to edge and look down onto the pier, so the tall frame
 // shows the answers large instead of a thin band of scene between sky and water.
 function battleFraming(aspect) {
-  if (aspect >= 1) return { span: 10.8, height: 6.5, target: [0, 1.2, 1], distance: 15.5 };
+  if (aspect >= 1) return { span: 10.8, height: 5.7, target: [0, 1.35, 1], distance: 15.0 };
   const k = Math.max(0, Math.min(1, (1 - aspect) / 0.55));
   return { span: 10.8 - 2.2 * k, height: 6.5 + 5.5 * k, target: [0, 1.2 + 0.6 * k, 1 + 1.6 * k], distance: 15.5 - 3 * k };
 }
 
 function makePillar(value, { anisotropy = 4 } = {}) {
   const group = new THREE.Group();
-  const stone = new THREE.MeshStandardMaterial({ color: 0x9aa39c, roughness: 0.88 });
+  const stone = makeStoneMaterial({ color: 0xc2bb8f });
   const moss = new THREE.MeshStandardMaterial({ color: 0x5f8f4a, roughness: 0.9 });
-  const wood = new THREE.MeshStandardMaterial({ color: 0xc4a06a, roughness: 0.75 });
+  const wood = makeTimberMaterial({ color: 0xe7cf9b });
 
   const base = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 1.0, 0.35, 16), stone);
   base.position.y = 0.18;
@@ -132,30 +133,33 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
   renderer.setSize(width, height);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.08;
+  renderer.toneMappingExposure = 1.13;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.domElement.className = 'webgl-canvas webgl-battle';
   renderer.domElement.setAttribute('aria-hidden', 'true');
   host.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x72b9be);
-  scene.fog = new THREE.Fog(0x83b7aa, 16, 36);
-  scene.add(makeSkyDome({ top: 0x8fcff5, horizon: 0xcfe8d2 }));
+  scene.background = new THREE.Color(0x70bdcb);
+  scene.fog = new THREE.Fog(0x81b9b1, 23, 49);
+  scene.add(makeSkyDome({ top: 0x67b5dc, horizon: 0xc4dfc6 }));
 
   const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 120);
   fitSceneCamera(camera, width / height, battleFraming(width / height));
   let cameraBaseY = camera.position.y;
   addJungleBanks(scene);
 
-  scene.add(new THREE.HemisphereLight(0xeaf9ff, 0x355f2b, 1.0));
-  const sun = new THREE.DirectionalLight(0xffe1ac, 1.65);
+  scene.add(new THREE.HemisphereLight(0xcbeefa, 0x304d27, 1.15));
+  const sun = new THREE.DirectionalLight(0xffd797, 2.2);
   sun.position.set(5, 14, 7);
   sun.shadow.mapSize.set(1024, 1024);
   Object.assign(sun.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near: 0.5, far: 35 });
   sun.shadow.camera.updateProjectionMatrix();
   sun.shadow.normalBias = 0.04;
   scene.add(sun);
+  const rim = new THREE.DirectionalLight(0x7bd5ef, 0.75);
+  rim.position.set(-4, 5, -5);
+  scene.add(rim);
 
   // Water
   const water = new THREE.Mesh(
@@ -167,7 +171,7 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
   scene.add(water);
 
   // Pier
-  const pierMat = new THREE.MeshStandardMaterial({ color: 0x8a6238, roughness: 0.9 });
+  const pierMat = makeTimberMaterial({ color: 0xe7c48a });
   const plankGeometry = new THREE.BoxGeometry(3.4, 0.28, 0.38);
   for (let i = 0; i < 13; i++) {
     const plank = new THREE.Mesh(plankGeometry, pierMat);
@@ -188,21 +192,23 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
   }
 
   // Broken rocky ridges behind the shared stepped temple, not solid grey walls.
-  const cliff = new THREE.MeshStandardMaterial({ color: 0x61765a, roughness: 0.95 });
+  const cliff = makeStoneMaterial({ color: 0x9fa67b, repeat: 2 });
+  const naturalRock = new THREE.MeshStandardMaterial({ color: 0x708373, roughness: 0.98 });
   const ridgeGeometry = new THREE.DodecahedronGeometry(1, 1);
   for (const [x, y, scale] of [[-8, 2.2, 3], [8, 2.1, 2.8], [-5, 1.5, 2.1], [5, 1.4, 2.1]]) {
-    const ridge = new THREE.Mesh(ridgeGeometry, cliff);
+    const ridge = new THREE.Mesh(ridgeGeometry, naturalRock);
     ridge.position.set(x, y, -9);
     ridge.scale.set(scale, scale * 1.2, scale * 0.8);
     scene.add(ridge);
   }
 
+  const fallMat = makeWaterfallMaterial();
   for (const x of [-2.6, 2.8]) {
     const fall = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.2, 2.8),
-      new THREE.MeshStandardMaterial({ color: 0xcff4ff, transparent: true, opacity: 0.7, roughness: 0.2 })
+      new THREE.PlaneGeometry(1.35, 3.4),
+      fallMat
     );
-    fall.position.set(x, 2.0, -5.9);
+    fall.position.set(x, 1.9, -5.3);
     scene.add(fall);
   }
 
@@ -745,9 +751,14 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
       if ('ABCD'.includes(child.userData.answer_slot || '_')) root.userData.slotChildren.push(child);
       if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
       if (child.userData.brainbite_kind === 'answer_pillar_label') child.visible = false;
-      if (/pillar_(ring|shaft)/.test(child.userData.brainbite_kind || '') && child.material) {
+      if (/pillar_(ring|shaft|base|cap)/.test(child.userData.brainbite_kind || '') && child.material) {
         child.material = child.material.clone();
         gltfOwnedMaterials.add(child.material);
+        child.material.color.setHex(/shaft/.test(child.userData.brainbite_kind) ? 0xb8b58b : 0xc6c396);
+        child.material.map = cliff.map;
+        child.material.bumpMap = cliff.bumpMap;
+        child.material.bumpScale = 0.045;
+        child.material.roughness = 0.9;
       }
     });
     setChoices(currentChoices, true);
@@ -804,6 +815,7 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
     lastFrameAt = now;
     frameCount += 1;
     const t = reducedMotion ? 0 : clock.getElapsedTime();
+    fallMat.uniforms.time.value = t;
     characterAnimation?.update(t, reducedMotion);
     programmableBit.update(t, reducedMotion);
     kraken.position.y = 0.1 + Math.sin(t * 1.3) * 0.12;
@@ -894,6 +906,8 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
       // locally above belong to this scene; detach cached roots before generic traversal.
       for (const material of gltfOwnedMaterials) material.dispose();
       gltfOwnedMaterials.clear();
+      cliff.map.dispose();
+      cliff.dispose();
       for (const root of gltfRoots) disposeGltfAsset(root);
       gltfRoots.clear();
       disposeObject(scene);

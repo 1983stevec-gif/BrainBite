@@ -33,12 +33,12 @@
 </nav>
 <main id="main">
 <section id="home" class="screen show">
-<div class="dash-shell home-shell home-target">
-<div class="dash-top">
+<div class="dash-shell home-shell home-target adventure-home">
+<div class="dash-top adventure-status-bar">
 <div class="dash-profile">
 <img id="homeAvatar" src="assets/art/nib.svg" alt="Active Bite avatar">
 <div>
-<small>ACTIVE PROFILE</small>
+<small>YOUR ADVENTURE</small>
 <h2 id="homeProfileName">Kid 1</h2>
 <div class="dash-level"><strong id="homeLevel">Level 1</strong><span id="homeXpText">0 / 300 XP</span></div>
 <div class="dash-xp"><span id="homeXpBar"></span></div>
@@ -54,7 +54,7 @@
 <button data-child-utility id="parentNav" data-screen="parent" class="orb-btn orb-parents"><span class="orb-glyph" aria-hidden="true"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-family"/></svg></span><span>Parents</span></button>
 </div>
 </div>
-<div id="firstRunCard" class="first-run-card" hidden>
+<div id="firstRunCard" class="first-run-card adventure-welcome" hidden>
 <div class="first-run-step">
 <small>WELCOME</small>
 <h3 id="firstRunTitle">What should Bite call you?</h3>
@@ -67,16 +67,8 @@
 <p id="firstRunStatus" class="sr-only" role="status" aria-live="polite"></p>
 </div>
 <div class="home-grid">
-<section class="home-rail home-primary-actions" aria-label="Primary activities">
-<h3>MAIN MENU</h3>
-<button id="continueBtn" class="rail-play" aria-label="Continue Adventure"><span class="rail-icon" aria-hidden="true"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-play"/></svg></span><span><strong>PLAY</strong><small>Jungle Circuit</small></span><span class="rail-thumb" aria-hidden="true"></span></button>
-<button data-screen="practice" class="rail-brain" aria-label="Practice Lab"><span class="rail-icon" aria-hidden="true"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-book"/></svg></span><span><strong>PRACTICE</strong><small>Build a learning activity</small></span></button>
-<button data-screen="worlds" class="rail-worlds" aria-label="Worlds"><span class="rail-icon" aria-hidden="true"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-map"/></svg></span><span><strong>WORLDS</strong><small>Choose an adventure</small></span></button>
-<button data-screen="brainbase" class="rail-base" aria-label="BrainBase"><span class="rail-icon" aria-hidden="true"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-house"/></svg></span><span><strong>BRAINBASE</strong><small>Your learning hub</small></span></button>
-<button data-screen="bites" class="rail-shop" aria-label="My Bites"><span class="rail-icon" aria-hidden="true"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-chest"/></svg></span><span><strong>COLLECTION &amp; SHOP</strong><small>Bites and cosmetics</small></span></button>
-<button data-screen="code" class="rail-code" aria-label="Code"><span class="rail-icon" aria-hidden="true"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-code"/></svg></span><span><strong>CODE</strong><small>Code Bridge and Code Lab</small></span></button>
-</section>
-<section class="home-scene">
+<div class="adventure-main">
+<div class="home-scene adventure-hero">
 <div class="home-stage">
 <img class="home-scene-bg" src="assets/art/bite-village.svg" alt="" aria-hidden="true">
 <div class="home-stage-shadow"></div>
@@ -86,19 +78,35 @@
 </div>
 <img id="homeBite" src="assets/art/nib.svg" alt="Nib" class="home-bite">
 </div>
-<div id="worldShowcase" class="world-showcase"></div>
-<div class="cards home-world-stats"><div><h3>Math</h3><p id="mathProgress">0 / 10</p></div><div><h3>Wordwood</h3><p id="wordProgress">0 / 10</p></div><div><h3>Spanish</h3><p id="spanishProgress">0 / 10</p></div></div>
+<section class="home-primary-actions" aria-label="Primary activities">
+<div class="adventure-hero-copy">
+<p id="homeHeroWorld" class="adventure-eyebrow">Number Nebula</p>
+<h2 id="homeHeroTitle">A little learning. A big adventure.</h2>
+<p id="homeHeroMission" class="adventure-hero-mission">Bite is ready to explore with you.</p>
+<button id="continueBtn" class="rail-play adventure-play" aria-label="Continue Adventure"><span class="rail-icon" aria-hidden="true"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-play"/></svg></span><span><strong>PLAY</strong><small id="homePlayMission">Start your adventure</small></span><span class="adventure-play-arrow" aria-hidden="true">&#8594;</span></button>
+</div>
+<nav class="home-rail adventure-destinations" aria-label="Explore BrainBite">
+<button data-screen="practice" class="rail-brain" aria-label="Practice Lab"><span class="rail-icon" aria-hidden="true"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-book"/></svg></span><span><strong>PRACTICE</strong><small>Learn at your pace</small></span></button>
+<button data-screen="worlds" class="rail-worlds" aria-label="Worlds"><span class="rail-icon" aria-hidden="true"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-map"/></svg></span><span><strong>WORLDS</strong><small>Choose your adventure</small></span></button>
+<button data-screen="brainbase" class="rail-base" aria-label="BrainBase"><span class="rail-icon" aria-hidden="true"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-house"/></svg></span><span><strong>BRAINBASE</strong><small>Your home for learning</small></span></button>
+<button data-screen="bites" class="rail-shop" aria-label="My Bites"><span class="rail-icon" aria-hidden="true"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-chest"/></svg></span><span><strong>COLLECTION</strong><small>Bites &amp; treasures</small></span></button>
+<button data-screen="code" class="rail-code" aria-label="Code"><span class="rail-icon" aria-hidden="true"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-code"/></svg></span><span><strong>CODE</strong><small>Build something clever</small></span></button>
+</nav>
 </section>
-<aside class="home-right">
+</div>
+<div id="worldShowcase" class="world-showcase adventure-world-strip" aria-label="Your learning worlds"></div>
+<div class="cards home-world-stats" hidden aria-hidden="true"><div><h3>Math</h3><p id="mathProgress">0 / 10</p></div><div><h3>Wordwood</h3><p id="wordProgress">0 / 10</p></div><div><h3>Spanish</h3><p id="spanishProgress">0 / 10</p></div></div>
+</div>
+<aside class="home-right adventure-progress" aria-label="Your progress">
 <div class="goal-card">
 <small>CURRENT GOAL</small>
 <h3 id="homeGoalTitle">Solve 5 missions</h3>
 <div class="goal-bar"><span id="homeGoalBar"></span></div>
 <p id="homeGoalText">Jungle Circuit is ready.</p>
-<p class="goal-reward">Reward: <b id="homeGoalReward">75 &#11088;</b></p>
+<p class="goal-reward" hidden><b id="homeGoalReward"></b></p>
 </div>
 <div class="reward-card">
-<small>NEXT REWARD</small>
+<small>NEXT LEVEL</small>
 <h3 id="homeRewardTitle">Gain more XP</h3>
 <div class="goal-bar"><span id="homeRewardBar"></span></div>
 <p id="homeRewardText">Collect enough BrainBites to level up.</p>
@@ -226,14 +234,14 @@ player.move()</textarea><div class="code-bridge-actions"><button id="codeRun">Ru
 <section id="settings" class="screen"><h2>Settings</h2><div class="panel"><label><input id="reducedMotion" type="checkbox"> Reduced motion</label><label><input id="cameraMotionReduction" type="checkbox"> Camera motion reduction</label><label><input id="largeTargets" type="checkbox"> Large touch targets</label><label><input id="highContrast" type="checkbox"> High contrast</label><label><input id="captions" type="checkbox"> Captions</label><label><input id="dyslexicFont" type="checkbox"> Dyslexic-friendly font</label><label>Text size <select id="textScale"><option value="0.9">Small</option><option value="1" selected>Default</option><option value="1.1">Large</option><option value="1.25">Extra large</option></select></label><label>Quality tier <select id="qualityTier"><option value="ultra">Ultra</option><option value="high">High</option><option value="balanced" selected>Balanced</option><option value="performance">Performance</option><option value="mobile">Mobile</option></select></label><label><input id="soundOn" type="checkbox" checked> Sound effects</label><label><input id="musicOn" type="checkbox"> Background music</label><label id="vibrationRow" hidden><input id="vibrationOn" type="checkbox" checked> Vibration</label><label class="volume-row">Volume <input id="volume" type="range" min="0" max="100" step="5" value="80" aria-describedby="volumeValue"> <output id="volumeValue" for="volume">80%</output></label><label>Enemy speed <select id="enemySpeed"><option value="slow">Slow</option><option value="normal">Normal</option><option value="fast">Fast</option></select></label></div></section>
 
 <section id="game" class="screen">
-<div class="battle-shell battle-target">
-<div class="battle-top">
-<div class="battle-profile">
+<div class="battle-shell battle-target adventure-battle">
+<div class="battle-top adventure-battle-hud">
+<div class="battle-profile adventure-player">
 <img id="nib" src="assets/art/nib.svg" alt="Current Bite character">
 <div>
 <small id="worldLabel"></small>
-<h2 id="battleProfileName">Alex</h2>
-<div class="battle-meta"><span><b id="battleProfileLevel">Level 12</b></span><span><b id="battleProfileStars">3,450</b> BrainBites</span></div>
+<h2 id="battleProfileName">Your Bite</h2>
+<div class="battle-meta"><span><b id="battleProfileLevel">Level 1</b></span><span><b id="battleProfileStars">0</b> BrainBites</span></div>
 <div class="goal-card battle-inline-goal">
 <small>CURRENT GOAL</small>
 <h3 id="battleGoalTitle">Solve the mission</h3>
@@ -242,17 +250,20 @@ player.move()</textarea><div class="code-bridge-actions"><button id="codeRun">Ru
 </div>
 </div>
 </div>
-<div class="battle-prompt">
+<div class="battle-prompt adventure-question">
+<p class="adventure-eyebrow">YOUR CHALLENGE</p>
+<div class="adventure-audio-controls" aria-label="Read-aloud controls">
 <button id="speakPrompt" aria-label="Repeat prompt" title="Repeat prompt">&#128266;</button>
 <button id="speakFeedback" class="speak-feedback" aria-label="Read the feedback aloud" title="Read the feedback aloud">&#128483;</button>
+</div>
 <h2 id="prompt"></h2>
 <p id="feedback" role="status" aria-live="polite">Ready.</p>
 <p id="firstRunHint" class="first-run-hint" hidden></p>
 <div id="explainer" class="explainer" hidden></div>
-<div class="battle-meta"><span><b id="lives">3</b> lives</span><span><b id="combo">0</b> combo</span><span><b id="targets">0/0</b> targets</span></div>
+<div class="battle-meta battle-live-stats"><span><b id="lives">3</b> lives</span><span><b id="combo">0</b> combo</span><span><b id="targets">0/0</b> targets</span></div>
 <p id="captionText" class="small" hidden></p>
 </div>
-<div class="battle-combo">
+<div class="battle-combo adventure-combo">
 <small>Combo</small>
 <strong id="comboBanner">x0</strong>
 <span id="comboStatus" class="sr-only" role="status" aria-live="polite"></span>
@@ -268,14 +279,14 @@ player.move()</textarea><div class="code-bridge-actions"><button id="codeRun">Ru
 </div>
 <button id="exitBtn" class="battle-pause" aria-label="Exit" title="Pause">&#10074;&#10074;</button>
 </div>
-<div class="battle-main">
+<div class="battle-main adventure-arena">
 <div class="battle-scene">
 <div class="battle-frame">
 <div id="board" class="board" role="grid" aria-label="Game board"></div>
 </div>
 <div class="touch" aria-label="Touch movement controls"><button data-d="u" aria-label="Move up">▲</button><div><button data-d="l" aria-label="Move left">◀</button><button data-d="d" aria-label="Move down">▼</button><button data-d="r" aria-label="Move right">▶</button></div></div>
 </div>
-<aside class="battle-right">
+<aside class="battle-right adventure-route">
 <div id="bossBox" class="boss-card"><div class="boss-art" aria-hidden="true"></div><div class="boss-copy"><h3 id="bossName">Fraction Kraken</h3><progress id="bossHealth" max="100" value="100" aria-label="Boss health"></progress><p id="bossPhase">Phase 1 of 3</p><p id="bossRule" class="boss-rule"></p><button id="bossPeek" type="button" class="boss-peek" hidden>Peek</button></div></div>
 <div class="reward-card battle-toast" hidden>
 <small>RIGHT NOW</small>
@@ -284,7 +295,7 @@ player.move()</textarea><div class="code-bridge-actions"><button id="codeRun">Ru
 <div class="minimap-card"><h3 id="minimapTitle">Jungle Circuit</h3><div id="minimapNodes" class="minimap" role="img" aria-label="Mission route map"></div></div>
 </aside>
 </div>
-<div class="battle-bottom">
+<div class="battle-bottom adventure-battle-bottom">
 <div class="battle-health" aria-label="Health">
 <span class="health-heart" aria-hidden="true">&#10084;</span>
 <div class="health-track"><span id="healthFill" class="health-fill"></span></div>

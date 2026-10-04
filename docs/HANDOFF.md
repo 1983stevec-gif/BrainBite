@@ -8,6 +8,8 @@ behind, because committing the file changes HEAD.
 This document is the entry point. It says what is verified, what is not, who owns what is
 left, and the operational details that are easy to get wrong. The other documents go deeper:
 
+**Latest local visual build (2026-10-04):** the substantial public home/battle redesign and Windows executable are recorded in [AUDIT_BUILD_PLAN_2026_10_02.md](AUDIT_BUILD_PLAN_2026_10_02.md), including the coordinator delivery section. Current local results are 291/291 units, 11/11 smoke checks, all 251 browser cases covered with six corrected focused reruns, and 30/30 real Firestore emulator tests. The report distinguishes initial failures, final native artifacts and external rollout gates; the older counts below remain historical. The unsigned installer and playable executable are in the task outputs folder named `BrainBite-Visual-Upgrade-2026-10-04`. Production Firebase rules and clients require coordinated rollout; no production deployment or merge is claimed.
+
 | Document | Contents |
 |---|---|
 | `docs/CLOSED_BETA_READINESS.md` | Verified surface, evidence inventory, defect ledger, external gates, rollback |

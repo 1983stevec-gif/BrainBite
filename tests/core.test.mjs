@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   ACTIVITY_FAMILIES,
+  CURRENCY_WRITER_LIMIT, CURRENCY_PACKED_LIMIT, CurrencyUpgradeRequiredError,
+  normalizeProfileCurrency, projectProfileCurrency, mergeProfileCurrency,
+  recordCurrencyScore, recordCurrencyMission, recordCurrencyPreview, recordCurrencyPurchase,
   OFFLINE_QUEUE_LIMIT,
   SENT_EVENT_ID_LIMIT,
   CURRICULUM_ITEM_TEMPLATES,
@@ -135,6 +138,44 @@ test('same-skill cloud branches merge unique evidence without double-counting sh
   assert.equal(merged.evidence.incorrectAttempts, 1);
   assert.equal(merged.recentPerformance.length, 3);
   assert.deepEqual(mergeSkillStates(merged, right.skills['number-facts'], { preferRight: true }).evidence, merged.evidence);
+});
+
+test('a stale replica cannot replace the schedule from the latest practice', () => {
+  const freshPracticeAt = 1_700_000_000_000;
+  const twelveMinutes = 12 * 60 * 1000;
+  let staleLearner = defaultLearner('Merge', 'profile-review-merge');
+  staleLearner = recordLearnerAttempt(staleLearner, 'fractions', {
+    id: 'old-review', originId: 'device-a', originSequence: 1,
+    at: freshPracticeAt - twelveMinutes - 1,
+    correct: true, assisted: true, responseTimeMs: 1800,
+  }, { id: 'fractions' });
+  const freshLearner = recordLearnerAttempt(structuredClone(staleLearner), 'fractions', {
+    id: 'fresh-review', originId: 'device-b', originSequence: 1,
+    at: freshPracticeAt,
+    correct: true, assisted: true, responseTimeMs: 1700,
+  }, { id: 'fractions' });
+  const stale = staleLearner.skills.fractions;
+  const fresh = freshLearner.skills.fractions;
+
+  assert.equal(stale.nextReviewAt, freshPracticeAt - 1);
+  assert.equal(fresh.nextReviewAt, freshPracticeAt + twelveMinutes);
+  const merged = mergeSkillStates(fresh, stale, { preferRight: true });
+  assert.equal(merged.nextReviewAt, fresh.nextReviewAt);
+  assert.equal(merged.evidence.attempts, 2);
+  assert.equal(evidenceProvenanceSources(merged).length, 2);
+
+  const repeated = mergeSkillStates(merged, stale, { preferRight: true });
+  assert.equal(repeated.nextReviewAt, fresh.nextReviewAt);
+  assert.deepEqual(repeated.evidence, merged.evidence);
+  assert.deepEqual(repeated.evidenceProvenance, merged.evidenceProvenance);
+
+  const unscheduled = scoreAttempt({
+    id: 'unscheduled-fresh', originId: 'device-c', originSequence: 1,
+    at: freshPracticeAt + 1,
+    correct: true, independent: true, responseTimeMs: 1600,
+  }, createSkillState('fractions'));
+  assert.equal(unscheduled.nextReviewAt, null);
+  assert.equal(mergeSkillStates(stale, unscheduled, { preferRight: true }).nextReviewAt, stale.nextReviewAt);
 });
 
 test('document-unique page writers preserve two attempts allocated from the same floor', () => {
@@ -1225,4 +1266,138 @@ test('cloud scrubbing removes a whole-word child name but not fields that merely
   assert.equal(sam.telemetry[0].payload.note, undefined);
   const samuel = normalizeFoundationState({ learners: { 'p-3': { ...defaultLearner('Samuel', 'p-3'), telemetry: [event()] } } }).learners['p-3'];
   assert.equal(samuel.telemetry[0].payload.note, 'Great job Sam!');
+});
+
+function currencyProfile(overrides = {}) {
+  return { id: 'currency-child', name: 'Kid', score: 0, stars: 0, spark: 0,
+    cosmetics: [], ...overrides };
+}
+function currencyScore(profile, originId, originSequence, points) {
+  return recordCurrencyScore(profile, { originId, originSequence, points });
+}
+
+test('currency distinct offline replicas preserve both rewards and scores without summing shared history', () => {
+  const legacy = currencyProfile({ score: 40, stars: 3, spark: 3, completed: [21] });
+  const shared = currencyScore(projectProfileCurrency(legacy), 'shared-writer', 1, 100);
+  const left = recordCurrencyMission(currencyScore(shared, 'left-writer', 1, 200), 1);
+  const right = recordCurrencyMission(currencyScore(shared, 'right-writer', 1, 300), 11);
+  const merged = mergeProfileCurrency(left, right);
+  assert.deepEqual([merged.score, merged.stars, merged.spark], [640, 9, 9]);
+  assert.deepEqual(mergeProfileCurrency(right, left).currencyLedger, merged.currencyLedger);
+  assert.deepEqual(mergeProfileCurrency(merged, right).currencyLedger, merged.currencyLedger);
+  assert.deepEqual(mergeProfileCurrency(merged, shared).currencyLedger, merged.currencyLedger);
+  assert.equal(legacy.currencyLedger, undefined);
+});
+
+test('currency shared mission and writer prefix replay exactly once including boss rewards', () => {
+  const base = projectProfileCurrency(currencyProfile());
+  const shared = currencyScore(recordCurrencyMission(base, 1), 'same-writer', 1, 100);
+  const advanced = currencyScore(recordCurrencyMission(shared, 10), 'same-writer', 2, 200);
+  const merged = mergeProfileCurrency(shared, advanced);
+  assert.deepEqual([merged.score, merged.stars, merged.spark], [300, 6, 13]);
+  assert.deepEqual(recordCurrencyMission(merged, 10).currencyLedger, merged.currencyLedger);
+  assert.deepEqual(currencyScore(merged, 'same-writer', 1, 100).currencyLedger, merged.currencyLedger);
+  assert.deepEqual(currencyScore(merged, 'same-writer', 2, 200).currencyLedger, merged.currencyLedger);
+});
+
+test('currency different purchases deduct once each and stale replicas cannot restore spent Spark', () => {
+  const base = projectProfileCurrency(currencyProfile({ spark: 30 }));
+  const left = recordCurrencyPurchase(base, 'space_trail');
+  const right = recordCurrencyPurchase(base, 'book_glasses');
+  const merged = mergeProfileCurrency(left, right);
+  assert.equal(merged.spark, 12);
+  assert.equal(mergeProfileCurrency(merged, base).spark, 12);
+  assert.equal(mergeProfileCurrency(left, structuredClone(left)).spark, 24);
+  assert.deepEqual(recordCurrencyPurchase(merged, 'space_trail').currencyLedger, merged.currencyLedger);
+  assert.throws(() => recordCurrencyPurchase(merged, 'boss_crown'), /Not enough/);
+});
+
+test('currency concurrent overspending keeps debt until subsequent mission rewards repay it', () => {
+  const base = projectProfileCurrency(currencyProfile({ spark: 12 }));
+  let merged = mergeProfileCurrency(recordCurrencyPurchase(base, 'space_trail'), recordCurrencyPurchase(base, 'book_glasses'));
+  assert.equal(merged.spark, 0);
+  merged = recordCurrencyMission(merged, 1);
+  assert.equal(merged.spark, 0);
+  merged = recordCurrencyMission(merged, 11);
+  assert.equal(merged.spark, 0);
+  merged = recordCurrencyMission(merged, 21);
+  assert.equal(merged.spark, 3);
+});
+
+test('currency legacy migration preserves net balances and zero-value completion and purchase barriers', () => {
+  const legacy = currencyProfile({ score: 100, stars: 3, spark: 9, completed: [1], cosmetics: ['space_trail'] });
+  const migrated = projectProfileCurrency(legacy);
+  assert.deepEqual([migrated.score, migrated.stars, migrated.spark], [100, 3, 9]);
+  assert.deepEqual(recordCurrencyMission(migrated, 1).currencyLedger, migrated.currencyLedger);
+  assert.deepEqual(recordCurrencyPurchase(migrated, 'space_trail').currencyLedger, migrated.currencyLedger);
+  const older = currencyProfile({ score: 40, completed: [] });
+  assert.deepEqual(mergeProfileCurrency(migrated, older).currencyLedger, migrated.currencyLedger);
+  const other = currencyProfile({ score: 200, stars: 6, spark: 5, completed: [1, 11] });
+  const merged = mergeProfileCurrency(legacy, other);
+  assert.deepEqual([merged.score, merged.stars, merged.spark], [200, 6, 9]);
+  assert.deepEqual(recordCurrencyMission(merged, 11).currencyLedger, merged.currencyLedger);
+});
+
+test('currency mixed-version cloud and ambiguous local progression fail with an actionable upgrade error', () => {
+  const base = currencyProfile({ score: 100, stars: 3, spark: 3, completed: [1] });
+  const upgraded = currencyScore(projectProfileCurrency(base), 'new-writer', 1, 100);
+  assert.equal(mergeProfileCurrency(upgraded, base, { cloud: true }).score, 200);
+  assert.equal(mergeProfileCurrency(base, upgraded, { cloud: true }).score, 200);
+  assert.throws(() => mergeProfileCurrency(upgraded, { ...base, score: 99 }, { cloud: true }), /Update every device/);
+  const oldWriter = { ...base, score: 200, completed: [1, 11] };
+  assert.throws(() => mergeProfileCurrency(upgraded, oldWriter), CurrencyUpgradeRequiredError);
+  assert.throws(() => mergeProfileCurrency(upgraded, oldWriter, { cloud: true }), CurrencyUpgradeRequiredError);
+  assert.throws(() => mergeProfileCurrency(upgraded, projectProfileCurrency(oldWriter)), CurrencyUpgradeRequiredError);
+  assert.equal(mergeProfileCurrency(upgraded, base).score, 200);
+});
+
+test('currency preview receipt never duplicates a canonical reward and legacy preview remains paid', () => {
+  const base = projectProfileCurrency(currencyProfile());
+  const canonical = recordCurrencyPreview(recordCurrencyMission(base, 8), { canonicalRewardGranted: true });
+  assert.deepEqual([canonical.stars, canonical.spark], [3, 3]);
+  assert.deepEqual(recordCurrencyPreview(canonical).currencyLedger, canonical.currencyLedger);
+  const bonus = recordCurrencyPreview(base);
+  assert.equal(mergeProfileCurrency(bonus, bonus).stars, 3);
+  assert.deepEqual(recordCurrencyPreview(bonus).currencyLedger, bonus.currencyLedger);
+  const legacy = currencyProfile({ stars: 3, spark: 3, bubbleReefRewards: { profileId: 'currency-child', rewards: [{ id: 'bubble-reef-base-current-restored:bubble-reef-current-cache' }] } });
+  assert.equal(recordCurrencyPreview(legacy).stars, 3);
+});
+
+test('currency export-style JSON round trips preserve receipts and imported scalar tampering cannot inflate them', () => {
+  const earned = recordCurrencyMission(currencyScore(projectProfileCurrency(currencyProfile({ spark: 20 })), 'device-a', 1, 100), 1);
+  const spent = recordCurrencyPurchase(earned, 'space_trail');
+  const imported = JSON.parse(JSON.stringify(spent));
+  imported.score = 999999; imported.stars = 999999; imported.spark = 999999;
+  const projected = projectProfileCurrency(imported);
+  assert.deepEqual([projected.score, projected.stars, projected.spark], [100, 3, 17]);
+  assert.deepEqual(projected.currencyLedger, spent.currencyLedger);
+  assert.deepEqual(mergeProfileCurrency(projected, spent).currencyLedger, spent.currencyLedger);
+});
+
+test('currency rejects cross-profile, malformed, oversized and conflicting receipts without mutation', () => {
+  const base = projectProfileCurrency(currencyProfile());
+  const malformed = [null, {}, { ...base.currencyLedger, profileId: 'sibling' },
+    { ...base.currencyLedger, writers: 'not-json' }, { ...base.currencyLedger, writers: 'x'.repeat(CURRENCY_PACKED_LIMIT + 1) },
+    { ...base.currencyLedger, missions: 'e' }, { ...base.currencyLedger, purchases: 'eeeee' },
+    { ...base.currencyLedger, legacy: { score: -1, stars: 0, spark: 0 } }];
+  for (const currencyLedger of malformed) assert.throws(() => normalizeProfileCurrency({ ...base, currencyLedger }));
+  assert.throws(() => mergeProfileCurrency(base, { ...base, id: 'sibling' }), /across learner/);
+  const left = currencyScore(base, 'device-a', 1, 100), right = currencyScore(base, 'device-a', 1, 200);
+  assert.throws(() => mergeProfileCurrency(left, right), /Conflicting/);
+  const writers = Object.fromEntries(Array.from({ length: CURRENCY_WRITER_LIMIT }, (_, index) => ['writer-' + index, { sequence: 1, total: 1 }]));
+  const full = { ...base, currencyLedger: { ...base.currencyLedger, writers: JSON.stringify(writers) } };
+  assert.equal(projectProfileCurrency(full).score, CURRENCY_WRITER_LIMIT);
+  assert.throws(() => currencyScore(full, 'one-more-writer', 1, 1), /limit exceeded/);
+  assert.equal(Object.keys(JSON.parse(full.currencyLedger.writers)).length, CURRENCY_WRITER_LIMIT);
+  assert.equal(base.score, 0);
+  assert.equal(base.currencyLedger.writers, '{}');
+  assert.equal(currencyScore(base, 'constructor', 1, 100).score, 100);
+});
+test('currency version 1 receipt indices permanently identify mission IDs 1 through 30', () => {
+  const base = projectProfileCurrency(currencyProfile());
+  const first = recordCurrencyMission(base, 1), last = recordCurrencyMission(base, 30);
+  assert.equal(first.currencyLedger.missions, 'e' + '0'.repeat(29));
+  assert.equal(last.currencyLedger.missions, '0'.repeat(29) + 'e');
+  assert.equal(last.spark, 10);
+  assert.deepEqual(globalThis.BrainBiteRegistry.missions.map(mission => mission.id).sort((a, b) => a - b), Array.from({ length: 30 }, (_, index) => index + 1));
 });

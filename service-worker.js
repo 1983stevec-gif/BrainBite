@@ -1,4 +1,4 @@
-const CACHE = 'brainbite-v2.0-shell-runtime-c05689d1ed207d76c2c0abec487524840f34bee84654bff742dccea68ff75de9';
+const CACHE = 'brainbite-v2.0-shell-runtime-b842bab31ff121fc3ba46981368dfbd2b8c57ff6b38bfbbc3efeafc5c2068be5';
 const FALLBACK = './index.html';
 const CORE = [
   './',
@@ -32,6 +32,9 @@ const CORE = [
   './assets/art/bloop.svg',
   './assets/art/scout.svg',
   './assets/art/bite-village.svg',
+  './assets/art/number-nebula.svg',
+  './assets/art/wordwood.svg',
+  './assets/art/language-portals.svg',
   './presentation/platform.js',
   './presentation/boot.mjs',
   './presentation/presentation-adapter.mjs',

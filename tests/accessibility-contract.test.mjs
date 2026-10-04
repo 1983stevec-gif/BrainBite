@@ -51,7 +51,7 @@ async function setChecked(page, selector, checked) {
 }
 
 async function unlockParent(page) {
-  await page.locator('#childDock button[data-screen="home"]').click();
+  if(!(await page.locator('#home.show').isVisible()))await page.locator('#childDock button[data-screen="home"]').click();
   await page.locator('#parentNav').click();
   await page.locator('#parentPinInput').fill('654321');
   if (await page.locator('#confirmParentPin').isVisible()) await page.locator('#confirmParentPin').fill('654321');

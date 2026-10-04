@@ -7,8 +7,13 @@ import { validateFirebaseRulesSource } from '../scripts/validate-firebase-securi
 const source = fs.readFileSync('firebase/firestore.rules', 'utf8');
 
 function mutated(from, to = '') {
-  assert.equal(source.includes(from), true, `mutation target must exist: ${from}`);
-  return source.replace(from, to);
+  if (source.includes(from)) return source.replace(from, to);
+  // Original conjunctive fixtures still target the same executable checks.
+  const escape = value => [...value].map(char => '\\^$.*+?()[]{}|'.includes(char) ? '\\' + char : char).join('');
+  const pattern = from.replaceAll('&&', ',').trim().split(/\s+/).map(escape).join('\\s*');
+  const target = new RegExp(pattern).exec(source)?.[0];
+  assert.ok(target, `mutation target must exist: ${from}`);
+  return source.replace(target, to.replaceAll('&&', ','));
 }
 
 function rejectsMutation(name, from, to = '') {
@@ -123,18 +128,14 @@ rejectsMutation(
 
 rejectsMutation(
   'top-level progress key count remains bounded',
-  `'programmableBitLessons', 'bubbleReefRewards'
-        ])`,
-  `'programmableBitLessons', 'bubbleReefRewards', 'unboundedExtension'
-        ])`,
+  "keys.size() == (('currencyLedger' in data) ? 28 : 27)",
+  "keys.size() >= (('currencyLedger' in data) ? 28 : 27)",
 );
 
 rejectsMutation(
   'secret fields remain explicitly rejected from cloud progress',
-  `'programmableBitLessons', 'bubbleReefRewards'
-        ])`,
-  `'programmableBitLessons', 'bubbleReefRewards', 'parentPin'
-        ])`,
+  "keys.size() == (('currencyLedger' in data) ? 28 : 27)",
+  "keys.size() == (('currencyLedger' in data) ? 29 : 28)",
 );
 
 rejectsMutation(
@@ -149,26 +150,22 @@ rejectsMutation(
 
 rejectsMutation(
   'owner ID remains immutable on profile updates',
-  'next.ownerId == previous.ownerId',
+  'resource.data.ownerId == familyId',
 );
 
 rejectsMutation(
   'client profile ID remains immutable on profile updates',
-  '&& next.clientProfileId == previous.clientProfileId',
+  '&& resource.data.clientProfileId == profileId',
 );
 
-rejectsMutation(
-  'profile update schema stays within the exact envelope allowlist',
-  `'ownerId', 'displayName', 'clientProfileId', 'progress', 'clientUpdatedAt'
-        ])`,
-  `'ownerId', 'displayName', 'clientProfileId', 'progress', 'clientUpdatedAt', 'unboundedExtension'
-        ])`,
-);
+rejectsMutation('profile update schema stays within the exact envelope allowlist', 'data.keys().size() == 5', 'data.keys().size() <= 6');
 
-rejectsMutation(
-  'tombstones keep an exact schema',
-  "&& data.keys().hasOnly(['id', 'deleted', 'deletedAt'])",
-);
+test('tombstones keep an exact schema', () => {
+  const block = /function validTombstone\(data, profileId\) \{[\s\S]*?\n    \}/.exec(source)[0];
+  const weakened = source.replace(block, block.replace('data.keys().size() == 3', 'data.keys().size() <= 4'));
+  assert.notEqual(weakened, source);
+  assert.equal(validateFirebaseRulesSource(weakened).some(error => error.includes('validTombstone needs its exact field count')), true);
+});
 
 rejectsMutation(
   'tombstone timestamps remain typed',
@@ -208,13 +205,7 @@ rejectsMutation(
   '&& data.skills is map',
 );
 
-rejectsMutation(
-  'Learning Core cannot admit local-only offline queues',
-  `'rewardLedger', 'hub'
-        ])`,
-  `'rewardLedger', 'hub', 'offlineQueue'
-        ])`,
-);
+rejectsMutation('Learning Core cannot admit local-only offline queues', 'data.keys().size() == 8', 'data.keys().size() <= 9');
 
 rejectsMutation(
   'time-control values remain typed and bounded',
@@ -397,7 +388,7 @@ test('Firestore emulator enforces ownership, bounds, types, immutable IDs, and p
     assert.equal((await request('family-a', 'PATCH', profileEnvelope(wrongType))).status, 403, `${label} rejects the wrong type`);
   }
 
-  const nonStringClientId = profileEnvelope(live);
+  const nonStringClientId = profileEnvelope(structuredClone(live));
   nonStringClientId.clientProfileId = 7;
   nonStringClientId.progress.id = 7;
   assert.equal((await request('family-a', 'PATCH', nonStringClientId)).status, 403, 'non-string client profile ID is rejected');
@@ -406,10 +397,107 @@ test('Firestore emulator enforces ownership, bounds, types, immutable IDs, and p
   wrongTimestamp.clientUpdatedAt = 'not-a-timestamp';
   assert.equal((await request('family-a', 'PATCH', wrongTimestamp)).status, 403, 'untyped clientUpdatedAt is rejected');
 
+  const denyRootShapeMutations = async baseline => {
+    const fields = Object.keys(baseline).filter(key => key !== 'currencyLedger');
+    assert.equal(fields.length, 27, 'every root base field is mandatory');
+    for (const key of fields) for (const replacement of [false, true]) {
+      const envelope = profileEnvelope(structuredClone(baseline)), target = envelope.progress, value = target[key];
+      delete target[key]; if (replacement) target.unexpectedRootField = value;
+      assert.equal((await request('family-a', 'PATCH', envelope)).status, 403, 'root ' + key + (replacement ? ' substitution' : ' missing') + (baseline.currencyLedger ? ' with ledger' : ' legacy'));
+    }
+    for (const key of ['unexpectedRootField', 'parentPin', 'deleted', 'deletedAt']) {
+      const envelope = profileEnvelope(structuredClone(baseline)); envelope.progress[key] = true;
+      assert.equal((await request('family-a', 'PATCH', envelope)).status, 403, 'extra root ' + key + (baseline.currencyLedger ? ' with ledger' : ' legacy'));
+    }
+  };
+  await denyRootShapeMutations(live);
+
+  const upgraded = structuredClone(live);
+  upgraded.currencyLedger = { version: 1, profileId, legacy: { score: 0, stars: 0, spark: 0 }, missions: '0'.repeat(30), preview: '0', purchases: '0000', writers: '{}' };
+  const upgradeResponse = await request('family-a', 'PATCH', profileEnvelope(upgraded));
+  assert.equal(upgradeResponse.status, 200, 'owner may upgrade an existing legacy save: ' + (upgradeResponse.status === 200 ? '' : await upgradeResponse.text()));
+  assert.equal((await request('family-a', 'PATCH', profileEnvelope(live))).status, 403, 'an old client cannot discard upgraded currency provenance');
+  await denyRootShapeMutations(upgraded);
+  const newProfileId = profileId + '-fresh', newProfile = structuredClone(upgraded);
+  newProfile.id = newProfileId;
+  const createLedgerDocument = progress => fetch(url.replace(profileId, newProfileId) + '?currentDocument.exists=false', { method: 'PATCH', headers: { Authorization: 'Bearer ' + tokenFor('family-a'), 'Content-Type': 'application/json' }, body: JSON.stringify(firestoreDocument(profileEnvelope(progress))) });
+  assert.equal((await createLedgerDocument(newProfile)).status, 403, 'create must deny cross-profile currency ownership');
+  newProfile.currencyLedger.profileId = newProfileId;
+  const createLedgerResponse = await createLedgerDocument(newProfile);
+  assert.equal(createLedgerResponse.status, 200, 'new ledger profile creates within evaluator budget: ' + (createLedgerResponse.status === 200 ? '' : await createLedgerResponse.text()));
+  for (const [label, mutate] of [
+    ['currency profile ownership', profile => { profile.currencyLedger.profileId = 'sibling'; }],
+    ['currency version', profile => { profile.currencyLedger.version = 2; }],
+    ['currency legacy type', profile => { profile.currencyLedger.legacy.spark = '0'; }],
+    ['currency legacy bounds', profile => { profile.currencyLedger.legacy.score = -1; }],
+    ['currency mission receipt size', profile => { profile.currencyLedger.missions = '0'.repeat(31); }],
+    ['currency mission receipt value', profile => { profile.currencyLedger.missions = 'x'.repeat(30); }],
+    ['currency purchase receipt size', profile => { profile.currencyLedger.purchases = '00000'; }],
+    ['currency writer bounds', profile => { profile.currencyLedger.writers = 'x'.repeat(131073); }],
+    ['currency mission type', profile => { profile.currencyLedger.missions = 0; }],
+    ['currency preview type', profile => { profile.currencyLedger.preview = null; }],
+    ['currency purchase type', profile => { profile.currencyLedger.purchases = []; }],
+    ['currency writer type', profile => { profile.currencyLedger.writers = {}; }],
+    ['currency fractional baseline', profile => { profile.currencyLedger.legacy.spark = 0.5; }],
+    ['currency excessive baseline', profile => { profile.currencyLedger.legacy.stars = 1000000001; }],
+    ['currency extra fields', profile => { profile.currencyLedger.secret = 'hidden'; }],
+  ]) {
+    const invalid = structuredClone(upgraded); mutate(invalid);
+    assert.equal((await request('family-a', 'PATCH', profileEnvelope(invalid))).status, 403, label + ' is rejected');
+  }
+
+
+  // Every renamed field keeps the count unchanged, proving mandatory accesses
+  // still deny substitutions; extra fields prove exact counts cannot grow.
+  for (const mapName of ['progression', 'mastery', 'settings', 'controls', 'learningCore', 'currencyLedger', 'learningCore.hub', 'currencyLedger.legacy']) {
+    const at = profile => mapName.split('.').reduce((value, key) => value[key], profile);
+    for (const key of Object.keys(at(upgraded))) {
+      for (const replacement of [false, true]) {
+        const invalid = structuredClone(upgraded), target = at(invalid), value = target[key];
+        delete target[key];
+        if (replacement) target.unexpectedField = value;
+        assert.equal((await request('family-a', 'PATCH', profileEnvelope(invalid))).status, 403, mapName + '.' + key + (replacement ? ' substitution' : ' missing'));
+      }
+    }
+    const extra = structuredClone(upgraded); at(extra).unexpectedField = true;
+    assert.equal((await request('family-a', 'PATCH', profileEnvelope(extra))).status, 403, mapName + ' extra field');
+  }
+
   const deletedAt = Date.now();
   const tombstone = profileEnvelope({ id: profileId, deleted: true, deletedAt });
   assert.equal((await request('family-a', 'PATCH', tombstone)).status, 200, 'owner can replace live progress with a tombstone');
   assert.equal((await request('family-a', 'PATCH', tombstone)).status, 200, 'an identical tombstone retry is idempotent');
   assert.equal((await request('family-a', 'PATCH', profileEnvelope(live))).status, 403, 'a tombstone cannot be un-deleted');
   assert.equal((await request('family-a', 'DELETE')).status, 403, 'physical delete cannot erase the tombstone');
+});
+
+test('currency rules pin profile ownership, bounds and old-client downgrade refusal', () => {
+  for (const clause of [
+    'data.profileId == profileId',
+    'data.missions is string',
+    "data.missions.matches('[0le]{30}')",
+    'data.purchases is string',
+    "data.purchases.matches('[0le]{4}')",
+    'data.writers is string',
+    'data.writers.size() <= 131072',
+    '&& validCurrencyTransition(resource.data, request.resource.data)',
+  ]) assert.equal(source.includes(clause), true, clause);
+});
+
+test('currency fields cannot hide removed range or ownership guards', () => {
+  for (const [from, to] of [['data.legacy.score <= 1000000000', 'true'], ['data.profileId == profileId', 'true']]) {
+    const errors = validateFirebaseRulesSource(mutated(from, to));
+    assert.equal(errors.some(error => !error.includes('pinned reviewed SHA-256')), true, from);
+  }
+});
+
+test('currency guard cannot be removed from either actual write grant', () => {
+  const guard = "          && (!('currencyLedger' in request.resource.data.progress) || validCurrencyLedger(request.resource.data.progress.currencyLedger, profileId))";
+  for (const operation of ['create', 'update']) {
+    const expression = new RegExp('allow ' + operation + ': if signedInAs\\(familyId\\)\\n          && [\\s\\S]*?;');
+    const block = [...source.matchAll(new RegExp(expression.source, 'g'))].find(match => match[0].includes(guard))[0];
+    const invalid = source.replace(block, block.replace(guard, ''));
+    assert.notEqual(invalid, source);
+    assert.equal(validateFirebaseRulesSource(invalid).some(error => error.includes('Profile ' + operation + ' must validate currency')), true);
+  }
 });

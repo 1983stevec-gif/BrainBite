@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const RULES_PATH = 'firebase/firestore.rules';
 // Deliberately independent of the rules file at runtime: any reviewed rule change,
 // including comments or line-ending changes, requires an explicit audited digest update.
-const REVIEWED_RULES_SHA256 = 'a937c0aa60dd69bf7915801f675b64907b2d672e0987f920b5807ae8f57a82c4';
+const REVIEWED_RULES_SHA256 = 'f1e7100fc1447090773fef624ce0f3b05b682fc425b544c83a447cb17d3ab075';
 
 function sha256(source) {
   return crypto.createHash('sha256').update(source, 'utf8').digest('hex');
@@ -276,12 +276,92 @@ function expect(errors, condition, message) {
   if (!condition) errors.push(message);
 }
 
+const BOOLEAN_GUARD_CONTRACTS = {
+  "validProgression": {
+    "params": "data",
+    "count": 12,
+    "hash": "a4ab05fef3923ad48e5e1a73f9d9e819b3277042619da455bcbb1fab5d1e7e99"
+  },
+  "validMastery": {
+    "params": "data",
+    "count": 11,
+    "hash": "58a04ed77e3565fddcc11c4807015bbb9af3c08363a6b15feb83b8e8976442dc"
+  },
+  "validSettings": {
+    "params": "data",
+    "count": 16,
+    "hash": "5fed8657ebfb2410a21b8a09b9657414a7bb20e9f3106d74088c2a17b025ec76"
+  },
+  "validControls": {
+    "params": "data",
+    "count": 11,
+    "hash": "f9a13c4425c6193bb03b0ab1d92f6ad18360f7406f43fc0c1c832c80e42aaeaf"
+  },
+  "validLearningCoreHub": {
+    "params": "data",
+    "count": 10,
+    "hash": "abd08026c42f73e9688ed08cd46adc026aa8b7049b9f7329da85d78c5d53a06a"
+  },
+  "validLearningCore": {
+    "params": "data",
+    "count": 18,
+    "hash": "3576e49c16ed2f13c0f4f9319c46de4c19e7cd233adf3cbe0d9cef3bb91b61ac"
+  },
+  "validOptionalProfileCollections": {
+    "params": "data",
+    "count": 10,
+    "hash": "ad06533db843b34c1f7acce2db23bef3a18ceaf1c222283f6ce1faf3ddd5ee9c"
+  },
+  "validCurrencyLedger": {
+    "params": "data, profileId",
+    "count": 24,
+    "hash": "3700e1a4fe8accd17cd9e0a305fa8e61bbdcf1426f5489c799cb730fc5f3de8f"
+  },
+  "validLiveProgress": {
+    "params": "data, profileId, displayName",
+    "count": 40,
+    "hash": "8445b7aa88b868ecbc830f9462c97d216350e80150ea5e85f705aed8b8a7cde0"
+  },
+  "validProfileDocument": {
+    "params": "data, profileId, familyId",
+    "count": 10,
+    "hash": "5f4ea69f187b0a13225d1f28edf7ce7892434ef80240278ec4d5fb8c41e50418"
+  }
+};
+
+// These fixed boolean lists retain every original predicate. A single list
+// avoids a long binary AND spine in Firestore's 1000-expression limit.
+function normalizeBooleanGuardLists(source, errors) {
+  for (const [name, contract] of Object.entries(BOOLEAN_GUARD_CONTRACTS)) {
+    const body = extractBlock(source, 'function ' + name + '(' + contract.params + ')');
+    const expression = /^\s*(let keys = data\.keys\(\);\s*)?return \[([\s\S]*)\]\.hasOnly\(\[true\]\);\s*$/.exec(body);
+    expect(errors, !!expression, 'Boolean guard list must use its fixed all-true form: ' + name);
+    if (!expression) continue;
+    const guards = []; let start = 0, depth = 0, quote = '';
+    const text = expression[2];
+    for (let index = 0; index < text.length; index++) {
+      const char = text[index];
+      if (quote) { if (char === '\\') index++; else if (char === quote) quote = ''; continue; }
+      if (char === "'" || char === '"') { quote = char; continue; }
+      if ('([{'.includes(char)) depth++;
+      if (')]}'.includes(char)) depth--;
+      if (depth === 0 && char === ',') { guards.push(text.slice(start, index).trim()); start = index + 1; }
+    }
+    guards.push(text.slice(start).trim());
+    expect(errors, depth === 0 && !quote && guards.length === contract.count, 'Boolean guard list needs every fixed check: ' + name);
+    expect(errors, sha256(guards.map(compact).join('\n')) === contract.hash, 'Boolean guard expressions must retain the audited contract: ' + name);
+    // Only the verified return-list syntax is reconstructed, never quoted aliases.
+    source = source.replace(body, (expression[1] || '') + 'return ' + guards.join(' && ') + ';');
+  }
+  return source;
+}
+
 export function validateFirebaseRulesSource(source) {
   const errors = [];
   expect(errors, sha256(source) === REVIEWED_RULES_SHA256,
     'Rules source differs from the pinned reviewed SHA-256 contract; intentional audited rule changes must update the independent digest constant and regression tests.');
   const lexical = sanitizeSource(source);
-  const executable = lexical.source;
+  const executable = normalizeBooleanGuardLists(lexical.source, errors);
   const all = compact(executable);
   expect(errors, lexical.valid, 'Rules contain an unterminated block comment or quoted string.');
   expect(errors, balancedDelimiters(executable), 'Rules delimiters or quoted strings are unbalanced.');
@@ -296,7 +376,7 @@ export function validateFirebaseRulesSource(source) {
   expect(errors, identifier.includes("value.matches('^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$')"), 'Identifiers need a single string-only, character, and 128-character regex bound.');
 
   const familyValidator = compact(extractBlock(executable, 'function validFamilyDocument(data, familyId)'));
-  expect(errors, familyValidator.includes("data.keys().hasOnly(['ownerId', 'updatedAt'])"), 'Family documents need an exact schema.');
+  expect(errors, familyValidator.includes("data.keys().size() == 2"), 'Family documents need an exact schema.');
   expect(errors, familyValidator.includes('data.ownerId == familyId'), 'Family ownerId must match the path familyId.');
   expect(errors, familyValidator.includes('data.updatedAt is timestamp'), 'Family updatedAt must be a timestamp.');
 
@@ -307,11 +387,11 @@ export function validateFirebaseRulesSource(source) {
   expect(errors, progression.includes('data.lastMissionId is int') && progression.includes('data.lastMissionId <= 30'), 'Last mission ID needs integer and range bounds.');
 
   const mastery = compact(extractBlock(executable, 'function validMastery(data)'));
-  expect(errors, mastery.includes("data.keys().hasOnly(['math', 'words', 'spanish'])"), 'Mastery needs an exact nested schema.');
+  expect(errors, mastery.includes("data.keys().size() == 3"), 'Mastery needs an exact nested schema.');
   expect(errors, ['math', 'words', 'spanish'].every(key => mastery.includes(`data.${key} is number`) && mastery.includes(`data.${key} <= 100`)), 'Mastery values need numeric percentage bounds.');
 
   const settings = compact(extractBlock(executable, 'function validSettings(data)'));
-  expect(errors, settings.includes('data.keys().hasOnly(['), 'Settings need an exact nested schema.');
+  expect(errors, settings.includes('data.keys().size() == 11'), 'Settings need an exact nested schema.');
   expect(errors, settings.includes('data.reducedMotion is bool') && settings.includes('data.soundOn is bool'), 'Settings boolean fields must be typed.');
   expect(errors, settings.includes('data.textScale is string') && settings.includes('data.textScale.size() <= 8'), 'Settings strings need type and size bounds.');
 
@@ -322,7 +402,7 @@ export function validateFirebaseRulesSource(source) {
 
   const learningCore = compact(extractBlock(executable, 'function validLearningCore(data)'));
   expect(errors, learningCore.includes('data is map'), 'Learning core must be a map.');
-  expect(errors, learningCore.includes("data.keys().hasOnly([ 'version', 'stage', 'completedStages', 'skills', 'mastery', 'rewards', 'rewardLedger', 'hub' ])"), 'Learning core needs the exact compact cloud allowlist.');
+  expect(errors, learningCore.includes("data.keys().size() == 8"), 'Learning core needs the exact compact cloud allowlist.');
   for (const omitted of ['profileId', 'name', 'practice', 'sessions', 'settings', 'currentChallenge', 'activeActivity', 'saveMeta', 'recoverySnapshot', 'telemetry', 'offlineQueue', 'sentEventIds', 'contentQuarantine', 'quarantinedRecords']) {
     expect(errors, !learningCore.includes(`'${omitted}'`), `Learning core cloud schema must omit ${omitted}.`);
   }
@@ -333,7 +413,7 @@ export function validateFirebaseRulesSource(source) {
   expect(errors, learningCore.includes('validLearningCoreHub(data.hub)'), 'Learning core hub must use its fixed schema validator.');
 
   const learningCoreHub = compact(extractBlock(executable, 'function validLearningCoreHub(data)'));
-  expect(errors, learningCoreHub.includes("data.keys().hasOnly([ 'variant', 'expansionUnlocked', 'visibleChangeCount', 'upgrades' ])"), 'Learning core hub needs an exact schema.');
+  expect(errors, learningCoreHub.includes("data.keys().size() == 4"), 'Learning core hub needs an exact schema.');
   expect(errors, learningCoreHub.includes('data.expansionUnlocked is bool') && learningCoreHub.includes('data.upgrades is list') && learningCoreHub.includes('data.upgrades.size() <= 64'), 'Learning core hub fields need types and bounds.');
 
   const collections = compact(extractBlock(executable, 'function validOptionalProfileCollections(data)'));
@@ -348,8 +428,11 @@ export function validateFirebaseRulesSource(source) {
 
   const live = compact(extractBlock(executable, 'function validLiveProgress(data, profileId, displayName)'));
   expect(errors, live.includes('data is map'), 'Live progress must be a map.');
-  expect(errors, live.includes('let keys = data.keys()') && live.includes('keys.hasOnly(['), 'Live progress needs one cached key set and an exact allowlist.');
-  expect(errors, live.includes("keys.hasOnly([ 'id', 'name', 'score', 'stars', 'spark', 'progression', 'learningCore', 'bestCombo', 'bite', 'unlockedBites', 'cosmetics', 'equippedCosmetic', 'programmableBits', 'activeProgrammableBitId', 'mastery', 'skills', 'mistakes', 'practice', 'snap', 'sessions', 'settings', 'controls', 'updatedAt', 'codeLabProjects', 'codeBridgeLessons', 'programmableBitLessons', 'bubbleReefRewards' ])"), 'Live progress needs the exact canonical field allowlist and resulting key-count bound.');
+  expect(errors, live.includes('let keys = data.keys()') && live.includes("keys.size() == (('currencyLedger' in data) ? 28 : 27)"), 'Live progress needs its exact 27 required fields plus optional currency ledger.');
+  // Cardinality excludes unknown fields only because every base field is required.
+  const requiredRootFields = ['id', 'name', 'score', 'stars', 'spark', 'progression', 'learningCore', 'bestCombo', 'bite', 'unlockedBites', 'cosmetics', 'equippedCosmetic', 'programmableBits', 'activeProgrammableBitId', 'mastery', 'skills', 'mistakes', 'practice', 'snap', 'sessions', 'settings', 'controls', 'updatedAt', 'codeLabProjects', 'codeBridgeLessons', 'programmableBitLessons', 'bubbleReefRewards'];
+  expect(errors, requiredRootFields.length === 27 && new Set(requiredRootFields).size === 27, 'Root required-field contract must contain 27 distinct fields.');
+  for (const field of requiredRootFields) expect(errors, new RegExp('\\bdata\\.' + field + '\\b').test(live + ' ' + collections + ' ' + scalars), 'Every root field must stay mandatory: ' + field);
   for (const secret of ['parentPin', 'parentAuth', 'pinHash', 'pinSalt', 'password', 'idToken', 'refreshToken']) {
     expect(errors, !live.includes(`'${secret}'`), `Live progress allowlist must reject ${secret}.`);
   }
@@ -368,18 +451,43 @@ export function validateFirebaseRulesSource(source) {
   expect(errors, live.includes('validLearningCore(data.learningCore)'), 'Live progress must require the compact Learning Core map.');
 
   const tombstone = compact(extractBlock(executable, 'function validTombstone(data, profileId)'));
-  expect(errors, tombstone.includes("data.keys().hasOnly(['id', 'deleted', 'deletedAt'])"), 'Tombstones need an exact three-field schema.');
+  expect(errors, tombstone.includes("data.keys().size() == 3"), 'Tombstones need an exact three-field schema.');
   expect(errors, tombstone.includes('data.id == profileId'), 'Tombstone ID must match the profile path.');
   expect(errors, tombstone.includes('data.deleted is bool') && tombstone.includes('data.deleted == true'), 'Tombstone deleted must be true and typed.');
   expect(errors, tombstone.includes('data.deletedAt is int') && tombstone.includes('data.deletedAt >= 0'), 'Tombstone deletedAt needs integer and range bounds.');
 
-  const profileUpdateBound = compact(extractBlock(executable, 'function validProfileUpdate(previous, next, profileId, familyId)'));
-  expect(errors, profileUpdateBound.includes('next.ownerId == previous.ownerId'), 'Profile ownerId must be immutable through updates.');
-  expect(errors, profileUpdateBound.includes('next.clientProfileId == previous.clientProfileId'), 'Profile clientProfileId must be immutable through updates.');
-  expect(errors, profileUpdateBound.includes('validProfileDocument(next, profileId, familyId)'), 'Profile updates must reuse the exact envelope and progress validator.');
+  const currency = compact(extractBlock(executable, 'function validCurrencyLedger(data, profileId)'));
+  const currencyIngress = "&& (!('currencyLedger' in request.resource.data.progress) || validCurrencyLedger(request.resource.data.progress.currencyLedger, profileId))";
+  expect(errors, all.split(currencyIngress).length - 1 === 2, 'Both create and update must validate any currency ledger at ingress.');
+  expect(errors, currency.includes("data.keys().size() == 7"), 'Currency ledger needs an exact bounded schema.');
+  expect(errors, currency.includes('data.version == 1') && currency.includes('data.profileId == profileId'), 'Currency version and profile ownership must be checked.');
+  for (const field of ['score', 'stars', 'spark']) expect(errors, currency.includes('data.legacy.' + field + ' is int') && currency.includes('data.legacy.' + field + ' <= 1000000000'), 'Currency baseline needs integer bounds.');
+  expect(errors, currency.includes("data.missions.matches('[0le]{30}')") && currency.includes("data.purchases.matches('[0le]{4}')") && currency.includes("data.preview.matches('[0le]')"), 'Currency receipt schemas must stay pinned.');
+  expect(errors, currency.includes('data.writers is string') && currency.includes('data.writers.size() <= 131072'), 'Currency writer receipts need a size bound.');
+  expect(errors, executable.includes('&& validCurrencyTransition(resource.data, request.resource.data)'), 'Upgraded currency history cannot be downgraded by old clients.');
+  const currencyTransition = compact(extractBlock(executable, 'function validCurrencyTransition(previous, next)'));
+  expect(errors, currencyTransition.includes("next.displayName == ''") && currencyTransition.includes("!('currencyLedger' in previous.progress)") && currencyTransition.includes("('currencyLedger' in next.progress)"), 'Currency transition must deny removal except validated tombstones or legacy upgrades.');
+
+  // Exact counts are safe only with all original mandatory-field guards present.
+  for (const [name, params, count, fields] of [
+    ['validFamilyDocument', 'data, familyId', 2, ['ownerId', 'updatedAt']],
+    ['validProgression', 'data', 4, ['version', 'completedMissionIds', 'unlockedMissionIds', 'lastMissionId']],
+    ['validMastery', 'data', 3, ['math', 'words', 'spanish']],
+    ['validSettings', 'data', 11, ['reducedMotion', 'cameraMotionReduction', 'largeTargets', 'highContrast', 'captions', 'dyslexicFont', 'textScale', 'qualityTier', 'soundOn', 'musicOn', 'enemySpeed']],
+    ['validControls', 'data', 4, ['dailyMinutes', 'maxSessionMinutes', 'requireParentForSnap', 'requireParentForPractice']],
+    ['validLearningCoreHub', 'data', 4, ['variant', 'expansionUnlocked', 'visibleChangeCount', 'upgrades']],
+    ['validLearningCore', 'data', 8, ['version', 'stage', 'completedStages', 'skills', 'mastery', 'rewards', 'rewardLedger', 'hub']],
+    ['validCurrencyLedger', 'data, profileId', 7, ['version', 'profileId', 'legacy', 'missions', 'preview', 'purchases', 'writers']],
+    ['validTombstone', 'data, profileId', 3, ['id', 'deleted', 'deletedAt']],
+    ['validProfileDocument', 'data, profileId, familyId', 5, ['ownerId', 'displayName', 'clientProfileId', 'progress', 'clientUpdatedAt']],
+  ]) {
+    const body = compact(extractBlock(executable, 'function ' + name + '(' + params + ')'));
+    expect(errors, body.includes('data.keys().size() == ' + count), name + ' needs its exact field count.');
+    for (const field of fields) expect(errors, body.includes('data.' + field), name + ' must require ' + field + '.');
+  }
 
   const envelope = compact(extractBlock(executable, 'function validProfileDocument(data, profileId, familyId)'));
-  expect(errors, envelope.includes("data.keys().hasOnly([ 'ownerId', 'displayName', 'clientProfileId', 'progress', 'clientUpdatedAt' ])"), 'Profile documents need an exact envelope schema.');
+  expect(errors, envelope.includes("data.keys().size() == 5"), 'Profile documents need an exact envelope schema.');
   expect(errors, envelope.includes('data.ownerId == familyId'), 'Profile ownerId must match the family path.');
   expect(errors, envelope.includes('data.clientProfileId == profileId'), 'clientProfileId must match the profile path.');
   expect(errors, envelope.includes('data.progress is map') && envelope.includes('data.clientProfileId == profileId'), 'Progress and client profile IDs must be rooted in the profile path.');
@@ -462,7 +570,12 @@ export function validateFirebaseRulesSource(source) {
   expect(errors, profileGet.includes('signedInAs(familyId)') && profileGet.includes('resource.data.ownerId == request.auth.uid') && profileGet.includes('resource.data.clientProfileId == profileId'), 'Profile document reads need family, stored-owner, and path-ID checks.');
   expect(errors, profileList.includes('signedInAs(familyId)'), 'Profile collection reads must be scoped to the caller\'s own family path.');
   expect(errors, profileCreate.includes('signedInAs(familyId)') && profileCreate.includes('validProfileDocument('), 'Profile creates need authentication and full validation.');
-  expect(errors, profileUpdate.includes('validProfileUpdate(resource.data, request.resource.data, profileId, familyId)'), 'Profile updates must use the bounded mutable-field allowlist.');
+  // Request and stored IDs both bind to the same path, proving immutability.
+  expect(errors, profileUpdate.includes('resource.data.ownerId == familyId'), 'Profile ownerId must be immutable through updates.');
+  expect(errors, profileUpdate.includes('resource.data.clientProfileId == profileId'), 'Profile clientProfileId must be immutable through updates.');
+  expect(errors, profileUpdate.includes('validProfileDocument(request.resource.data, profileId, familyId)'), 'Profile updates must reuse the exact envelope and progress validator.');
+  expect(errors, profileUpdate.includes('validCurrencyTransition(resource.data, request.resource.data)'), 'Profile updates must preserve upgraded currency provenance.');
+  for (const [label, condition] of [['create', profileCreate], ['update', profileUpdate]]) expect(errors, condition.includes(currencyIngress), 'Profile ' + label + ' must validate currency at write ingress.');
   expect(errors, profileUpdate.includes('!isStoredTombstone(resource.data)') && profileUpdate.includes('request.resource.data == resource.data'), 'Stored tombstones must allow only identical idempotent retries.');
   expect(errors, profileDelete === 'false', 'Physical profile deletion must be denied to preserve authoritative tombstones.');
 

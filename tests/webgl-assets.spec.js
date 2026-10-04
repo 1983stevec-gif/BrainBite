@@ -2,6 +2,47 @@ import { test, expect } from '@playwright/test';
 
 const assets = ['mascot', 'jungle_props', 'portal', 'answer_pillars', 'kraken'];
 
+test('world art is available from the install cache before an app visit', async ({ page, context }) => {
+  const artPaths = [
+    '/assets/art/number-nebula.svg',
+    '/assets/art/wordwood.svg',
+    '/assets/art/language-portals.svg',
+  ];
+
+  // This page renders no world art, so only service-worker installation can cache the SVGs.
+  await page.goto('/privacy.html');
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.register('/service-worker.js');
+    await navigator.serviceWorker.ready;
+    if (!navigator.serviceWorker.controller) {
+      await new Promise(resolve => navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true }));
+    }
+  });
+  await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+
+  await context.setOffline(true);
+  const results = await page.evaluate(async paths => Promise.all(paths.map(async path => {
+    try {
+      const response = await fetch(path, { cache: 'no-store' });
+      return {
+        path,
+        ok: response.ok,
+        contentType: response.headers.get('content-type'),
+        body: await response.text(),
+      };
+    } catch (error) {
+      return { path, error: String(error) };
+    }
+  })), artPaths);
+
+  for (const result of results) {
+    expect(result.error, result.path).toBeUndefined();
+    expect(result.ok, result.path).toBe(true);
+    expect(result.contentType, result.path).toContain('image/svg+xml');
+    expect(result.body, result.path).toMatch(/<svg[\s>]/);
+  }
+});
+
 test('parsed GLB documents are cached and scene disposal only detaches their shared resources', async ({ page }) => {
   const glbRequests = [];
   page.on('request', request => { if (/\.glb($|\?)/.test(request.url())) glbRequests.push(request.url().split('/').pop()); });

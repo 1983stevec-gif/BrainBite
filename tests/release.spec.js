@@ -18,8 +18,23 @@ test.beforeEach(async ({ page }) => {
   await page.locator('#unlockParent').click();
   await expect(page.locator('#parentContent')).toBeVisible();
   await page.getByRole('button', { name: 'Back to kid hub' }).click();
-  await expect(page.locator('#childDock')).toBeVisible();
+  await expectChildHome(page);
 });
+
+// The live home activities replace the duplicate desktop dock; phones keep the dock.
+async function expectChildHome(page) {
+  await expect(page.locator('#home.show')).toBeVisible();
+  const activities = page.locator('#home .home-primary-actions button');
+  await expect(activities).toHaveCount(6);
+  for (const activity of await activities.all()) {
+    await expect(activity).toBeVisible();
+    await expect(activity).toBeEnabled();
+  }
+  await expect(page.locator('#parentNav')).toBeVisible();
+  await expect(page.locator('#parentNav')).toBeEnabled();
+  if (page.viewportSize().width <= 900) await expect(page.locator('#childDock')).toBeVisible();
+  else await expect(page.locator('#childDock')).toBeHidden();
+}
 
 async function unlockViaGate(page) {
   await page.locator('#parentPinInput').fill('654321');
@@ -54,7 +69,7 @@ async function parentDestination(page, name) {
 
 async function leaveParentArea(page) {
   await page.getByRole('button', { name: 'Back to kid hub' }).click();
-  await expect(page.locator('#childDock')).toBeVisible();
+  await expectChildHome(page);
 }
 
 async function openLab(page) {
@@ -65,7 +80,9 @@ async function openLab(page) {
 }
 
 async function openWorld(page, name) {
-  await page.locator('#childDock button[data-screen="worlds"]').click();
+  const homeWorlds=page.locator('#home .adventure-destinations button[data-screen="worlds"]');
+  if(await homeWorlds.isVisible())await homeWorlds.click();
+  else await page.locator('#childDock button[data-screen="worlds"]').click();
   await page.getByRole('button', { name, exact: true }).click();
 }
 
@@ -117,8 +134,9 @@ test('boots without runtime errors and separates the child hub from parent tools
   await page.reload();
   await unlockParent(page);
   await leaveParentArea(page);
-  await expect(page.getByRole('heading', { name: 'BrainBite' })).toBeVisible();
-  // Child hub: six primary tiles plus three utility controls, and one five-target dock.
+  await expect(page.locator('#homeProfileName')).toHaveText('Kid 1');
+  await expect(page.locator('#continueBtn')).toBeVisible();
+  // Child hub: six primary activities, three utilities, and one dock retained for phones.
   const hub = page.locator('#home .home-primary-actions');
   for (const name of ['Continue Adventure','Practice Lab','Worlds','BrainBase','My Bites','Code']) {
     await expect(hub.getByRole('button', { name, exact: true })).toBeVisible();
@@ -155,7 +173,7 @@ test('child hub drops placeholder cards, debug badges, and duplicated docks', as
   await expect(page.locator('#parentShellNav')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Back to kid hub' })).toBeVisible();
   await page.getByRole('button', { name: 'Back to kid hub' }).click();
-  await expect(page.locator('#childDock')).toBeVisible();
+  await expectChildHome(page);
   await expect(page.locator('#parentShellNav')).toBeHidden();
 });
 
@@ -182,8 +200,7 @@ test('launch policy pages are linked and clearly labeled', async ({ page }) => {
 test('all 30 missions and all 3 bosses launch and complete through progression', async ({ page }) => {
   test.setTimeout(90_000);
   for (const [world, first, last] of [['Number Nebula',1,10],['Wordwood',11,20],['Spanish Portal',21,30]]) {
-    await page.locator('#childDock button[data-screen="worlds"]').click();
-    await page.getByRole('button', { name: world, exact: true }).click();
+    await openWorld(page,world);
     const list = page.locator(`#${first === 1 ? 'math' : first === 11 ? 'words' : 'spanish'}List`);
     await expect(list.locator('.mission-row')).toHaveCount(10);
     for (let id = first; id <= last; id++) {
@@ -406,6 +423,19 @@ test('cloud profile merge preserves independent LearningCore skills, rewards, an
   expect(result.hub.variant).toBe('upgraded');
 });
 
+test('profile merge keeps every completed mission rating while currency remains max-merged', async ({ page }) => {
+  const merged = await page.evaluate(() => {
+    const base = { id: 'profile-ratings', name: 'Kid', score: 40, stars: 3, spark: 3, updatedAt: 100 };
+    const local = { ...base, progression: { ...REGISTRY.createProgression(), completedMissionIds: [1, 11] }, missionStars: { 1: 2, 2: 3, 11: 3 } };
+    const remote = { ...base, score: 50, stars: 2, spark: 4, progression: { ...REGISTRY.createProgression(), completedMissionIds: [1, 21] }, missionStars: { 1: 3, 21: 1 }, updatedAt: 200 };
+    const result = mergeProfiles(local, remote);
+    return { completed: result.progression.completedMissionIds, missionStars: result.missionStars, score: result.score, stars: result.stars, spark: result.spark };
+  });
+  expect(merged.completed).toEqual([1, 11, 21]);
+  expect(merged.missionStars).toEqual({ 1: 3, 11: 3, 21: 1 });
+  expect(merged).toMatchObject({ score: 50, stars: 3, spark: 4 });
+});
+
 test('locked missions cannot launch or grant progression rewards', async ({ page }) => {
   const result = await page.evaluate(() => {
     const before = { stars: P().stars, spark: P().spark, lastMissionId: progression().lastMissionId };
@@ -502,6 +532,8 @@ test('legacy secrets are scrubbed and every external boundary omits forbidden au
   const result = await page.evaluate(async () => {
     const forbiddenKeys = new Set(['parentPin','parentAuth','pinHash','pinSalt','password','idToken','refreshToken','accessToken']);
     const legacy = structuredClone(STORE);
+    // Model a pre-ledger save: modern balances are projected from currency receipts.
+    delete legacy.profiles[0].currencyLedger;
     legacy.profiles[0].score = 321;
     legacy.profiles[0].parentPin = 'legacy-pin-value';
     legacy.profiles[0].learningCore = { ...(legacy.profiles[0].learningCore || {}), password: 'legacy-password-value' };
@@ -594,7 +626,7 @@ test('Phase 2.4 retires Snap from production while preserving only local recover
   for (const privateValue of ['PRIVATE_LOCAL_WORKSHEET_TEXT','PRIVATE_LOCAL_WORKSHEET_IMAGE','PRIVATE_UNEXPECTED_TEXT','PRIVATE_UNEXPECTED_IMAGE','PRIVATE_VERIFIER','PRIVATE_TOKEN','PRIVATE_REMOTE_WORKSHEET_TEXT','PRIVATE_REMOTE_WORKSHEET_IMAGE','PRIVATE_REMOTE_TOP_LEVEL']) {
     expect(result.cloudText).not.toContain(privateValue);
   }
-  expect(result.cloudKeys).toEqual(['activeProgrammableBitId','bestCombo','bite','bubbleReefRewards','codeBridgeLessons','codeLabProjects','controls','cosmetics','equippedCosmetic','id','learningCore','mastery','mistakes','name','practice','programmableBitLessons','programmableBits','progression','score','sessions','settings','skills','snap','spark','stars','unlockedBites','updatedAt']);
+  expect(result.cloudKeys).toEqual(['activeProgrammableBitId','bestCombo','bite','bubbleReefRewards','codeBridgeLessons','codeLabProjects','controls','cosmetics','currencyLedger','equippedCosmetic','id','learningCore','mastery','mistakes','name','practice','programmableBitLessons','programmableBits','progression','score','sessions','settings','skills','snap','spark','stars','unlockedBites','updatedAt']);
   expect(result.integrations).toEqual({ cloud: { provider: 'none', url: '', key: '' } });
 });
 test('Phase 2.4 nested cloud projections reject adversarial child data while valid progress round-trips', async ({ page }) => {
@@ -674,7 +706,7 @@ test('parent authorization is revoked when the active child profile changes', as
   await parentDestination(page, 'Profiles');
   await page.locator('#newProfile').fill('Different Child');
   await page.getByRole('button', { name: 'Add Profile' }).click();
-  await expect(page.locator('#childDock')).toBeVisible();
+  await expectChildHome(page);
   await page.getByRole('button', { name: 'Parents', exact: true }).click();
   await expect(page.locator('#parentGate')).toBeVisible();
   await expect(page.locator('#parentContent')).toBeHidden();
@@ -1136,6 +1168,60 @@ for (const lockMode of ['web-locks', 'indexed-db', 'local-storage']) {
   });
 }
 
+test('SecurityError opening IndexedDB falls back to the exclusive localStorage lease', async ({ browser }) => {
+  const context = await browser.newContext();
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, 'locks', { value: undefined, configurable: true });
+    Object.defineProperty(globalThis, 'indexedDB', { value: { open() { throw new DOMException('IndexedDB denied', 'SecurityError'); } }, configurable: true });
+  });
+  const page = await context.newPage();
+  await page.goto('/?match=0&webgl=0');
+  const result = await page.evaluate(async () => {
+    await PERSISTENCE_CHAIN;
+    P().name = 'Lease fallback kid';
+    await save();
+    return { memory: P().name, primary: JSON.parse(localStorage.getItem(KEY)).profiles[0].name, error: globalThis.__BRAINBITE_PERSISTENCE_ERROR__ || null };
+  });
+  expect(result).toEqual({ memory: 'Lease fallback kid', primary: 'Lease fallback kid', error: null });
+  await context.close();
+});
+
+test('boot tolerates SecurityError from every localStorage read', async ({ browser }) => {
+  const context = await browser.newContext();
+  await context.addInitScript(() => {
+    Storage.prototype.getItem = function deniedStorageRead() { throw new DOMException('Storage read denied', 'SecurityError'); };
+  });
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/?match=0&webgl=0');
+  await page.waitForFunction(() => typeof window.BrainBiteGame === 'object' && typeof window.BrainBiteTimeUsage === 'object');
+  await expectChildHome(page);
+  expect(errors).toEqual([]);
+  await context.close();
+});
+
+test('boot requests persistent storage when available and does not depend on the API', async ({ browser }) => {
+  const available = await browser.newContext();
+  await available.addInitScript(() => {
+    globalThis.__persistCalls = 0;
+    Object.defineProperty(navigator, 'storage', { value: { persist() { globalThis.__persistCalls += 1; return Promise.reject(new DOMException('Grant denied', 'NotAllowedError')); } }, configurable: true });
+  });
+  const availablePage = await available.newPage();
+  await availablePage.goto('/?match=0&webgl=0');
+  await availablePage.waitForFunction(() => globalThis.__persistCalls === 1 && typeof window.BrainBiteGame === 'object');
+  expect(await availablePage.evaluate(() => globalThis.__persistCalls)).toBe(1);
+  await available.close();
+
+  const unavailable = await browser.newContext();
+  await unavailable.addInitScript(() => { Object.defineProperty(navigator, 'storage', { value: undefined, configurable: true }); });
+  const unavailablePage = await unavailable.newPage();
+  await unavailablePage.goto('/?match=0&webgl=0');
+  await unavailablePage.waitForFunction(() => typeof window.BrainBiteGame === 'object');
+  await expectChildHome(unavailablePage);
+  await unavailable.close();
+});
+
 test('localStorage fallback keeps tombstones and queue IDs while defeating a stale tab', async ({ browser }) => {
   const context = await browser.newContext();
   await context.addInitScript(() => {
@@ -1428,7 +1514,7 @@ test('autosave rotates distinct generations and explicit restore replaces a newe
   expect(restored).toEqual({ memory: 'Generation One', primary: 'Generation One', backup: 'Generation One' });
 });
 
-test('storage quota failure is visible and keeps the current session available', async ({ page }) => {
+test('storage quota failure stays visible across renders until a durable save succeeds', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const originalSetItem = Storage.prototype.setItem;
     Storage.prototype.setItem = function setItemWithQuotaFailure(key, value) {
@@ -1440,20 +1526,26 @@ test('storage quota failure is visible and keeps the current session available',
     try {
       P().name = 'Unsaved Session Kid';
       await save();
-      return {
+      render();
+      const refused = {
         memoryName: P().name,
         error: globalThis.__BRAINBITE_PERSISTENCE_ERROR__,
         status: document.getElementById('saveHealth').textContent,
       };
+      Storage.prototype.setItem = originalSetItem;
+      await save();
+      render();
+      return { refused, recoveredStatus: document.getElementById('saveHealth').textContent };
     } finally {
       Storage.prototype.setItem = originalSetItem;
     }
   });
 
-  expect(result.memoryName).toBe('Unsaved Session Kid');
-  expect(result.error).toMatchObject({ name: 'QuotaExceededError' });
-  expect(result.status).toContain('Save failed: device storage is full');
-  expect(result.status).toContain('current session is still open');
+  expect(result.refused.memoryName).toBe('Unsaved Session Kid');
+  expect(result.refused.error).toMatchObject({ name: 'QuotaExceededError' });
+  expect(result.refused.status).toContain('Save failed: device storage is full');
+  expect(result.refused.status).toContain('current session is still open');
+  expect(result.recoveredStatus).toContain('Save healthy');
 });
 
 test('duplicate sync events are rejected even when separated by other queued events', async ({ page }) => {
@@ -1712,7 +1804,8 @@ test('PWA manifest, service worker, cache boundary, and offline reload work', as
     // A cached heading alone does not prove the JavaScript runtime booted.
     await page.waitForFunction(() => typeof window.BrainBiteGame?.getState === 'function');
     await expect(page.locator('#home.show')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'BrainBite' })).toBeVisible();
+    await expect(page.locator('#homeProfileName')).toHaveText('Kid 1');
+  await expect(page.locator('#continueBtn')).toBeVisible();
     expect(errors).toEqual([]);
   } finally {
     await context.setOffline(false);
@@ -1788,6 +1881,56 @@ test('Phase 3.2 altered generated payloads cannot borrow a reviewed template ide
   await expect(page.locator('#game')).not.toHaveClass(/show/);
 });
 
+test('production Practice Lab distinguishes pending educator review from quarantined content', async ({ page }) => {
+  await page.goto('/?presentation=dom&release=1');
+  await page.waitForFunction(() => !!window.BrainBiteCore && !!window.BrainBiteGame);
+  await page.getByRole('button', { name: 'Practice Lab', exact: true }).click();
+  await page.locator('#practiceSubject').selectOption('reading');
+  const before = await page.evaluate(() => ({ mastery: structuredClone(P().learningCore.skills), score: P().score, stars: P().stars, progression: structuredClone(progression()) }));
+  await page.getByRole('button', { name: 'Build Practice', exact: true }).click();
+  await expect(page.locator('#practiceResult')).toContainText('awaiting educator review');
+  await expect(page.locator('#practiceResult')).not.toContainText('quarantined');
+  await expect(page.locator('#guidedPractice, #independentPractice')).toHaveCount(0);
+  const pending = await page.evaluate(async () => {
+    await PERSISTENCE_CHAIN;
+    const item = P().learningCore.practice.at(-1);
+    const record = CONTENT_CONTROL.getReviewRecord(item.contentIdentity.split('@sha256:')[0]);
+    return { item, status: record.educatorReview.status, eligible: CONTENT_CONTROL.evaluateRecord(record, { mode: 'production', core: core() }).eligible, mastery: structuredClone(P().learningCore.skills), score: P().score, stars: P().stars, progression: structuredClone(progression()) };
+  });
+  expect(pending.item).toMatchObject({ subject: 'reading', validated: false, quarantined: false, manifestStatus: 'pending-educator', gateMode: 'production' });
+  expect(pending.status).toBe('pending-educator');
+  expect(pending.eligible).toBe(false);
+  expect({ mastery: pending.mastery, score: pending.score, stars: pending.stars, progression: pending.progression }).toEqual(before);
+
+  await page.evaluate(() => {
+    const item = P().learningCore.practice.at(-1);
+    P().learningCore.contentQuarantine[item.contentIdentity] = { quarantinedAt: Date.now(), signals: ['corroborated-content-check'] };
+    // Rebuild the same deterministic first item so its real launch gate sees the quarantine.
+    P().learningCore.practice = [];
+    projectLearningCore(P(), P().learningCore);
+  });
+  await page.getByRole('button', { name: 'Build Practice', exact: true }).click();
+  await expect(page.locator('#practiceResult')).toContainText('quarantined after a content check');
+  await expect(page.locator('#practiceResult')).not.toContainText('awaiting educator review');
+  await expect(page.locator('#guidedPractice, #independentPractice')).toHaveCount(0);
+  expect(await page.evaluate(() => P().learningCore.practice.at(-1))).toMatchObject({ validated: false, quarantined: true, gateMode: 'production' });
+  await expect(page.locator('#game')).not.toHaveClass(/show/);
+});
+
+test('home mission goal reports progress without inventing a star bonus', async ({ page }) => {
+  for (const completed of [[], [1], [1, 2, 3, 4], [1, 2, 3, 4, 5]]) {
+    const world = await page.evaluate(ids => {
+      P().progression = REGISTRY.normalizeProgression({ ...REGISTRY.createProgression(), completedMissionIds: ids });
+      render();
+      return REGISTRY.getWorld('math').name;
+    }, completed);
+    const remaining = 5 - completed.length % 5;
+    await expect(page.locator('#homeGoalText')).toHaveText(`${remaining} more mission${remaining === 1 ? '' : 's'} in ${world} to complete this goal.`);
+    await expect(page.locator('#homeGoalReward')).toHaveText('');
+    await expect(page.locator('#home .goal-reward')).toBeHidden();
+  }
+});
+
 test('production mode allows canonical registry missions but fails closed for generated prototypes', async ({ page }) => {
   await page.goto('/?match=0&webgl=0&contentMode=production');
   await page.waitForFunction(() => !!window.BrainBiteContentControl && !!window.BrainBiteGame && !!window.BrainBiteCore);
@@ -1812,7 +1955,10 @@ test('production mode allows canonical registry missions but fails closed for ge
 });
 
 test('non-localhost production host launches and completes a canonical registry mission', async ({ page }) => {
-  await page.goto('http://brainbite.localhost:4318/?match=0&webgl=0');
+  const productionURL = new URL(test.info().project.use.baseURL);
+  productionURL.hostname = 'brainbite.localhost';
+  productionURL.search = '?match=0&webgl=0';
+  await page.goto(productionURL.href);
   await page.waitForFunction(() => !!window.BrainBiteGame && !!window.BrainBiteContentControl);
   const result = await page.evaluate(async () => {
     const mode = window.BrainBiteGame.getContentControl().mode;
@@ -2238,12 +2384,64 @@ test('Phase 3.1 Practice Lab locked missions complete as non-progression practic
   expect(afterFailedRetry.practiceRetry).toBe(true);
 });
 
+test('home XP and next-level reward agree at level boundaries and the former 500 XP boundary', async ({ page }) => {
+  const cases = [
+    { score: 0, level: 1, current: 0, remaining: 300, percent: 0 },
+    { score: 299, level: 1, current: 299, remaining: 1, percent: 100 },
+    { score: 300, level: 2, current: 0, remaining: 300, percent: 0 },
+    { score: 499, level: 2, current: 199, remaining: 101, percent: 66 },
+    { score: 500, level: 2, current: 200, remaining: 100, percent: 67 },
+    { score: 599, level: 2, current: 299, remaining: 1, percent: 100 },
+    { score: 600, level: 3, current: 0, remaining: 300, percent: 0 },
+  ];
+  for (const boundary of cases) {
+    const state = await page.evaluate(score => {
+      delete P().currencyLedger;
+      P().score = score;
+      Object.assign(P(), core().projectProfileCurrency(P()));
+      render();
+      return { level: profileLevel(), xp: profileXp(), reward: nextRewardState() };
+    }, boundary.score);
+    expect(state).toEqual({ level: boundary.level, xp: { current: boundary.current, max: 300, percent: boundary.percent }, reward: { remaining: boundary.remaining, percent: boundary.percent } });
+    await expect(page.locator('#homeLevel')).toHaveText(`Level ${boundary.level}`);
+    await expect(page.locator('#homeXpText')).toHaveText(`${boundary.current} / 300 XP`);
+    await expect(page.locator('#homeRewardTitle')).toHaveText(`Gain ${boundary.remaining} more XP`);
+    expect(await page.locator('#homeXpBar').evaluate(element => element.style.width)).toBe(`${boundary.percent}%`);
+    expect(await page.locator('#homeRewardBar').evaluate(element => element.style.width)).toBe(`${boundary.percent}%`);
+  }
+});
+
+test('mission-earned XP crosses the displayed level threshold and survives reload', async ({ page }) => {
+  const earned = await page.evaluate(async () => {
+    delete P().currencyLedger;
+    P().score = 299;
+    await save();
+    const started = window.BrainBiteGame.startMission(1);
+    if (!started) throw new Error('Expected the first registry mission to launch');
+    const correct = String(G.cells.find(cell => !cell.eaten && cell.correct).value);
+    const accepted = window.BrainBiteGame.tryAnswer(correct);
+    await save();
+    show('home');
+    return { accepted, score: P().score };
+  });
+  expect(earned.accepted).toBe(true);
+  expect(earned.score).toBe(399);
+  await expect(page.locator('#homeLevel')).toHaveText('Level 2');
+  await expect(page.locator('#homeXpText')).toHaveText('99 / 300 XP');
+  await expect(page.locator('#homeRewardTitle')).toHaveText('Gain 201 more XP');
+  await page.reload();
+  await expect(page.locator('#homeLevel')).toHaveText('Level 2');
+  await expect(page.locator('#homeXpText')).toHaveText('99 / 300 XP');
+  await expect(page.locator('#homeRewardTitle')).toHaveText('Gain 201 more XP');
+});
+
 test('P1 non-progression practice never awards progression currency, including retries', async ({ page }) => {
   await page.clock.install();
   await page.waitForFunction(() => !!window.BrainBiteCore && !!window.BrainBiteGame);
 
   const baseline = await page.evaluate(() => {
     const profile = P();
+    delete profile.currencyLedger;
     profile.score = 299;
     profile.stars = 2;
     profile.spark = 4;
@@ -2340,6 +2538,7 @@ test('P1 Foundation imports never resurrect tombstoned profiles', async ({ page 
     const existing = store.profiles[0];
     const tombstonedId = 'p1-foundation-tombstoned';
     const cachedValidId = 'p1-foundation-cached-valid';
+    delete existing.currencyLedger;
     existing.score = 17;
     existing.stars = 2;
     existing.spark = 5;
