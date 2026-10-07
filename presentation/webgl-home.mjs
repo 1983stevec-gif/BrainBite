@@ -1,16 +1,19 @@
 import * as THREE from '../vendor/three/three.module.js';
-import { makeMascot, makeTreeGrove, makeRock, makeWorldSign, disposeObject } from './props.mjs';
+import { makeMascot, makeTreeGrove, makeRock, makeWorldSign, disposeObject, polishAuthoredAsset } from './props.mjs';
 import { shouldReduceMotion } from './capability.mjs';
 import { loadGltfAsset, disposeGltfAsset } from './gltf-assets.mjs';
-import { addJungleBanks, makeWaterMaterial, fitSceneCamera, makeBiteHouse, makeSkyDome } from './jungle-environment.mjs';
+import { addJungleBanks, makeWaterMaterial, fitSceneCamera, makeBiteHouse, makeSkyDome, addJungleDepth, addWaterContact, makeNaturalRockGeometry } from './jungle-environment.mjs';
 import { createCharacterAnimation } from './character-animation.mjs';
 import { createQualityController } from './graphics-quality.mjs';
-import { makeTerrainMaterial, makePortalEnergyMaterial } from './surface-textures.mjs';
+import { makeTerrainMaterial, makePortalEnergyMaterial, makeStoneMaterial, makePlazaMaterial, makeWaterfallMaterial } from './surface-textures.mjs';
 import { createPerformanceBudget } from './performance-budget.mjs';
 
 // How long to wait for the browser to restore a lost WebGL context before falling back
 // to the DOM presentation. Long enough for a driver reset, short enough to stay snappy.
 const CONTEXT_RESTORE_WINDOW_MS = 1500;
+const homeFraming = aspect => aspect >= 1
+  ? { span: 8.8, height: 2.75, target: [-1.1, 1.25, 0], distance: 6.4 }
+  : { span: 10.8, height: 4.6, target: [0, 1.25, 0], distance: 11.5 };
 import { createProgrammableBit } from './programmable-bit.mjs';
 import { createWorldProfileDecor, getWorldProfile } from './world-profiles.mjs';
 import { createBubbleReefKit } from './bubble-reef-kit.mjs';
@@ -33,7 +36,7 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
   renderer.setSize(width, height);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.14;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.domElement.className = 'webgl-canvas';
@@ -42,16 +45,17 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(worldProfile.palette.sky);
-  scene.fog = new THREE.Fog(worldProfile.palette.fog, 15, 34);
-  scene.add(makeSkyDome({ top: 0x8fcff5, horizon: worldProfile.palette.fog }));
+  scene.fog = new THREE.Fog(0x83b6b3, 18, 52);
+  scene.add(makeSkyDome({ top: 0x62b9e7, horizon: 0xd9eacf }));
+  if (worldProfile.id === 'jungle-circuit') addJungleDepth(scene);
 
   const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 120);
-  fitSceneCamera(camera, width / height, { span: 10.8, height: 4.6, target: [0, 1.25, 0], distance: 11.5 });
+  fitSceneCamera(camera, width / height, homeFraming(width / height));
   addJungleBanks(scene);
 
-  scene.add(new THREE.HemisphereLight(0xd7f4ed, 0x344831, 1.05));
-  const sun = new THREE.DirectionalLight(worldProfile.lighting.key, 2.05);
-  sun.position.set(-5, 9, 6);
+  scene.add(new THREE.HemisphereLight(0xc4eaf5, 0x31452d, 1.25));
+  const sun = new THREE.DirectionalLight(0xffdb98, 2.45);
+  sun.position.set(-4, 8, 5);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
   Object.assign(sun.shadow.camera, { left: -9, right: 9, top: 8, bottom: -8, near: 0.5, far: 28 });
@@ -59,9 +63,12 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
   sun.shadow.bias = -0.0003;
   sun.shadow.normalBias = 0.035;
   scene.add(sun);
-  const fill = new THREE.DirectionalLight(worldProfile.lighting.fill, 0.35);
-  fill.position.set(-6, 4, -3);
+  const fill = new THREE.DirectionalLight(0x94d8f8, 0.7);
+  fill.position.set(4, 5, -4);
   scene.add(fill);
+  const faceFill = new THREE.DirectionalLight(0xfff1d2, 0.4);
+  faceFill.position.set(1, 3, 7);
+  scene.add(faceFill);
 
   // Terrain bowl
   const ground = new THREE.Mesh(
@@ -71,6 +78,11 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
+  const plaza = new THREE.Mesh(new THREE.CircleGeometry(4.9, 64), makePlazaMaterial());
+  plaza.rotation.x = -Math.PI / 2;
+  plaza.position.set(0, 0.015, 0.3);
+  plaza.receiveShadow = true;
+  scene.add(plaza);
 
   const water = new THREE.Mesh(
     new THREE.CircleGeometry(3.7, 48),
@@ -79,6 +91,7 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
   water.rotation.x = -Math.PI / 2;
   water.position.set(0.4, 0.03, -3.2);
   scene.add(water);
+  addWaterContact(scene, [[-4, -4.5], [4, -4.5], [1.6, -2.5]]);
   const bubbleReefKit = worldProfile.id === 'bubble-reef' ? createBubbleReefKit() : null;
   const bubbleReefRouteKit = worldProfile.id === 'bubble-reef' ? createBubbleReefRouteSceneKit() : null;
   const bubbleReefContribution = worldProfile.id === 'bubble-reef' ? createBubbleReefBaseContribution() : null;
@@ -98,14 +111,14 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
   // Stone stage
   const stage = new THREE.Mesh(
     new THREE.CylinderGeometry(1.65, 1.85, 0.42, 36),
-    new THREE.MeshStandardMaterial({ color: 0xb8a879, roughness: 0.88 })
+    makeStoneMaterial({ color: 0xd9c992, repeat: 2 })
   );
   stage.position.y = 0.22;
   stage.castShadow = true;
   stage.receiveShadow = true;
   const stageRim = new THREE.Mesh(
     new THREE.TorusGeometry(1.72, 0.08, 10, 48),
-    new THREE.MeshStandardMaterial({ color: 0x7d8578, roughness: 0.85 })
+    new THREE.MeshStandardMaterial({ color: 0xaaa57b, roughness: 0.85 })
   );
   stageRim.rotation.x = Math.PI / 2;
   stageRim.position.y = 0.42;
@@ -114,8 +127,8 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
   // Shared stepping stones connect the foreground water to the two destinations.
   const pathGeometry = new THREE.CylinderGeometry(0.46, 0.5, 0.16, 7);
   const pathMaterials = [
-    new THREE.MeshStandardMaterial({ color: 0xc7b995, roughness: 0.96 }),
-    new THREE.MeshStandardMaterial({ color: 0xa99e82, roughness: 0.96 }),
+    makeStoneMaterial({ color: 0xd9c99a }),
+    makeStoneMaterial({ color: 0xbcb388 }),
   ];
   const path = [
     [-0.25, 4.5], [0.08, 3.7], [-0.16, 2.9], [0.06, 2.1],
@@ -245,6 +258,9 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
   portal.position.set(...portalPosition);
   portal.scale.setScalar(portalScale);
   scene.add(portal);
+  const portalGlow = new THREE.PointLight(0x57dbff, 2.6, 4.2, 1.4);
+  portalGlow.position.set(portalPosition[0], 1.35, portalPosition[2] + 0.6);
+  scene.add(portalGlow);
   const portalSign = makeWorldSign('PLAY PORTAL');
   portalSign.scale.set(1.85, 0.46, 1);
   portalSign.position.set(portalPosition[0], 2.7, -0.25);
@@ -277,29 +293,23 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
   host.appendChild(portalButton);
 
   // Ruins / cliff backdrop
-  const cliffMat = new THREE.MeshStandardMaterial({ color: 0x7a8574, roughness: 0.95 });
+  const cliffMat = new THREE.MeshStandardMaterial({ color: 0xc3d3cd, vertexColors: true, roughness: 0.96 });
+  const cliffGeometry = makeNaturalRockGeometry();
   for (const [x, z, w, h, d] of [
     [-7.5, -4.5, 3.2, 3.8, 2.2],
     [7.2, -4.2, 3.0, 3.4, 2.0],
     [0.5, -6.5, 8.5, 2.6, 2.4],
   ]) {
-    const cliff = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 1), cliffMat);
+    const cliff = new THREE.Mesh(cliffGeometry, cliffMat);
     cliff.scale.set(w * 0.6, h * 0.65, d);
     cliff.position.set(x, h / 2 - 0.1, z);
     scene.add(cliff);
   }
 
-  // Waterfalls (simple planes)
-  const fallMat = new THREE.MeshStandardMaterial({
-    color: 0xbfefff,
-    transparent: true,
-    opacity: 0.72,
-    roughness: 0.2,
-    metalness: 0.1,
-  });
-  for (const x of [-2.2, 2.4]) {
-    const fall = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 2.4), fallMat);
-    fall.position.set(x, 1.5, -5.2);
+  const fallMat = makeWaterfallMaterial();
+  for (const x of [-4.0, 4.0]) {
+    const fall = new THREE.Mesh(new THREE.PlaneGeometry(1.25, 3.4), fallMat);
+    fall.position.set(x, 1.9, -4.75);
     scene.add(fall);
   }
 
@@ -349,6 +359,8 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
   let frameCount = 0;
   let characterAnimation = null;
   let portalEnergyMaterial = null;
+  const gltfRoots = new Set();
+  const assetVisualDisposers = [];
   let pendingAssetLoads = 0;
   let sceneReadyRecorded = false;
   let frameTimingActive = false;
@@ -360,6 +372,8 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
     if (reducedMotion) renderFrame();
   });
   classObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+  const onSurfaceReady = () => { if (reducedMotion) renderFrame(); };
+  window.addEventListener('bb:surface-ready', onSurfaceReady);
 
   function installAsset(asset, fallback, options, onInstall) {
     pendingAssetLoads += 1;
@@ -374,7 +388,9 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
         return;
       }
       if (fallback) fallback.visible = false;
+      gltfRoots.add(root);
       scene.add(root);
+      assetVisualDisposers.push(polishAuthoredAsset(root));
       onInstall?.(root);
       host.dispatchEvent(new CustomEvent('bb:webgl-asset-loaded', { detail: { asset } }));
       if (reducedMotion) renderFrame();
@@ -386,6 +402,11 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
       console.warn(`[BrainBite] ${asset} GLB unavailable; keeping procedural fallback.`, error.message);
     }).finally(() => {
       pendingAssetLoads -= 1;
+      recordSceneReady();
+    });
+  }
+
+  function recordSceneReady() {
       if (!sceneReadyRecorded && pendingAssetLoads === 0) {
         sceneReadyRecorded = true;
         frameTimingActive = true;
@@ -394,7 +415,6 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
         performanceBudget.sampleRenderer();
         performanceBudget.recordSceneLoad(Math.max(0, performanceClock.now() - sceneStartedAt));
       }
-    });
   }
 
   installAsset('mascot', mascotFallback, {
@@ -435,11 +455,17 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
     if (disposed || contextLost) return;
     const w = Math.max(host.clientWidth || width, 1);
     const h = Math.max(host.clientHeight || height, 1);
-    fitSceneCamera(camera, w / h, { span: 10.8, height: 4.6, target: [0, 1.25, 0], distance: 11.5 });
+    fitSceneCamera(camera, w / h, homeFraming(w / h));
     renderer.setSize(w, h);
     const anchor = new THREE.Vector3(portalPosition[0], 0.5, portalPosition[2] + 0.6).project(camera);
-    portalButton.style.left = `${(anchor.x + 1) * w / 2}px`;
-    portalButton.style.top = `${(1 - anchor.y) * h / 2}px`;
+    // Narrow hero panels can put the portal near an edge. Keep its accessible
+    // button fully inside the panel while preserving the projected scene anchor.
+    const halfWidth = portalButton.offsetWidth / 2;
+    const halfHeight = portalButton.offsetHeight / 2;
+    const x = Math.max(halfWidth + 8, Math.min(w - halfWidth - 8, (anchor.x + 1) * w / 2));
+    const y = Math.max(halfHeight + 8, Math.min(h - halfHeight - 8, (1 - anchor.y) * h / 2));
+    portalButton.style.left = `${x}px`;
+    portalButton.style.top = `${y}px`;
     if (reducedMotion) renderFrame();
   };
   window.addEventListener('resize', onResize);
@@ -498,6 +524,7 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
   function renderFrame() {
     if (disposed || contextLost || renderer.getContext().isContextLost()) return;
     renderer.render(scene, camera);
+    recordSceneReady();
   }
 
   function frame() {
@@ -508,6 +535,7 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
     frameCount += 1;
     const t = reducedMotion ? 0 : clock.getElapsedTime();
     if (portalEnergyMaterial) portalEnergyMaterial.uniforms.time.value = t;
+    fallMat.uniforms.time.value = t;
     characterAnimation?.update(t, reducedMotion);
     programmableBit.update(t, reducedMotion);
     bubbleReefKit?.update(t, reducedMotion);
@@ -548,14 +576,20 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
       bubbleReefRouteKit?.dispose();
       bubbleReefContribution?.dispose();
       window.removeEventListener('bb:bit-event', onBitEvent);
-      scene.traverse(child => { child.userData.originalEnergyMaterial?.dispose(); });
       window.removeEventListener('resize', onResize);
       motionQuery.removeEventListener('change', onMotionChange);
       classObserver.disconnect();
+      window.removeEventListener('bb:surface-ready', onSurfaceReady);
       resizeObserver.disconnect();
       renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
       renderer.domElement.removeEventListener('webglcontextrestored', handleContextRestored);
       clearTimeout(restoreTimer);
+      // GLTF clones share their geometry, original materials, textures, and skeleton data
+      // with the parse cache. Detach them before disposing resources owned by this scene.
+      for (const root of gltfRoots) disposeGltfAsset(root);
+      assetVisualDisposers.forEach(dispose => dispose());
+      gltfRoots.clear();
+      portalEnergyMaterial?.dispose();
       disposeObject(scene);
       sun.shadow.dispose();
       renderer.dispose();

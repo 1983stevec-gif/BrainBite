@@ -7,16 +7,11 @@ external gates, and rollback.
 This document is the honest state of the closed-beta candidate. It separates what is
 verified locally from what is not, and it does not claim external gates.
 
-The current implementation is on `mobile/runtime-readiness` in [PR #2](https://github.com/1983stevec-gif/BrainBite/pull/2),
-open and mergeable to `main`. Latest fully tested gameplay commit
-`3ebcf35d8bc7ea18d7c69b64b9015cdedd7201e6` includes runtime/evidence baseline
-`a6786aaa04ec09d1ffdda2420ffff30a59b07e4b` and
-browser-readiness commit `2cf4de6367d7d9cc90fb8549ef687013b5809331`. GitHub Actions runs
-[36316190009](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316190009) and
-[36316192782](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316192782) each
-passed all validators, native package verification, 236 unit tests, 211 browser tests with
-zero retries, 11/11 smoke checks, the clean-tree guard, and the Firestore emulator job. Steve
-owns the merge under decision D6.
+The PR #2 implementation and its CI/native results are historical evidence, not current
+verification. The current local audit, including the final digest-gate acceptance fix,
+passes the focused content-review checks and the integrated unit, browser, and smoke gates
+listed below. No remote CI, native, device, educator, or external certification is claimed.
+Steve owns the eventual merge under decision D6.
 
 ## 1. Runtime package
 
@@ -61,30 +56,32 @@ npm run native:build               # produces the installer under src-tauri/targ
 
 The installer is unsigned and is an internal closed-beta artifact.
 
-## 2. Verified locally
+## 2. Historical and current local evidence
 
-| Area | Evidence |
-|---|---|
-| Unit tests | `236/236` on Windows with the locked install |
-| Browser suite | Latest CI runs 43 and 44: **211 passed with zero retries**. These runs include the landscape rotation prompt and direct 3D pointer-to-answer regression. Earlier Windows certification recorded two retry-only attempts; group reruns passed `tests/release.spec.js` `92/92` and BrainBase/MATCH `14/14`; latest reload-sensitive rerun passed `2/2` |
-| Smoke checks | `11/11` via local certification, evidence in `release-evidence/smoke-report.json` |
-| Repository validators | content, content-review, static (10 checks), runtime, release, Firebase, launch, final, Firebase security, native package, and release evidence — all PASS |
-| Performance budgets (headless-judgeable) | 0 headless budget violations; 26 device-only measurements remain unverified |
-| Offline | service worker precaches 90 assets; offline reload, offline 3D reopen, and PWA installability pass on Chrome and Edge |
-| Profile isolation | unit and browser coverage, plus the cross-tab reconciliation tests in all three lock modes |
-| Native runtime | Fresh `npm run native:build`; `npm run native:verify:runtime` opened BrainBite and its child processes with zero TCP listeners |
-| Content safety | production mode fails closed; 30 reviewed registry missions ship; 75 records remain quarantined or non-production |
-| Accessibility | axe: zero serious/critical violations across 21 primary screens plus the live battle HUD |
+| Area | Source | Evidence |
+|---|---|---|
+| Current focused content-review tests | `node --test tests/content-review.test.mjs` | **25/25** |
+| Current content-review validator | `npm run check:content-review` | **PASS**, 105 records, 0 digest mismatches |
+| Current integrated unit run | `npm run test:unit` | **267/267**, zero failed/skipped |
+| Current browser suite | Local audit run | **220/220, zero retries** |
+| Current smoke checks | Local audit run | **11/11**, including Chrome+Edge Windows matrix |
+| Historical repository validators | Prior Cycle 2 audit | content, content-review, static (10 checks), runtime, release, Firebase, launch, final, Firebase security, native package, and release evidence — all PASS |
+| Historical performance budgets | Prior Cycle 2 audit | 0 headless budget violations; device-only measurements remain unverified |
+| Offline | Static inventory and historical browser checks | 94 precached URLs; offline reload, offline 3D reopen, and PWA installability are historical Chrome/Edge results |
+| Profile isolation | Prior unit and browser coverage | Cross-tab reconciliation tests in all three lock modes |
+| Historical native runtime | Prior PR #2 local record | Fresh `npm run native:build`; `npm run native:verify:runtime` opened BrainBite and its child processes with zero TCP listeners |
+| Content safety | Current manifest and gate contract | Production mode fails closed; 30 registry missions are production-eligible; 75 records remain quarantined or non-production |
+| Historical automated accessibility | Prior PR #2 local record | axe: zero serious/critical violations across 21 primary screens plus the live battle HUD |
 
 ## 3. Evidence inventory
 
 | Artifact | Produced by | Status |
 |---|---|---|
-| `release-evidence/smoke-report.json` | `npm run smoke` | Current: 11/11 passed |
-| `release-evidence/package-manifest.json` | `npm run package:manifest` | Current: 100 files, verified by `check:stage` |
-| `release-evidence/content-review-packet.{json,html}` | `npm run review:packet` | Current: 75 pending records, 0 digest mismatches |
-| `test-results/performance-evidence/{desktop,mobile}.json` | `npm run probe:performance` | Current: zero headless budget violations |
-| `release-evidence/local-certification.json` | `npm run certify:local` | Current: **17/17 stages**, 210 browser cases (2 passed on retry), 11/11 smokes, probe exit 0 with zero headless budget violations. The report was captured on `36887b9` with the final stylesheet/evidence changes in the worktree and records that initial tree as dirty; those changes are committed in `a6786aa`. No-retry follow-ups passed `tests/release.spec.js` 92/92 and BrainBase/MATCH 14/14 |
+| `release-evidence/smoke-report.json` | `npm run smoke` | Current local audit: 11/11 passed; report remains git-ignored unless deliberately promoted |
+| `release-evidence/package-manifest.json` | `npm run package:manifest` | Prior package check: 100 files, verified by `check:stage` |
+| `release-evidence/content-review-packet.{json,html}` | `npm run review:packet` | Prior packet: 75 pending records, 0 digest mismatches |
+| `test-results/performance-evidence/{desktop,mobile}.json` | `npm run probe:performance` | Prior Cycle 2 audit: zero headless budget violations |
+| `release-evidence/local-certification.json` | `npm run certify:local` | Historical: **17/17 stages**, 210 browser cases (2 passed on retry), 11/11 smokes, probe exit 0 with zero headless budget violations. The report was captured on `36887b9` with the final stylesheet/evidence changes in the worktree and records that initial tree as dirty; those changes are committed in `a6786aa`. No-retry follow-ups passed `tests/release.spec.js` 92/92 and BrainBase/MATCH 14/14 |
 
 ## 4. Defect ledger
 
@@ -185,7 +182,7 @@ Windows-only blind spots:
 | `check:static` failed on six package manifest digests (app.js, index.html, boot.mjs, capability.mjs, service-worker.js, three.module.js) | The manifest hashed raw working-copy bytes; the Windows copy had mixed CRLF/LF endings while CI checked out LF | `.gitattributes` normalizes text to LF in the repository and every checkout; text hashing is line-ending independent and binaries are still hashed byte for byte |
 | `smoke-pwa-installability` failed 10/11 | It hardcoded `D:/Codex/Brainbite` as the repository root, so every manifest icon lookup failed on Linux | The root is derived from the module location; `check:host-paths` joined `check:static` to prevent a recurrence |
 
-The fully tested gameplay commit `3ebcf35d8bc7ea18d7c69b64b9015cdedd7201e6` is green: [CI run 43](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316190009) and [CI run 44](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316192782) each passed all validators, native package verification, 236 unit tests, 211 browser tests with zero retries, 11/11 smoke checks, the clean-tree guard, and the Firestore emulator job. The 3D pointer regression is exercised in the full suite. Runs 41/42 exposed two test races: the local-storage tab check read rotating snapshots before persistence reconciliation, and the Classic Practice Lab test deduplicated repeated correct cells. Both were fixed; runs 43/44 pass without retries.
+Historical PR #2 evidence for fully tested gameplay commit `3ebcf35d8bc7ea18d7c69b64b9015cdedd7201e6` is recorded in [CI run 43](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316190009) and [CI run 44](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316192782): each passed all validators, native package verification, 236 unit tests, 211 browser tests with zero retries, 11/11 smoke checks, the clean-tree guard, and the Firestore emulator job. This is not current Cycle 2 verification. The 3D pointer regression was exercised in that historical suite. Runs 41/42 exposed two test races: the local-storage tab check read rotating snapshots before persistence reconciliation, and the Classic Practice Lab test deduplicated repeated correct cells. Both were fixed before runs 43/44.
 
 ### Open, non-blocking
 

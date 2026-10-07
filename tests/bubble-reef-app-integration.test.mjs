@@ -2,7 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import { projectProfileCurrency, recordCurrencyPreview } from '../brainbite-core.mjs';
 import { createRequire } from 'node:module';
+import { chromium } from '@playwright/test';
+import { createBrainBiteServer } from '../scripts/serve.mjs';
 import {
   BUBBLE_REEF_BASE_CONTRIBUTION,
   createBubbleReefRewardState,
@@ -55,6 +58,7 @@ function normalize(value) {
 function createGrantHarness(profiles) {
   const context = vm.createContext({
     fixtureStore: { profiles },
+    currencyCore: { projectProfileCurrency, recordCurrencyPreview },
     rewards: {
       BUBBLE_REEF_BASE_CONTRIBUTION,
       createBubbleReefRewardState,
@@ -65,6 +69,7 @@ function createGrantHarness(profiles) {
   });
   vm.runInContext(`
     const STORE = fixtureStore;
+    const core = () => currencyCore;
     const bubbleReefRewards = async () => rewards;
     const persistCanonicalState = async options => persistenceCalls.push(structuredClone(options));
     ${extractFunction('grantBubbleReefPreviewReward')}
@@ -164,4 +169,90 @@ test('app reward merge cannot import another profile reward payload', () => {
   assert.deepEqual(isolated, normalize(profileAState));
   assert.equal(isolated.profileId, 'profile-a');
   assert.equal(isolated.rewards[0].awardedAt, 100);
+});
+
+test('Bubble Reef preview completion grants and persists the active profile reward through the shipping trigger', { timeout: 120_000 }, async () => {
+  const port = Number(process.env.BRAINBITE_TEST_PORT || 4318);
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const server = await createBrainBiteServer({ port });
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto(`${baseUrl}/?presentation=webgl&contentMode=internal-review&bubble-reward-bust=${Date.now()}`);
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    await page.waitForFunction(() => typeof window.BrainBiteWorldPreview?.setProfile === 'function');
+
+    const fixture = await page.evaluate(async () => {
+      const active = P();
+      active.name = 'Reef Kid';
+      active.stars = 0;
+      active.spark = 0;
+      let progression = BrainBiteRegistry.createProgression();
+      for (let missionId = 1; missionId < 8; missionId += 1) {
+        progression = BrainBiteRegistry.completeMission(progression, missionId);
+      }
+      active.progression = BrainBiteRegistry.normalizeProgression({ ...progression, lastMissionId: 8 });
+      active.updatedAt = Date.now();
+
+      const other = blank('Other Kid');
+      other.stars = 11;
+      other.spark = 13;
+      other.updatedAt = active.updatedAt;
+      STORE.profiles = [active, other];
+      STORE.active = 0;
+      await persistCanonicalState({ renderAfter: true });
+      await PERSISTENCE_CHAIN;
+      return { activeId: active.id, otherId: other.id };
+    });
+
+    await page.locator('#home .home-primary-actions button[data-screen="brainbase"]').click();
+    await page.locator('.bb-world-gateway-card summary').click();
+    await page.locator('#bubbleReefLivePreviewBtn').click();
+    await page.waitForFunction(() => window.BrainBiteWorldPreview?.getProfile?.() === 'bubble-reef');
+    await page.getByRole('button', { name: /enter the 3d play portal/i }).click();
+    await page.locator('#game.show').waitFor({ state: 'visible' });
+    await page.waitForFunction(() => window.BrainBiteGame?.getState?.()?.m?.id === 8);
+
+    for (const answer of ['1/2', '2/4', '3/6', '4/8', '5/10']) {
+      await page.locator(`.webgl-answer-controls button[data-value="${answer}"]`).click();
+      await page.waitForTimeout(750);
+    }
+    await page.waitForFunction(activeId => {
+      const store = JSON.parse(localStorage.getItem('bb-core-v3'));
+      const profile = store.profiles.find(candidate => candidate.id === activeId);
+      return profile?.bubbleReefRewards?.rewards?.length === 1;
+    }, fixture.activeId);
+
+    await page.reload();
+    await page.waitForFunction(() => Boolean(window.BrainBiteGame?.getState));
+    const persisted = await page.evaluate(({ activeId, otherId }) => {
+      const store = JSON.parse(localStorage.getItem('bb-core-v3'));
+      return {
+        activeProfileId: store.profiles[store.active].id,
+        active: store.profiles.find(profile => profile.id === activeId),
+        other: store.profiles.find(profile => profile.id === otherId),
+      };
+    }, fixture);
+
+    assert.equal(persisted.activeProfileId, fixture.activeId);
+    assert.equal(persisted.active.stars, 3);
+    assert.equal(persisted.active.spark, 3);
+    assert.ok(persisted.active.progression.completedMissionIds.includes(8));
+    assert.equal(persisted.active.bubbleReefRewards.profileId, fixture.activeId);
+    assert.equal(persisted.active.bubbleReefRewards.contributions.length, 1);
+    assert.equal(persisted.active.bubbleReefRewards.rewards.length, 1);
+    assert.equal(persisted.other.stars, 11);
+    assert.equal(persisted.other.spark, 13);
+    assert.equal(persisted.other.bubbleReefRewards, null);
+    await context.close();
+  } finally {
+    await browser?.close();
+    await new Promise(resolve => {
+      server.close(resolve);
+      server.closeAllConnections?.();
+    });
+  }
 });

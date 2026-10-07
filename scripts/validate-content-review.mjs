@@ -50,6 +50,12 @@ function isObject(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
+function isPlainObject(value) {
+  if (!isObject(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
 function sameValue(left, right) {
   return canonicalize(left) === canonicalize(right);
 }
@@ -64,14 +70,15 @@ function addExpected(expected, approvals, findings, { identity, kind, source, pr
   const finding = findings?.[identity] || null;
   const allReasons = finding ? [...quarantineReasons, `reviewer-rejected: ${finding.reason}`] : quarantineReasons;
   const productionRegistry = kind === 'registry-mission' && allReasons.length === 0;
-  const approved = allReasons.length === 0 && Boolean(approvals[identity]);
+  const sourceDigest = digest(value);
+  const approved = allReasons.length === 0 && approvals[identity]?.reviewedDigest === sourceDigest;
   const productionEligible = productionRegistry || approved;
   expected.push({
     identity,
     kind,
     source,
     provenance,
-    digest: digest(value),
+    digest: sourceDigest,
     evidence,
     taxonomy,
     quarantineStatus: allReasons.length ? 'quarantined' : 'clear',
@@ -253,14 +260,16 @@ function validateRecord(record, expected, errors, approvals = {}) {
   }
   if (!sameValue(record.verification?.evidence, expected.evidence)) errors.push(`${expected.identity}: verification evidence mismatch`);
   if (!sameValue(record.taxonomy, expected.taxonomy)) errors.push(`${expected.identity}: taxonomy linkage mismatch`);
-  // An approval is only valid while the reviewed source is unchanged: the digest check
-  // above already fails a stale approval, and this block enforces the reviewer contract.
+  // Bind the approval to the reviewed snapshot as well as the current source. Regenerating
+  // a row's digest must not silently carry an older educator approval onto new content.
   const approval = approvals[record.identity] || null;
   if (approval) {
+    if (approval.reviewedDigest !== record.digest?.value) errors.push(`${expected.identity}: approval reviewedDigest does not match record digest`);
     if (record.quarantine?.status === 'quarantined') errors.push(`${expected.identity}: a quarantined record can never be educator-approved`);
     if (record.educatorReview?.status !== 'approved') errors.push(`${expected.identity}: approval data exists but educator review is not approved`);
     if (!sameValue(record.educatorReview?.reviewer, approval.reviewer)) errors.push(`${expected.identity}: approval reviewer metadata mismatch`);
     if (record.educatorReview?.reviewedAt !== approval.reviewedAt) errors.push(`${expected.identity}: approval timestamp mismatch`);
+    if (record.educatorReview?.reviewedDigest !== approval.reviewedDigest) errors.push(`${expected.identity}: approval reviewedDigest metadata mismatch`);
     if (record.runtime?.production !== true || record.runtime?.prototype !== false) errors.push(`${expected.identity}: an approved record must be promoted to production`);
     if (record.promotion?.status !== 'production-reviewed') errors.push(`${expected.identity}: an approved record must be promoted to production-reviewed`);
   } else if (expected.reviewStatus === 'rejected') {
@@ -284,11 +293,45 @@ function validateRecord(record, expected, errors, approvals = {}) {
   if (record.promotion?.status !== expected.promotionStatus) errors.push(`${expected.identity}: promotion status mismatch`);
 }
 
+// Validate every review entry, including orphan entries that record validation cannot see.
+// Preserve malformed values in the normalized map so diagnostics never discard review data.
+function validateReviewMap(value, name, errors) {
+  if (!isPlainObject(value)) {
+    errors.push(`manifest: ${name} must be an object map with Object.prototype or null prototype`);
+    return Object.create(null);
+  }
+  // Keep every own entry in the returned map, even when its value is malformed. The
+  // subsequent identity pass must report orphaned/bad entries rather than silently losing
+  // them while normalizing the map.
+  const entries = Object.create(null);
+  for (const [identity, review] of Object.entries(value)) {
+    entries[identity] = review;
+    if (!isPlainObject(review)) {
+      errors.push(`${identity}: ${name} entry must be an object`);
+      continue;
+    }
+    if (!isPlainObject(review.reviewer) || !nonEmpty(review.reviewer.id) || !nonEmpty(review.reviewer.role)) {
+      errors.push(`${identity}: review requires a non-empty reviewer id and role`);
+    }
+    const timestamp = name === 'approvals' ? review.reviewedAt : review.rejectedAt;
+    if (!nonEmpty(timestamp) || !Number.isFinite(Date.parse(timestamp))) {
+      errors.push(`${identity}: review requires a valid timestamp`);
+    }
+    if (name === 'approvals' && (typeof review.reviewedDigest !== 'string' || !/^[0-9a-f]{64}$/.test(review.reviewedDigest))) {
+      errors.push(`${identity}: approval requires a SHA-256 reviewedDigest`);
+    }
+    if (name === 'reviewerFindings' && !nonEmpty(review.reason)) {
+      errors.push(`${identity}: rejection requires a non-empty reason`);
+    }
+  }
+  return entries;
+}
+
 function validateContentReview({ manifest = null } = {}) {
   const errors = [];
   const sourceManifest = manifest || reviewManifest.getReviewManifest();
-  const approvals = sourceManifest?.approvals && typeof sourceManifest.approvals === 'object' ? sourceManifest.approvals : {};
-  const findings = sourceManifest?.reviewerFindings && typeof sourceManifest.reviewerFindings === 'object' ? sourceManifest.reviewerFindings : {};
+  const approvals = validateReviewMap(sourceManifest?.approvals, 'approvals', errors);
+  const findings = validateReviewMap(sourceManifest?.reviewerFindings, 'reviewerFindings', errors);
   const expected = expectedSources(errors, approvals, findings);
   const records = Array.isArray(sourceManifest?.records) ? sourceManifest.records : [];
   const expectedByIdentity = new Map();
@@ -307,6 +350,11 @@ function validateContentReview({ manifest = null } = {}) {
   for (const item of expected) {
     if (expectedByIdentity.has(item.identity)) errors.push(`source inventory: duplicate expected identity ${item.identity}`);
     expectedByIdentity.set(item.identity, item);
+  }
+  for (const [name, reviewMap] of [['approvals', approvals], ['reviewerFindings', findings]]) {
+    for (const identity of Object.keys(reviewMap)) {
+      if (!expectedByIdentity.has(identity)) errors.push(`manifest: ${name} contains unknown identity ${identity}`);
+    }
   }
   for (const record of records) {
     if (!isObject(record) || !nonEmpty(record.identity)) {
@@ -330,8 +378,9 @@ function validateContentReview({ manifest = null } = {}) {
     registryMissions: expected.filter(item => item.kind === 'registry-mission').length,
     generatedTemplates: expected.filter(item => item.kind === 'generated-template').length,
     jsonPackItems: expected.filter(item => item.kind === 'json-pack-item').length,
-    linkedJsonPackItems: expected.filter(item => item.kind === 'json-pack-item' && item.quarantineStatus === 'clear').length,
-    quarantinedJsonPackItems: expected.filter(item => item.kind === 'json-pack-item' && item.quarantineStatus === 'quarantined').length,
+    // Coverage describes source linkage, not the independent reviewer quarantine state.
+    linkedJsonPackItems: expected.filter(item => item.kind === 'json-pack-item' && item.taxonomy?.linkage === 'linked').length,
+    quarantinedJsonPackItems: expected.filter(item => item.kind === 'json-pack-item' && item.taxonomy?.linkage !== 'linked').length,
     totalRecords: expected.length,
   };
   if (summary.registryMissions !== 30) errors.push(`source inventory: expected 30 registry missions, found ${summary.registryMissions}`);
@@ -352,8 +401,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   } else {
     console.log('OK content/content-review-manifest.js');
     console.log(`Validated ${result.summary.totalRecords} records: ${result.summary.registryMissions} missions, ${result.summary.generatedTemplates} generated templates, ${result.summary.jsonPackItems} JSON pack items.`);
-    console.log(`JSON pack control state: linked=${result.summary.linkedJsonPackItems} non-production, quarantined=${result.summary.quarantinedJsonPackItems}.`);
+    console.log(`JSON pack source linkage: linked=${result.summary.linkedJsonPackItems}, quarantined=${result.summary.quarantinedJsonPackItems}.`);
   }
 }
 
-export { canonicalize, digest, validateContentReview };
+export { canonicalize, digest, isPlainObject, validateContentReview };

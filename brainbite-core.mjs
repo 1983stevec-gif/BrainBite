@@ -12,7 +12,157 @@ if (!EXPERIENCE_REGISTRY?.validateRegistry().valid) throw new Error('BrainBite e
 const MASTERY_STATES = ['Unknown', 'Introduced', 'Practicing', 'Developing', 'Strong', 'Mastered'];
 
 const ACTIVITY_FAMILIES = EXPERIENCE_REGISTRY.activityFamilies;
+// Currency receipts stay separate from independent/assisted mastery evidence.
+const CURRENCY_WRITER_LIMIT = 1024;
+const CURRENCY_PACKED_LIMIT = 131072;
+const CURRENCY_MAX = 1_000_000_000;
+const CURRENCY_PURCHASES = Object.freeze({ space_trail: 6, book_glasses: 12, rainbow_cape: 20, boss_crown: 36 });
+// Version 1 permanently maps receipt positions to mission IDs 1 through 30.
+const CURRENCY_MISSIONS = Array.from({ length: 30 }, (_, index) => index + 1);
+if (EXPERIENCE_REGISTRY.missions.length !== 30 || !CURRENCY_MISSIONS.every(id => EXPERIENCE_REGISTRY.getMission(id)))
+  throw new Error('Currency mission schema changed; an explicit ledger-version migration is required.');
+class CurrencyUpgradeRequiredError extends Error {
+  constructor() {
+    super('Currency history needs an updated save. Update every device before syncing and keep an export of the older progress.');
+    this.name = 'CurrencyUpgradeRequiredError';
+  }
+}
+function currencyObject(value) { return !!value && typeof value === 'object' && !Array.isArray(value); }
+function currencyInteger(value, max = CURRENCY_MAX) { return Number.isSafeInteger(value) && value >= 0 && value <= max; }
+function currencyProfileId(value) { return typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value); }
 
+function currencyWriters(packed) {
+  if (typeof packed !== 'string' || packed.length > CURRENCY_PACKED_LIMIT) throw new Error('Invalid currency writer receipts.');
+  let writers;
+  try { writers = JSON.parse(packed); } catch { throw new Error('Invalid currency writer receipts.'); }
+  if (!currencyObject(writers) || Object.keys(writers).length > CURRENCY_WRITER_LIMIT) throw new Error('Currency writer receipt limit exceeded.');
+  for (const [id, writer] of Object.entries(writers)) {
+    if (!currencyProfileId(id) || !currencyObject(writer) || Object.keys(writer).sort().join(',') !== 'sequence,total'
+      || !currencyInteger(writer.sequence, Number.MAX_SAFE_INTEGER) || !writer.sequence || !currencyInteger(writer.total))
+      throw new Error('Invalid currency writer receipt.');
+  }
+  return writers;
+}
+function packCurrencyWriters(writers) {
+  const packed = JSON.stringify(Object.fromEntries(Object.keys(writers).sort().map(id => [id, writers[id]])));
+  currencyWriters(packed);
+  return packed;
+}
+function normalizeProfileCurrency(profile) {
+  if (!currencyProfileId(profile?.id)) throw new Error('Currency requires a safe learner profile ID.');
+  const stored = profile.currencyLedger;
+  if (stored === undefined) {
+    const legacy = {};
+    for (const key of ['score', 'stars', 'spark']) {
+      const amount = Number(profile[key] || 0);
+      if (!currencyInteger(amount)) throw new Error('Invalid legacy currency balance.');
+      legacy[key] = amount;
+    }
+    const completed = new Set(EXPERIENCE_REGISTRY.normalizeProgression(profile).completedMissionIds);
+    const cosmetics = new Set(Array.isArray(profile.cosmetics) ? profile.cosmetics : []);
+    const preview = profile.bubbleReefRewards?.profileId === profile.id
+      && profile.bubbleReefRewards?.rewards?.some(reward => reward.id === 'bubble-reef-base-current-restored:bubble-reef-current-cache');
+    return { version: 1, profileId: profile.id, legacy,
+      missions: CURRENCY_MISSIONS.map(id => completed.has(id) ? 'l' : '0').join(''), preview: preview ? 'l' : '0',
+      purchases: Object.keys(CURRENCY_PURCHASES).map(id => cosmetics.has(id) ? 'l' : '0').join(''), writers: '{}' };
+  }
+  if (!currencyObject(stored) || Object.keys(stored).sort().join(',') !== 'legacy,missions,preview,profileId,purchases,version,writers'
+    || stored.version !== 1 || stored.profileId !== profile.id || !currencyObject(stored.legacy)
+    || Object.keys(stored.legacy).sort().join(',') !== 'score,spark,stars'
+    || !['score', 'stars', 'spark'].every(key => currencyInteger(stored.legacy[key]))
+    || typeof stored.missions !== 'string' || stored.missions.length !== CURRENCY_MISSIONS.length || /[^0le]/.test(stored.missions)
+    || !['0', 'l', 'e'].includes(stored.preview) || typeof stored.purchases !== 'string' || !/^[0le]{4}$/.test(stored.purchases))
+    throw new Error('Invalid or cross-profile currency ledger.');
+  const ledger = structuredClone(stored);
+  ledger.writers = packCurrencyWriters(currencyWriters(stored.writers));
+  currencyBalances(ledger);
+  return ledger;
+}
+function currencyBalances(ledger) {
+  let score = ledger.legacy.score, stars = ledger.legacy.stars, spark = ledger.legacy.spark;
+  for (const writer of Object.values(currencyWriters(ledger.writers))) score += writer.total;
+  CURRENCY_MISSIONS.forEach((id, index) => {
+    if (ledger.missions[index] === 'e') { stars += 3; spark += EXPERIENCE_REGISTRY.getMission(id).boss ? 10 : 3; }
+  });
+  if (ledger.preview === 'e') { stars += 3; spark += 3; }
+  Object.values(CURRENCY_PURCHASES).forEach((cost, index) => { if (ledger.purchases[index] === 'e') spark -= cost; });
+  if (!currencyInteger(score) || !currencyInteger(stars) || !Number.isSafeInteger(spark) || spark > CURRENCY_MAX)
+    throw new Error('Currency balance limit exceeded.');
+  // Concurrent purchases retain debt: future earnings pay it before becoming spendable.
+  return { score, stars, spark: Math.max(0, spark) };
+}
+function projectProfileCurrency(profile, ledger = normalizeProfileCurrency(profile)) {
+  const checked = normalizeProfileCurrency({ ...profile, currencyLedger: ledger });
+  return { ...profile, currencyLedger: checked, ...currencyBalances(checked) };
+}
+function currencyHasReceipts(ledger) {
+  return ledger.writers !== '{}' || ledger.missions.includes('e') || ledger.preview === 'e' || ledger.purchases.includes('e');
+}
+function currencyStaleBaseline(stale, current) {
+  return !currencyHasReceipts(stale) && ['score', 'stars', 'spark'].every(key => stale.legacy[key] <= current.legacy[key])
+    && [...stale.missions].every((state, index) => state === '0' || current.missions[index] === 'l')
+    && [...stale.purchases].every((state, index) => state === '0' || current.purchases[index] === 'l')
+    && (stale.preview === '0' || current.preview === 'l');
+}
+function mergeProfileCurrency(left, right, { cloud = false } = {}) {
+  if (left?.id !== right?.id) throw new Error('Cannot merge currency across learner profiles.');
+  const a = normalizeProfileCurrency(left), b = normalizeProfileCurrency(right);
+  const mixed = (left.currencyLedger === undefined) !== (right.currencyLedger === undefined);
+  const stale = left.currencyLedger === undefined ? a : b, tracked = left.currencyLedger === undefined ? b : a;
+  const exactCloudBaseline = ['score', 'stars', 'spark'].every(key => stale.legacy[key] === tracked.legacy[key])
+    && stale.missions === tracked.missions.replaceAll('e', '0')
+    && stale.purchases === tracked.purchases.replaceAll('e', '0') && stale.preview === (tracked.preview === 'e' ? '0' : tracked.preview);
+  if (mixed && (cloud ? !exactCloudBaseline : currencyHasReceipts(tracked) && !currencyStaleBaseline(stale, tracked)))
+    throw new CurrencyUpgradeRequiredError();
+  const sameBaseline = ['score', 'stars', 'spark'].every(key => a.legacy[key] === b.legacy[key]);
+  if (!sameBaseline && (currencyHasReceipts(a) || currencyHasReceipts(b)) && !currencyStaleBaseline(a, b) && !currencyStaleBaseline(b, a))
+    throw new CurrencyUpgradeRequiredError();
+  const mergeState = (x, y) => x === 'l' || y === 'l' ? 'l' : x === 'e' || y === 'e' ? 'e' : '0';
+  const writers = currencyWriters(a.writers);
+  for (const [id, incoming] of Object.entries(currencyWriters(b.writers))) {
+    const existing = Object.hasOwn(writers, id) ? writers[id] : null;
+    if (existing && (existing.sequence === incoming.sequence && existing.total !== incoming.total
+      || existing.sequence < incoming.sequence && existing.total > incoming.total
+      || existing.sequence > incoming.sequence && existing.total < incoming.total)) throw new Error('Conflicting currency writer receipts.');
+    if (!existing || incoming.sequence > existing.sequence) writers[id] = incoming;
+  }
+  return projectProfileCurrency(left, { version: 1, profileId: left.id,
+    legacy: Object.fromEntries(['score', 'stars', 'spark'].map(key => [key, Math.max(a.legacy[key], b.legacy[key])])),
+    missions: [...a.missions].map((state, index) => mergeState(state, b.missions[index])).join(''),
+    preview: mergeState(a.preview, b.preview), purchases: [...a.purchases].map((state, index) => mergeState(state, b.purchases[index])).join(''),
+    writers: packCurrencyWriters(writers) });
+}
+function recordCurrencyScore(profile, { originId, originSequence, points } = {}) {
+  if (!currencyProfileId(originId) || !currencyInteger(originSequence, Number.MAX_SAFE_INTEGER) || !originSequence
+    || !currencyInteger(points) || !points) throw new Error('Invalid currency score receipt.');
+  const ledger = normalizeProfileCurrency(profile), writers = currencyWriters(ledger.writers);
+  const prior = Object.hasOwn(writers, originId) ? writers[originId] : null;
+  if (prior && originSequence <= prior.sequence) return projectProfileCurrency(profile, ledger);
+  writers[originId] = { sequence: originSequence, total: (prior?.total || 0) + points };
+  ledger.writers = packCurrencyWriters(writers);
+  return projectProfileCurrency(profile, ledger);
+}
+function recordCurrencyMission(profile, missionId) {
+  const index = CURRENCY_MISSIONS.indexOf(missionId);
+  if (index < 0) throw new Error('Unknown currency mission.');
+  const ledger = normalizeProfileCurrency(profile);
+  if (ledger.missions[index] === '0') ledger.missions = ledger.missions.slice(0, index) + 'e' + ledger.missions.slice(index + 1);
+  return projectProfileCurrency(profile, ledger);
+}
+function recordCurrencyPreview(profile, { canonicalRewardGranted = false } = {}) {
+  const ledger = normalizeProfileCurrency(profile);
+  if (ledger.preview === '0') ledger.preview = canonicalRewardGranted ? 'l' : 'e';
+  return projectProfileCurrency(profile, ledger);
+}
+function recordCurrencyPurchase(profile, cosmeticId) {
+  const index = Object.keys(CURRENCY_PURCHASES).indexOf(cosmeticId);
+  if (index < 0) throw new Error('Unknown currency purchase.');
+  const ledger = normalizeProfileCurrency(profile);
+  if (ledger.purchases[index] !== '0') return projectProfileCurrency(profile, ledger);
+  if (currencyBalances(ledger).spark < CURRENCY_PURCHASES[cosmeticId]) throw new Error('Not enough Spark yet.');
+  ledger.purchases = ledger.purchases.slice(0, index) + 'e' + ledger.purchases.slice(index + 1);
+  return projectProfileCurrency(profile, ledger);
+}
 const DEFAULT_WORLD_DEFINITIONS = EXPERIENCE_REGISTRY.verticalSlice.worldDefinitions;
 const DEFAULT_ACTIVITY_DEFINITIONS = EXPERIENCE_REGISTRY.verticalSlice.activityDefinitions;
 const DEFAULT_BOSS_DEFINITIONS = EXPERIENCE_REGISTRY.verticalSlice.bossDefinitions;
@@ -1174,6 +1324,16 @@ function createSkillState(skillId, definition = {}) {
   };
 }
 
+const EVIDENCE_KEYS = Object.freeze([
+  'attempts',
+  'independentSuccesses',
+  'assistedSuccesses',
+  'hintsUsed',
+  'incorrectAttempts',
+  'rapidAttempts',
+  'responseTimeMsTotal',
+]);
+
 function masteryStateFor(score, confidence, evidence) {
   if (score >= 85 && confidence >= 0.72 && evidence.independentSuccesses >= 2 && evidence.incorrectAttempts <= 1) return 'Mastered';
   if (score >= 65) return 'Strong';
@@ -1195,9 +1355,16 @@ function normalizeSkillState(skillState, definition = {}) {
     missing: Array.isArray(skillState.prerequisiteState?.missing) ? clone(skillState.prerequisiteState.missing) : [...base.prerequisiteState.missing],
   };
   out.rewardIds = Array.isArray(skillState.rewardIds) ? clone(skillState.rewardIds) : [];
-  out.masteryScore = clamp(Number(out.masteryScore) || 0, 0, 100);
-  out.confidence = clamp(Number(out.confidence) || 0, 0, 1);
-  out.masteryState = MASTERY_STATES.includes(out.masteryState) ? out.masteryState : masteryStateFor(out.masteryScore, out.confidence, out.evidence);
+  const hasEvidence = EVIDENCE_KEYS.some(key => (Number(out.evidence[key]) || 0) > 0);
+  // Pre-evidence saves only recorded the scalar. Keep that real legacy progress,
+  // but make any available evidence authoritative so forged scalars cannot win.
+  out.masteryScore = hasEvidence
+    ? Math.round(computeMasteryScore(out))
+    : clamp(Number(skillState.masteryScore) || 0, 0, 100);
+  out.confidence = hasEvidence
+    ? computeConfidence(out.evidence)
+    : out.masteryScore > 0 ? clamp(out.masteryScore / 200, 0, 0.4) : computeConfidence(out.evidence);
+  out.masteryState = masteryStateFor(out.masteryScore, out.confidence, out.evidence);
   out.evidenceProvenance = evidenceProvenanceFor(skillState);
   return out;
 }
@@ -1221,16 +1388,6 @@ function computeMasteryScore(skillState) {
   const responseBonus = evidence.attempts ? clamp(evidence.responseTimeMsTotal / evidence.attempts, 0, 15000) < 3500 ? 4 : 0 : 0;
   return clamp(correctWeight - penaltyWeight + responseBonus, 0, 100);
 }
-
-const EVIDENCE_KEYS = Object.freeze([
-  'attempts',
-  'independentSuccesses',
-  'assistedSuccesses',
-  'hintsUsed',
-  'incorrectAttempts',
-  'rapidAttempts',
-  'responseTimeMsTotal',
-]);
 
 // Metadata-free callers stay bounded here; exact divergent merges require distinct stable origins and sequences.
 const LOCAL_UNSCOPED_EVIDENCE_SOURCE = 'local-unscoped';
@@ -1454,6 +1611,20 @@ function mergeRecords(first, second, limit) {
   return [...unique.values()].sort((a, b) => (Number(a.at) || 0) - (Number(b.at) || 0)).slice(-limit);
 }
 
+function reviewScheduleCandidate(skillState) {
+  const nextReviewAt = Number(skillState?.nextReviewAt);
+  if (!Number.isFinite(nextReviewAt) || nextReviewAt <= 0) return null;
+  const evidenceDates = [
+    skillState?.lastPracticedAt,
+    ...(skillState?.recentPerformance || []).map(record => record?.at),
+    ...(skillState?.reviewHistory || []).map(record => record?.at),
+  ].map(Number).filter(value => Number.isFinite(value) && value > 0);
+  return {
+    evidenceAt: evidenceDates.length ? Math.max(...evidenceDates) : 0,
+    nextReviewAt,
+  };
+}
+
 function evidenceProvenanceFor(skillState) {
   const total = evidenceVector(skillState.evidence);
   const stored = skillState.evidenceProvenance;
@@ -1542,25 +1713,19 @@ function scoreAttempt(attempt = {}, skillState = createSkillState('skill')) {
     if (independent) {
       next.evidence.independentSuccesses += 1;
       next.lastIndependentSuccessAt = next.lastPracticedAt;
-      next.masteryScore += 18;
     } else {
       next.evidence.assistedSuccesses += 1;
-      next.masteryScore += 9;
     }
     if (hintsUsed) next.evidence.hintsUsed += hintsUsed;
     if (rapid) next.evidence.rapidAttempts += 1;
   } else {
     next.evidence.incorrectAttempts += 1;
-    next.masteryScore -= assisted ? 4 : 8;
     if (rapid) next.evidence.rapidAttempts += 1;
   }
 
-  if (hintsUsed) next.masteryScore -= hintsUsed * 1.2;
-  if (attempt.prerequisiteMissing) next.masteryScore -= 3;
-  if (attempt.randomLike) next.masteryScore -= 4;
   if (attempt.repeatedPattern) next.evidence.rapidAttempts += 1;
 
-  next.masteryScore = clamp(Math.round(next.masteryScore), 0, 100);
+  next.masteryScore = Math.round(computeMasteryScore(next));
   next.confidence = computeConfidence(next.evidence);
   next.masteryState = masteryStateFor(next.masteryScore, next.confidence, next.evidence);
   next.prerequisiteState = {
@@ -1619,26 +1784,17 @@ function mergeSkillStates(leftValue, rightValue, { preferRight = false } = {}) {
   merged.reviewHistory = mergeRecords(left.reviewHistory, right.reviewHistory, 32);
   merged.lastPracticedAt = Math.max(Number(left.lastPracticedAt) || 0, Number(right.lastPracticedAt) || 0) || null;
   merged.lastIndependentSuccessAt = Math.max(Number(left.lastIndependentSuccessAt) || 0, Number(right.lastIndependentSuccessAt) || 0) || null;
-  const reviewDates = [left.nextReviewAt, right.nextReviewAt].map(Number).filter(value => value > 0);
-  merged.nextReviewAt = reviewDates.length ? Math.min(...reviewDates) : null;
+  const latestSchedule = [other, preferred]
+    .map(reviewScheduleCandidate)
+    .filter(Boolean)
+    .reduce((latest, candidate) => !latest || candidate.evidenceAt >= latest.evidenceAt ? candidate : latest, null);
+  merged.nextReviewAt = latestSchedule?.nextReviewAt ?? null;
   merged.remediationLevel = Math.max(Number(left.remediationLevel) || 0, Number(right.remediationLevel) || 0);
   merged.rewardIds = [...new Set([...(left.rewardIds || []), ...(right.rewardIds || [])])];
   merged.prerequisiteState = {
     met: [...new Set([...(left.prerequisiteState?.met || []), ...(right.prerequisiteState?.met || [])])],
     missing: [...new Set([...(left.prerequisiteState?.missing || []), ...(right.prerequisiteState?.missing || [])])],
   };
-  const importedMasteryFloor = Math.max(left.legacyImported ? left.masteryScore : 0, right.legacyImported ? right.masteryScore : 0);
-  // The incremental scorer (scoreAttempt) and the evidence formula
-  // (computeMasteryScore) are tuned differently on purpose, so recomputing on
-  // every merge would nudge a score even when the merge added no evidence.
-  // When one side already holds exactly the merged evidence, its score stands;
-  // only a merge that genuinely combines new evidence recomputes.
-  const sameEvidence = (a, b) => EVIDENCE_KEYS.every(key => Number(a?.evidence?.[key]) === Number(b?.evidence?.[key]));
-  if (merged.evidence.attempts > 0 && sameEvidence(merged, right) && !right.legacyImported) merged.masteryScore = right.masteryScore;
-  else if (merged.evidence.attempts > 0 && sameEvidence(merged, left) && !left.legacyImported) merged.masteryScore = left.masteryScore;
-  else merged.masteryScore = merged.evidence.attempts > 0 ? Math.round(computeMasteryScore(merged)) : importedMasteryFloor;
-  merged.confidence = computeConfidence(merged.evidence);
-  merged.masteryState = masteryStateFor(merged.masteryScore, merged.confidence, merged.evidence);
   return normalizeSkillState(merged);
 }
 
@@ -2489,7 +2645,16 @@ function replayOfflineQueue(learner, transport) {
   const remaining = [];
   for (const event of next.offlineQueue) {
     if (next.sentEventIds.includes(event.id)) continue;
-    const accepted = transport ? !!transport(clone(event)) : true;
+    let accepted = true;
+    if (transport) {
+      try {
+        accepted = !!transport(clone(event));
+      } catch {
+        // A transient transport failure must leave this event queued. Continue so
+        // an independent later event can still be delivered in the same replay.
+        accepted = false;
+      }
+    }
     if (accepted) {
       next.sentEventIds.push(event.id);
       sent.push(event.id);
@@ -3004,12 +3169,12 @@ function createActivityForStage(stage, learner, foundation) {
 }
 
 function activityMarkup(stage, activity, learner) {
-  const stageLabelText = stageLabel(stage);
+  const stageLabelText = escapeHtml(stageLabel(stage));
   if (stage === 'secret-reward') {
     return `
       <div class="bbf-activity-card">
         <h4>${stageLabelText}</h4>
-        <p>${activity.prompt}</p>
+        <p>${escapeHtml(activity.prompt)}</p>
         <button data-reward-open>Open chest</button>
         <p class="bbf-feedback">${activity.open ? 'Chest opened.' : 'Chest is sealed.'}</p>
       </div>
@@ -3019,10 +3184,10 @@ function activityMarkup(stage, activity, learner) {
     return `
       <div class="bbf-activity-card">
         <h4>${stageLabelText}</h4>
-        <p>${activity.prompt}</p>
-        <p class="bbf-phase">Kraken stage: <strong>${krakenPhaseLabel(activity.phase)}</strong></p>
-        <p class="bbf-phase">Health: ${activity.health} tentacles remaining</p>
-        <div class="bbf-choice-grid">${activity.choices.map(choice => `<button data-choice="${choice}">${choice}</button>`).join('')}</div>
+        <p>${escapeHtml(activity.prompt)}</p>
+        <p class="bbf-phase">Kraken stage: <strong>${escapeHtml(krakenPhaseLabel(activity.phase))}</strong></p>
+        <p class="bbf-phase">Health: ${escapeHtml(activity.health)} tentacles remaining</p>
+        <div class="bbf-choice-grid">${activity.choices.map(choice => `<button data-choice="${escapeHtml(choice)}">${escapeHtml(choice)}</button>`).join('')}</div>
         <p class="bbf-feedback">${learner.hub.expansionUnlocked ? 'The BrainBase already shows the Kraken upgrade.' : 'The hub is still in starter form.'}</p>
       </div>
     `;
@@ -3031,7 +3196,7 @@ function activityMarkup(stage, activity, learner) {
     return `
       <div class="bbf-activity-card">
         <h4>${stageLabelText}</h4>
-        <p>${activity.prompt}</p>
+        <p>${escapeHtml(activity.prompt)}</p>
         <div class="bbf-choice-grid">${activity.choices.map(choice => `<button data-choice="${escapeHtml(choice.value)}">${escapeHtml(choice.value)}</button>`).join('')}</div>
         <p class="bbf-feedback">${activity.completed ? 'Target Smash complete.' : 'Pop the correct answers.'}</p>
       </div>
@@ -3041,9 +3206,9 @@ function activityMarkup(stage, activity, learner) {
     return `
       <div class="bbf-activity-card">
         <h4>${stageLabelText}</h4>
-        <p>${activity.prompt}</p>
+        <p>${escapeHtml(activity.prompt)}</p>
         <div class="bbf-trail">${activity.choices.map(choice => `<button data-letter="${escapeHtml(choice)}">${escapeHtml(choice)}</button>`).join('')}</div>
-        <p class="bbf-feedback">Trail progress: ${activity.revealed.join('')}</p>
+        <p class="bbf-feedback">Trail progress: ${activity.revealed.map(escapeHtml).join('')}</p>
       </div>
     `;
   }
@@ -3051,16 +3216,16 @@ function activityMarkup(stage, activity, learner) {
     return `
       <div class="bbf-activity-card">
         <h4>${stageLabelText}</h4>
-        <p>${activity.prompt}</p>
+        <p>${escapeHtml(activity.prompt)}</p>
         <div class="bbf-choice-grid">${activity.platforms.map(choice => `<button data-platform="${escapeHtml(choice)}">${escapeHtml(choice)}</button>`).join('')}</div>
-        <p class="bbf-feedback">Platform path: ${activity.visited.join(' → ') || 'None yet'}</p>
+        <p class="bbf-feedback">Platform path: ${activity.visited.map(escapeHtml).join(' → ') || 'None yet'}</p>
       </div>
     `;
   }
   return `
     <div class="bbf-activity-card">
       <h4>${stageLabelText}</h4>
-      <p>${activity.prompt}</p>
+      <p>${escapeHtml(activity.prompt)}</p>
       <button data-stage-advance>Advance</button>
       <p class="bbf-feedback">Greybox placeholder.</p>
     </div>
@@ -3210,6 +3375,16 @@ function mountBrainBiteFoundation(root, options = {}) {
 }
 
 const BrainBiteCore = {
+  CURRENCY_WRITER_LIMIT,
+  CURRENCY_PACKED_LIMIT,
+  CurrencyUpgradeRequiredError,
+  normalizeProfileCurrency,
+  projectProfileCurrency,
+  mergeProfileCurrency,
+  recordCurrencyScore,
+  recordCurrencyMission,
+  recordCurrencyPreview,
+  recordCurrencyPurchase,
   CORE_VERSION,
   STORAGE_KEY,
   BACKUP_KEY,
@@ -3301,6 +3476,16 @@ if (hasWindow()) {
 }
 
 export {
+  CURRENCY_WRITER_LIMIT,
+  CURRENCY_PACKED_LIMIT,
+  CurrencyUpgradeRequiredError,
+  normalizeProfileCurrency,
+  projectProfileCurrency,
+  mergeProfileCurrency,
+  recordCurrencyScore,
+  recordCurrencyMission,
+  recordCurrencyPreview,
+  recordCurrencyPurchase,
   CORE_VERSION,
   STORAGE_KEY,
   BACKUP_KEY,

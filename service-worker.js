@@ -1,4 +1,4 @@
-const CACHE = 'brainbite-v2.0-shell-v45-battle-draws';
+const CACHE = 'brainbite-v2.0-shell-runtime-3b79ac34ed3faf2c5418872bf3cd38e9e2ef50a141ea3c2441e21a92b7895c48';
 const FALLBACK = './index.html';
 const CORE = [
   './',
@@ -32,6 +32,9 @@ const CORE = [
   './assets/art/bloop.svg',
   './assets/art/scout.svg',
   './assets/art/bite-village.svg',
+  './assets/art/number-nebula.svg',
+  './assets/art/wordwood.svg',
+  './assets/art/language-portals.svg',
   './presentation/platform.js',
   './presentation/boot.mjs',
   './presentation/presentation-adapter.mjs',
@@ -75,6 +78,8 @@ const OFFLINE_CONTENT = [
   './content/words-question-bank-v1.9.json',
 ];
 const OPTIONAL_3D = [
+  './assets/art/jungle-stone-albedo-v1.png',
+  './assets/art/jungle-ground-albedo-v1.png',
   "./presentation/webgl-home.mjs",
   "./presentation/webgl-battle.mjs",
   './presentation/gltf-assets.mjs',
@@ -134,4 +139,3 @@ self.addEventListener('fetch', event => {
     return response;
   })));
 });
-

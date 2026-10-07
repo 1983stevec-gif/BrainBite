@@ -40,7 +40,17 @@ await page.waitForTimeout(700);
 
 const offline = await page.evaluate(() => ({
   mode: document.documentElement.className,
-  navVisible: !!document.querySelector('nav') && getComputedStyle(document.querySelector('nav')).display !== 'none',
+  homeNavigationUsable: (() => {
+    const activities = [...document.querySelectorAll('#home .home-primary-actions button')];
+    const controls = [...activities, document.getElementById('parentNav')];
+    return activities.length === 6 && controls.every(control => {
+      if (!control || control.disabled) return false;
+      const style = getComputedStyle(control);
+      const bounds = control.getBoundingClientRect();
+      return style.display !== 'none' && style.visibility !== 'hidden' && bounds.width > 0 && bounds.height > 0;
+    });
+  })(),
+  runtimeBooted: typeof window.BrainBiteGame?.getState === 'function',
   home: !!document.getElementById('home')?.classList.contains('show'),
   title: document.title || '',
   hasApp: !!document.querySelector('.app'),
@@ -57,7 +67,8 @@ const ok =
   online.home &&
   offline.home &&
   offline.hasApp &&
-  offline.navVisible &&
+  offline.homeNavigationUsable &&
+  offline.runtimeBooted &&
   !offline.matchForced &&
   !String(offline.mode || '').includes('presentation-match') &&
   errors.length === 0;

@@ -33,7 +33,12 @@ const results = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await open(page, 'match=0&webgl=0');
   const mode = await page.evaluate(() => document.documentElement.className);
-  const nav = await page.locator('#childDock').isVisible();
+  const activities = page.locator('#home .home-primary-actions button');
+  const activityStates = await Promise.all((await activities.all()).map(async activity =>
+    (await activity.isVisible()) && (await activity.isEnabled())));
+  const nav = await page.locator('#home.show').isVisible() && activityStates.length === 6 &&
+    activityStates.every(Boolean) && await page.locator('#parentNav').isVisible() &&
+    await page.locator('#parentNav').isEnabled();
   await openWorld(page, 'Number Nebula');
   await page.locator('#mathList button', { hasText: 'Play' }).first().click();
   await page.waitForSelector('#game.show', { timeout: 10000 });

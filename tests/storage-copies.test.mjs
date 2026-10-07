@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 // content/storage-copies.js is a classic script that attaches to the global object, so it
 // loads here exactly as the browser loads it.
 const source = readFileSync(new URL('../content/storage-copies.js', import.meta.url), 'utf8');
+const appSource = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
 const sandbox = {};
 new Function('window', 'globalThis', `${source}\nreturn window;`)(sandbox, sandbox);
 const { DEFAULT_KEYS, readAll, readEvery, writeRotated, converge } = sandbox.BrainBiteStorageCopies;
@@ -21,13 +22,40 @@ function fakeStorage(initial = {}) {
 }
 const store = name => ({ profiles: [{ id: 'p1', name }] });
 const nameOf = raw => JSON.parse(raw).profiles[0].name;
-// Mirrors app.js: parse, and treat anything without a profiles array as unreadable.
+function appFunctionSource(name) {
+  const match = new RegExp(`function\\s+${name}\\s*\\(`).exec(appSource);
+  assert.ok(match, `${name} must be declared in app.js`);
+  const bodyStart = appSource.indexOf('{', match.index);
+  let depth = 0;
+  for (let index = bodyStart; index < appSource.length; index += 1) {
+    if (appSource[index] === '{') depth += 1;
+    if (appSource[index] === '}') depth -= 1;
+    if (depth === 0) return appSource.slice(match.index, index + 1);
+  }
+  throw new Error(`Could not extract ${name} from app.js`);
+}
+// Mirrors app.js: legacy saves remain migration-readable, while modern boot
+// generations need a bounded identity/shape check before selection. Import validation
+// remains a separate app-level contract.
+const modernId = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const readerFor = storage => key => {
   const raw = storage.getItem(key);
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
-    return parsed && Array.isArray(parsed.profiles) ? parsed : null;
+    if (!parsed || !Array.isArray(parsed.profiles) || parsed.profiles.length === 0) return null;
+    if (Object.hasOwn(parsed, 'schemaVersion') && (!Number.isInteger(parsed.schemaVersion) || parsed.schemaVersion < 1 || parsed.schemaVersion > 9)) return null;
+    if (parsed.schemaVersion >= 8) {
+      if (!Number.isInteger(parsed.active) || parsed.active < 0 || parsed.active >= parsed.profiles.length) return null;
+      const ids = new Set();
+      if (Object.hasOwn(parsed, 'deletedProfiles') && !Array.isArray(parsed.deletedProfiles)) return null;
+      for (const profile of parsed.profiles) {
+        if (!profile || typeof profile !== 'object' || Array.isArray(profile) || typeof profile.id !== 'string' || !modernId.test(profile.id) || ids.has(profile.id) || typeof profile.name !== 'string' || !profile.name.trim()) return null;
+        ids.add(profile.id);
+      }
+      for (const tombstone of parsed.deletedProfiles || []) if (!tombstone || typeof tombstone.id !== 'string' || !modernId.test(tombstone.id) || ids.has(tombstone.id)) return null;
+    }
+    return parsed;
   } catch { return null; }
 };
 
@@ -87,6 +115,40 @@ test('readAll prefers the primary and falls back only when a copy is unreadable'
   assert.deepEqual(readAll(readerFor(fakeStorage()), DEFAULT_KEYS), []);
 });
 
+test('malformed modern primary falls back to a healthy backup before rotation', () => {
+  const storage = fakeStorage({
+    [DEFAULT_KEYS.primary]: JSON.stringify({ schemaVersion: 9, active: 0, profiles: [{}], deletedProfiles: [] }),
+    [DEFAULT_KEYS.backup]: JSON.stringify({ schemaVersion: 9, active: 0, profiles: [{ id: 'backup-id', name: 'backup learner' }], deletedProfiles: [] }),
+    [DEFAULT_KEYS.recovery]: JSON.stringify({ schemaVersion: 9, active: 0, profiles: [{ id: 'recovery-id', name: 'recovery learner' }], deletedProfiles: [] }),
+  });
+  assert.deepEqual(readAll(readerFor(storage), DEFAULT_KEYS).map(entry => entry.profiles[0].name), ['backup learner']);
+  writeRotated(storage, DEFAULT_KEYS, { schemaVersion: 9, active: 0, profiles: [{ id: 'next-id', name: 'next learner' }], deletedProfiles: [] }, readerFor(storage));
+  assert.equal(nameOf(storage.getItem(DEFAULT_KEYS.primary)), 'next learner');
+  assert.equal(nameOf(storage.getItem(DEFAULT_KEYS.backup)), 'next learner');
+  assert.equal(nameOf(storage.getItem(DEFAULT_KEYS.recovery)), 'backup learner');
+});
+
+for (const [label, schemaVersion] of [['nonnumeric string', 'corrupt'], ['null', null], ['fraction', 7.5], ['future version', 10]]) {
+  test(`declared ${label} schema falls back to backup and survives rotation`, () => {
+    const storage = fakeStorage({
+      [DEFAULT_KEYS.primary]: JSON.stringify({ schemaVersion, active: 0, profiles: [{}], deletedProfiles: [] }),
+      [DEFAULT_KEYS.backup]: JSON.stringify({ schemaVersion: 9, active: 0, profiles: [{ id: 'backup-id', name: 'saved learner' }], deletedProfiles: [] }),
+    });
+    assert.deepEqual(readAll(readerFor(storage), DEFAULT_KEYS).map(entry => entry.profiles[0].name), ['saved learner']);
+    writeRotated(storage, DEFAULT_KEYS, { schemaVersion: 9, active: 0, profiles: [{ id: 'backup-id', name: 'rotated learner' }], deletedProfiles: [] }, readerFor(storage));
+    assert.equal(nameOf(storage.getItem(DEFAULT_KEYS.primary)), 'rotated learner');
+    assert.equal(nameOf(storage.getItem(DEFAULT_KEYS.backup)), 'rotated learner');
+    assert.equal(nameOf(storage.getItem(DEFAULT_KEYS.recovery)), 'saved learner');
+  });
+}
+
+test('legacy generations remain readable for migration', () => {
+  const storage = fakeStorage({
+    [DEFAULT_KEYS.primary]: JSON.stringify({ active: 0, profiles: [{ name: 'legacy learner' }] }),
+  });
+  assert.deepEqual(readAll(readerFor(storage), DEFAULT_KEYS).map(entry => entry.profiles[0].name), ['legacy learner']);
+});
+
 test('readEvery returns every readable generation oldest first', () => {
   const storage = fakeStorage({
     [DEFAULT_KEYS.primary]: JSON.stringify(store('primary')),
@@ -126,6 +188,33 @@ test('a failed read never produces a partial generation set', () => {
   writeRotated(storage, DEFAULT_KEYS, store('only'), readerFor(storage));
   assert.deepEqual(readAll(readerFor(storage), DEFAULT_KEYS).map(entry => entry.profiles[0].name), ['only']);
   assert.deepEqual(readEvery(readerFor(storage), DEFAULT_KEYS).map(entry => entry.profiles[0].name), ['only', 'only', 'only']);
+});
+
+test('total validation failure quarantines every raw generation before blank rotation', () => {
+  const quarantineKey = 'bb-core-v3-unreadable-quarantine';
+  const raw = {
+    [DEFAULT_KEYS.primary]: '{"schemaVersion":9,"active":2,"profiles":[{"id":"p1","name":"Primary evidence"}]}',
+    [DEFAULT_KEYS.backup]: '{broken backup bytes',
+    [DEFAULT_KEYS.recovery]: '{"schemaVersion":10,"active":0,"profiles":[{"id":"p2","name":"Future evidence"}]}',
+  };
+  const storage = fakeStorage(raw);
+  const reader = readerFor(storage);
+  assert.deepEqual(readAll(reader, DEFAULT_KEYS), []);
+  const initialization = appFunctionSource('initializeCanonicalState');
+  const quarantineAt = initialization.indexOf('preserveUnreadableStoreCopies();');
+  const blankWriteAt = initialization.indexOf('writeStoreCopiesUnlocked(STORE);');
+  assert.ok(quarantineAt >= 0 && quarantineAt < blankWriteAt, 'boot must quarantine unreadable bytes before writing blank state');
+  const preserve = new Function('localStorage', 'KEY', 'BACK', 'RECOVERY_KEY', 'UNREADABLE_STORE_QUARANTINE_KEY', 'readAllStoredStores', `
+    ${appFunctionSource('readLocalStorage')}
+    ${appFunctionSource('preserveUnreadableStoreCopies')}
+    return preserveUnreadableStoreCopies;
+  `)(storage, DEFAULT_KEYS.primary, DEFAULT_KEYS.backup, DEFAULT_KEYS.recovery, quarantineKey, () => readAll(reader, DEFAULT_KEYS));
+  assert.equal(preserve(), true);
+
+  writeRotated(storage, DEFAULT_KEYS, store('blank learner'), reader);
+  const quarantine = JSON.parse(storage.getItem(quarantineKey));
+  assert.deepEqual(quarantine.snapshots[0].generations, raw);
+  assert.equal(nameOf(storage.getItem(DEFAULT_KEYS.primary)), 'blank learner');
 });
 
 // M2 native save mirror.

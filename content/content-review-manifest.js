@@ -2823,9 +2823,9 @@
     return value;
   }
 
-  // Educator approvals are data, not code. The digest gate still protects the content:
-  // if a source value changes, its recorded digest no longer matches and the approval
-  // stops being eligible until a reviewer re-signs the new digest.
+  // Educator approvals retain their own reviewedDigest. Regenerating a source row cannot
+  // carry an approval forward: it stays in the data for validation but is not eligible
+  // until a reviewer signs the new digest.
   // Populate with: node scripts/review-content.mjs --reviewer <id> --role <role> --ids <file>
   const EDUCATOR_APPROVALS = {
   };
@@ -2847,7 +2847,8 @@
     const allQuarantineReasons = [...quarantineReasons, ...rejectionReasons];
     const quarantined = allQuarantineReasons.length > 0;
     const productionRegistry = kind === "registry-mission" && !quarantined;
-    const approval = quarantined ? null : EDUCATOR_APPROVALS[identity] || null;
+    const recordedApproval = EDUCATOR_APPROVALS[identity] || null;
+    const approval = !quarantined && recordedApproval?.reviewedDigest === digest ? recordedApproval : null;
     const productionEligible = productionRegistry || Boolean(approval);
     return {
       identity,
@@ -2867,7 +2868,7 @@
       },
       taxonomy,
       educatorReview: approval
-        ? { status: "approved", reviewer: approval.reviewer, reviewedAt: approval.reviewedAt }
+        ? { status: "approved", reviewer: approval.reviewer, reviewedAt: approval.reviewedAt, reviewedDigest: approval.reviewedDigest }
         : finding
           ? { status: "rejected", reviewer: finding.reviewer, reviewedAt: finding.rejectedAt }
           : { status: "pending-educator", reviewer: null, reviewedAt: null },
@@ -2906,7 +2907,7 @@
     educatorReviewPolicy: {
       requiredForProduction: true,
       currentState: "pending-educator",
-      approvalMetadata: ["reviewer.id", "reviewer.role", "reviewer.reviewedAt"],
+      approvalMetadata: ["reviewer.id", "reviewer.role", "reviewedAt", "reviewedDigest"],
     },
     coverage: {
       registryMissions: 30,
@@ -2917,6 +2918,8 @@
       totalRecords: 105,
     },
     records,
+    approvals: EDUCATOR_APPROVALS,
+    reviewerFindings: REVIEWER_FINDINGS,
   });
 
   function isObject(value) {
@@ -2927,6 +2930,8 @@
     return typeof value === "string" && value.trim().length > 0;
   }
 
+  const SHA256_HEX = /^[0-9a-f]{64}$/;
+
   function resolveRecord(input) {
     return typeof input === "string" ? recordByIdentity.get(input) || null : input;
   }
@@ -2936,16 +2941,19 @@
     return options.currentDigest ?? options.sourceDigest ?? options.digest ?? null;
   }
 
-  function educatorReviewIssues(review) {
+  function educatorReviewIssues(review, recordDigest) {
     if (!isObject(review)) return ["educator-review-metadata-invalid"];
     if (review.status === "approved") {
       const reviewer = isObject(review.reviewer) ? review.reviewer : review;
       const reviewerId = reviewer.id ?? review.reviewerId;
       const reviewerRole = reviewer.role ?? review.reviewerRole;
       const reviewedAt = reviewer.reviewedAt ?? review.reviewedAt;
-      return nonEmpty(reviewerId) && nonEmpty(reviewerRole) && nonEmpty(reviewedAt)
+      const metadataIssues = nonEmpty(reviewerId) && nonEmpty(reviewerRole) && nonEmpty(reviewedAt)
         ? []
         : ["educator-review-metadata-invalid"];
+      if (metadataIssues.length > 0) return metadataIssues;
+      if (!SHA256_HEX.test(review.reviewedDigest || "")) return ["educator-review-digest-invalid"];
+      return review.reviewedDigest === recordDigest ? [] : ["educator-review-digest-mismatch"];
     }
     if (review.status === "pending-educator") {
       return review.reviewer === null && review.reviewedAt === null
@@ -2988,7 +2996,7 @@
     if (record.quarantine?.status !== "clear" || !Array.isArray(record.quarantine?.reasons) || record.quarantine.reasons.length !== 0) {
       reasons.push("quarantine-active");
     }
-    reasons.push(...educatorReviewIssues(record.educatorReview));
+    reasons.push(...educatorReviewIssues(record.educatorReview, record.digest?.value));
 
     const productionRegistry = record.kind === "registry-mission"
       && record.runtime?.status === "production-reviewed"

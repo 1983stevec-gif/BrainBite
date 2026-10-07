@@ -8,7 +8,7 @@ globalThis.localStorage = { getItem: key => (storage.has(key) ? storage.get(key)
 const setNavigator = value => Object.defineProperty(globalThis, 'navigator', { value, configurable: true, writable: true });
 setNavigator({});
 
-const { requestedPresentation, constrainedDevice } = await import('../presentation/capability.mjs');
+const { requestedPresentation, constrainedDevice, matchPreviewAllowed, matchNeedsPortraitFallback, shouldEnableMatch } = await import('../presentation/capability.mjs');
 
 test('constrainedDevice is conservative: only Save-Data or very low memory/cores', () => {
   assert.equal(constrainedDevice({}), false);
@@ -36,4 +36,29 @@ test('a constrained device with no choice defaults to dom, but explicit and stor
   globalThis.location = { search: '' };
   storage.set('bb-presentation', 'webgl');
   assert.equal(requestedPresentation(), 'webgl');
+});
+
+test('MATCH preview is fail-closed outside the authoritative internal-review mode', () => {
+  assert.equal(matchPreviewAllowed(undefined), false);
+  assert.equal(matchPreviewAllowed({ getRuntimeMode: () => 'production' }), false);
+  assert.equal(matchPreviewAllowed({ getRuntimeMode: () => { throw new Error('unavailable'); } }), false);
+  assert.equal(matchPreviewAllowed({ getRuntimeMode: () => 'internal-review' }), true);
+});
+
+test('portrait fallback preserves the requested MATCH preference and wide preview contract', () => {
+  storage.clear();
+  storage.set('bb-presentation', 'match');
+  globalThis.location = { search: '' };
+  globalThis.BrainBiteContentControl = { getRuntimeMode: () => 'internal-review' };
+  for (const [innerWidth, innerHeight, fallback] of [[320, 844, true], [390, 844, true], [768, 1024, true], [1280, 800, false], [1024, 682, false]]) {
+    Object.assign(globalThis, { innerWidth, innerHeight });
+    assert.equal(matchNeedsPortraitFallback(), fallback);
+    assert.equal(shouldEnableMatch(), !fallback);
+    assert.equal(requestedPresentation(), 'match');
+    assert.equal(storage.get('bb-presentation'), 'match');
+  }
+  globalThis.BrainBiteContentControl = { getRuntimeMode: () => 'production' };
+  assert.equal(shouldEnableMatch(), false);
+  globalThis.location = { search: '?presentation=match&release=1' };
+  assert.equal(shouldEnableMatch(), false);
 });

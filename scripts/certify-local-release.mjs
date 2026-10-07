@@ -92,7 +92,7 @@ try {
   for (const [label, script] of validators) await record(label, npmCommand, ['run', script]);
 
   const browserGroups = [
-    ['release-browser', 'tests/release.spec.js'],
+    ['release-browser', 'tests/release.spec.js', 'tests/mobile-home-layout.spec.js', 'tests/currency-ledger.spec.js'],
     // bubble-reef-preview is a world/activity preview, so it belongs with the activity
     // family. It used to be in no group at all: the certification ran 159 of the 161
     // browser tests and still reported a clean sweep. check:certification-coverage now

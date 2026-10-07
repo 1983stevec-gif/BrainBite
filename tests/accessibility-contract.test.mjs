@@ -51,7 +51,7 @@ async function setChecked(page, selector, checked) {
 }
 
 async function unlockParent(page) {
-  await page.locator('#childDock button[data-screen="home"]').click();
+  if(!(await page.locator('#home.show').isVisible()))await page.locator('#childDock button[data-screen="home"]').click();
   await page.locator('#parentNav').click();
   await page.locator('#parentPinInput').fill('654321');
   if (await page.locator('#confirmParentPin').isVisible()) await page.locator('#confirmParentPin').fill('654321');
@@ -240,6 +240,35 @@ test('captions and repeat-prompt read-aloud retain accessible semantics', async 
       { type: 'cancel' },
       { type: 'speak', text: captionContract.prompt, lang: 'en-US' },
     ]);
+  } finally {
+    await closePage(context);
+  }
+});
+
+test('dynamic status surfaces announce updates to assistive technology', async () => {
+  const { context, page } = await openPage();
+  try {
+    const statusContract = await page.evaluate(() => Object.fromEntries([
+      'practiceResult', 'saveHealth', 'cloudConfigMsg', 'copySetupMsg',
+      'integrationCheckResult', 'controlsStatus', 'todayUsage', 'sessionLimitStatus',
+    ].map(id => {
+      const element = document.getElementById(id);
+      return [id, {
+        role: element?.getAttribute('role'),
+        live: element?.getAttribute('aria-live'),
+        atomic: element?.getAttribute('aria-atomic'),
+      }];
+    })));
+    assert.deepEqual(statusContract, {
+      practiceResult: { role: 'status', live: 'polite', atomic: 'true' },
+      saveHealth: { role: 'status', live: 'polite', atomic: 'true' },
+      cloudConfigMsg: { role: 'status', live: 'polite', atomic: 'true' },
+      copySetupMsg: { role: 'status', live: 'polite', atomic: 'true' },
+      integrationCheckResult: { role: 'status', live: 'polite', atomic: 'true' },
+      controlsStatus: { role: 'status', live: 'polite', atomic: 'true' },
+      todayUsage: { role: 'status', live: 'polite', atomic: 'true' },
+      sessionLimitStatus: { role: 'status', live: 'polite', atomic: 'true' },
+    });
   } finally {
     await closePage(context);
   }

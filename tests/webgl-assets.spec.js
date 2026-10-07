@@ -2,7 +2,55 @@ import { test, expect } from '@playwright/test';
 
 const assets = ['mascot', 'jungle_props', 'portal', 'answer_pillars', 'kraken'];
 
-test('parsed GLB documents are cached and every mount receives an independent clone', async ({ page }) => {
+test('world art is available from the install cache before an app visit', async ({ page, context }) => {
+  const artPaths = [
+    '/assets/art/number-nebula.svg',
+    '/assets/art/wordwood.svg',
+    '/assets/art/language-portals.svg',
+    '/assets/art/jungle-stone-albedo-v1.png',
+    '/assets/art/jungle-ground-albedo-v1.png',
+  ];
+
+  // This page renders no world art, so only service-worker installation can cache these assets.
+  await page.goto('/privacy.html');
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.register('/service-worker.js');
+    await navigator.serviceWorker.ready;
+    if (!navigator.serviceWorker.controller) {
+      await new Promise(resolve => navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true }));
+    }
+  });
+  await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+
+  await context.setOffline(true);
+  const results = await page.evaluate(async paths => Promise.all(paths.map(async path => {
+    try {
+      const response = await fetch(path, { cache: 'no-store' });
+      return {
+        path,
+        ok: response.ok,
+        contentType: response.headers.get('content-type'),
+        bytes: Array.from(new Uint8Array(await response.arrayBuffer()).slice(0, 256)),
+      };
+    } catch (error) {
+      return { path, error: String(error) };
+    }
+  })), artPaths);
+
+  for (const result of results) {
+    expect(result.error, result.path).toBeUndefined();
+    expect(result.ok, result.path).toBe(true);
+    if (result.path.endsWith('.png')) {
+      expect(result.contentType, result.path).toContain('image/png');
+      expect(result.bytes.slice(0, 8), result.path).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+    } else {
+      expect(result.contentType, result.path).toContain('image/svg+xml');
+      expect(String.fromCharCode(...result.bytes), result.path).toMatch(/<svg[\s>]/);
+    }
+  }
+});
+
+test('parsed GLB documents are cached and scene disposal only detaches their shared resources', async ({ page }) => {
   const glbRequests = [];
   page.on('request', request => { if (/\.glb($|\?)/.test(request.url())) glbRequests.push(request.url().split('/').pop()); });
   await page.goto('/?presentation=webgl');
@@ -11,12 +59,36 @@ test('parsed GLB documents are cached and every mount receives an independent cl
   const afterHome = { size: await page.evaluate(() => window.BrainBiteGltfCache.size()), clones: await page.evaluate(() => window.BrainBiteGltfCache.clones()), requests: glbRequests.length };
   expect(afterHome.requests).toBeGreaterThan(0);
 
+  const probedResources = await page.evaluate(async () => {
+    const { loadGltfAsset, disposeGltfAsset } = await import('/presentation/gltf-assets.mjs');
+    const root = await loadGltfAsset('mascot');
+    const resources = new Set();
+    root.traverse(child => {
+      if (child.geometry) resources.add(child.geometry);
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      for (const material of materials) {
+        if (!material) continue;
+        resources.add(material);
+        for (const value of Object.values(material)) if (value?.isTexture) resources.add(value);
+      }
+      if (child.skeleton?.boneTexture) resources.add(child.skeleton.boneTexture);
+    });
+    const probe = { disposals: 0, root };
+    for (const resource of resources) resource.addEventListener('dispose', () => { probe.disposals += 1; });
+    window.__sharedGltfDisposalProbe = probe;
+    disposeGltfAsset(root);
+    return resources.size;
+  });
+  expect(probedResources).toBeGreaterThan(0);
+  expect(await page.evaluate(() => window.__sharedGltfDisposalProbe.disposals)).toBe(0);
+
   // Move to the battle and back: the same assets must come from the cache, not the network.
   await page.evaluate(() => window.BrainBiteGame.startMission(1));
   await expect(page.locator('#game canvas.webgl-canvas')).toHaveCount(1);
   await page.evaluate(() => document.querySelector('nav button[data-screen="home"]')?.click());
   await expect(page.locator('#home canvas.webgl-canvas')).toHaveCount(1);
   await expect.poll(() => page.evaluate(() => window.BrainBiteGltfCache.clones())).toBeGreaterThan(afterHome.clones);
+  expect(await page.evaluate(() => window.__sharedGltfDisposalProbe.disposals)).toBe(0);
 
   const after = { size: await page.evaluate(() => window.BrainBiteGltfCache.size()), clones: await page.evaluate(() => window.BrainBiteGltfCache.clones()) };
   const repeatRequests = glbRequests.slice(afterHome.requests).filter(name => glbRequests.slice(0, afterHome.requests).includes(name));
@@ -121,14 +193,23 @@ test('animated Bite and real quality budgets load in both scenes', async ({ page
 });
 
 test('live WebGL scenes expose frame and scene-load budget evidence', async ({ page }) => {
+  const createLongTask = () => page.evaluate(() => {
+    const startedAt = performance.now();
+    while (performance.now() - startedAt < 80) {
+      // Keep the main thread busy long enough to emit a PerformanceLongTaskTiming entry.
+    }
+  });
   await page.goto('/?presentation=webgl');
   await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.home?.metrics?.sceneLoad?.count || 0)).toBe(1);
   await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.home?.metrics?.frame?.count || 0)).toBeGreaterThan(2);
   await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.home?.assetTiming?.count || 0)).toBe(3);
+  const homeLongTaskCount = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().home.metrics.longTask.count);
+  await createLongTask();
+  await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.home?.metrics?.longTask?.count || 0)).toBeGreaterThan(homeLongTaskCount);
   const homeReport = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().home);
   expect(homeReport.metrics.sceneLoad.count).toBe(1);
   expect(homeReport.metrics.frame.p95).not.toBeNull();
-  expect(homeReport.metrics.longTask).toBeDefined();
+  expect(homeReport.metrics.longTask.count).toBeGreaterThan(homeLongTaskCount);
   expect(homeReport.metrics.rendererGeometries.count).toBeGreaterThan(0);
   expect(homeReport.metrics.renderCalls.max).toBeLessThanOrEqual(200);
   expect(homeReport.assetTiming.count).toBeGreaterThan(0);
@@ -137,12 +218,35 @@ test('live WebGL scenes expose frame and scene-load budget evidence', async ({ p
   await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.battle?.metrics?.sceneLoad?.count || 0)).toBe(1);
   await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.battle?.metrics?.frame?.count || 0)).toBeGreaterThan(2);
   await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.battle?.assetTiming?.count || 0)).toBe(3);
+  const battleLongTaskCount = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().battle.metrics.longTask.count);
+  await createLongTask();
+  await expect.poll(() => page.evaluate(() => window.BrainBitePresentation?.getPerformanceReport()?.battle?.metrics?.longTask?.count || 0)).toBeGreaterThan(battleLongTaskCount);
   const battleReport = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().battle);
   expect(battleReport.metrics.sceneLoad.count).toBe(1);
   expect(battleReport.metrics.frame.p99).not.toBeNull();
-  expect(battleReport.metrics.longTask).toBeDefined();
+  expect(battleReport.metrics.longTask.count).toBeGreaterThan(battleLongTaskCount);
   expect(battleReport.metrics.rendererGeometries.count).toBeGreaterThan(0);
   expect(battleReport.assetTiming.count).toBeGreaterThan(0);
   const runtimeReport = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().runtime);
   expect(runtimeReport.metrics.save.count).toBeGreaterThan(0);
+});
+
+
+test('late material artwork updates live textures without reviving disposed textures', async ({ page }) => {
+  const held = [];
+  await page.route('**/jungle-*-albedo-v1.png', route => { held.push(route); });
+  await page.goto('/privacy.html');
+  await page.evaluate(async () => {
+    const { makeStoneMaterial, makeTerrainMaterial } = await import('/presentation/surface-textures.mjs');
+    const stone = makeStoneMaterial();
+    const ground = makeTerrainMaterial();
+    window.__surfaceProbe = { stone, ground, stoneVersion: stone.map.version, groundVersion: ground.map.version };
+    stone.map.dispose();
+    stone.dispose();
+  });
+  await expect.poll(() => held.length).toBe(2);
+  await Promise.all(held.map(route => route.continue()));
+  await expect.poll(() => page.evaluate(() => window.__surfaceProbe.ground.map.version > window.__surfaceProbe.groundVersion)).toBe(true);
+  expect(await page.evaluate(() => window.__surfaceProbe.stone.map.version)).toBe(await page.evaluate(() => window.__surfaceProbe.stoneVersion));
+  await page.evaluate(() => { window.__surfaceProbe.ground.map.dispose(); window.__surfaceProbe.ground.dispose(); });
 });

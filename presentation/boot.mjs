@@ -1,4 +1,5 @@
 import { PresentationAdapter } from './presentation-adapter.mjs';
+import { matchPreviewAllowed, matchNeedsPortraitFallback } from './capability.mjs';
 
 async function boot() {
   window.BrainBitePresentation = PresentationAdapter;
@@ -18,10 +19,12 @@ async function boot() {
     const select = document.createElement('select');
     select.setAttribute('aria-label', 'Scene presentation');
     for (const [value, text] of [['webgl', 'Live 3D'], ['dom', 'Classic'], ['match', 'Reference preview']]) {
+      if (value === 'match' && !matchPreviewAllowed()) continue;
       const option = document.createElement('option');
       option.value = value; option.textContent = text; select.append(option);
     }
-    select.value = PresentationAdapter.mode;
+    select.value = PresentationAdapter.requestedMode === 'match' && matchPreviewAllowed()
+      ? 'match' : PresentationAdapter.mode;
     select.addEventListener('change', () => {
       try { localStorage.setItem('bb-presentation', select.value); } catch {}
       const url = new URL(location.href);
@@ -30,6 +33,20 @@ async function boot() {
       location.assign(url.href);
     });
     label.append(select); badge.append(label);
+    const previewStatus = document.createElement('span');
+    previewStatus.setAttribute('role', 'status');
+    badge.append(previewStatus);
+    const syncPreviewStatus = () => {
+      previewStatus.textContent = PresentationAdapter.requestedMode === 'match'
+        ? !matchPreviewAllowed()
+          ? 'Reference preview is for internal review. Classic play is ready.'
+          : matchNeedsPortraitFallback()
+            ? 'Reference preview uses Classic play in portrait. Rotate to landscape to view the artwork.'
+            : 'Reference artwork preview: painted names, numbers and rewards are examples, not learner progress.'
+        : '';
+    };
+    syncPreviewStatus();
+    window.addEventListener('bb:presentation-responsive', syncPreviewStatus);
     window.addEventListener('bb:presentation-fallback', () => {
       select.value = 'dom';
       const status = document.createElement('span'); status.setAttribute('role', 'status');
