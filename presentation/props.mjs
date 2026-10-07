@@ -87,15 +87,119 @@ export function makeMascot({ facing = 0, wave = true } = {}) {
 
 let treeAssets;
 
+// A crown of curved leaves, shared by every tree rather than a faceted solid blob.
+function makeLeafCrownGeometry() {
+  const positions = [], colors = [], indices = [];
+  const transform = new THREE.Object3D();
+  const point = new THREE.Vector3();
+  // Rounded lobes need only a small mesh at their actual on-screen size. Keeping
+  // this coarse avoids delaying UI timers during the first live scene renders.
+  const leafCount = 8, lengthSegments = 5, radialSegments = 6;
+  for (let leaf = 0; leaf < leafCount; leaf++) {
+    const azimuth = leaf * 2.399963;
+    const y = 1 - 2 * (leaf + 0.5) / leafCount;
+    const radius = Math.sqrt(1 - y * y);
+    transform.position.set(Math.cos(azimuth) * radius * 0.65, y * 0.7, Math.sin(azimuth) * radius * 0.65);
+    transform.rotation.set(0.35 + y * 0.6, azimuth, Math.sin(azimuth) * 0.6);
+    transform.updateMatrix();
+    const start = positions.length / 3;
+    for (let row = 0; row <= lengthSegments; row++) {
+      const t = row / lengthSegments;
+      const halfWidth = Math.pow(Math.sin(t * Math.PI), 0.6) * 0.4;
+      for (let side = 0; side <= radialSegments; side++) {
+        const angle = side / radialSegments * Math.PI * 2;
+        point.set(Math.cos(angle) * halfWidth, (t - 0.4) * 0.75,
+          Math.sin(angle) * halfWidth * 0.3 + Math.sin(t * Math.PI) * 0.07);
+        point.applyMatrix4(transform.matrix);
+        positions.push(point.x, point.y, point.z);
+        const shade = new THREE.Color(0x95bc85).lerp(new THREE.Color(0xd5e7ab), t * 0.65 + (leaf % 3) * 0.08);
+        colors.push(shade.r, shade.g, shade.b);
+      }
+    }
+    for (let row = 0; row < lengthSegments; row++) for (let side = 0; side < radialSegments; side++) {
+      const a = start + row * (radialSegments + 1) + side, b = a + radialSegments + 1;
+      indices.push(a, b, a + 1, a + 1, b, b + 1);
+    }
+  }
+  // An irregular smooth core fills the envelope, so sparse broad lobes can retain
+  // a full crown without dozens of overlapping surfaces at every pixel.
+  const core = new THREE.SphereGeometry(0.72, 12, 8);
+  const corePosition = core.getAttribute('position');
+  const coreStart = positions.length / 3;
+  for (let i = 0; i < corePosition.count; i++) {
+    const x = corePosition.getX(i), y = corePosition.getY(i), z = corePosition.getZ(i);
+    const variation = 1 + Math.sin(x * 8 + y * 6) * Math.sin(z * 9 - y * 4) * 0.08;
+    positions.push(x * variation, y * variation * 0.93, z * variation);
+    const shade = new THREE.Color(0x8fb380).lerp(new THREE.Color(0xc8dda2), Math.max(0, y * 0.55 + 0.4));
+    colors.push(shade.r, shade.g, shade.b);
+  }
+  for (const index of core.index.array) indices.push(coreStart + index);
+  core.dispose();
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+// GLB clones share cached resources. Every visual override here belongs to this mount.
+export function polishAuthoredAsset(root) {
+  const materials = new Map(), geometries = new Set();
+  let crownTemplate = null;
+  root.traverse(mesh => {
+    if (!mesh.isMesh) return;
+    const source = mesh.material;
+    if (Array.isArray(source)) return;
+    if (!materials.has(source)) {
+      const material = source.clone();
+      const name = source.name || '';
+      if (/Bite_V2_(blue|cyan|crest)/.test(name)) material.roughness = 0.4;
+      if (/Bite_V2_(iris|ink|white)/.test(name)) material.roughness = 0.19;
+      if (/gold/i.test(name)) { material.metalness = 0.4; material.roughness = 0.32; }
+      if (/Leaf/.test(name)) {
+        material.color.setHex(/Light/.test(name) ? 0xb7d291 : /Dark/.test(name) ? 0x789c75 : 0x9fbd83);
+        material.vertexColors = true;
+        material.side = THREE.FrontSide;
+        material.roughness = 0.8;
+        material.flatShading = false;
+        material.emissive.setHex(0x243a2c);
+        material.emissiveIntensity = 0.12;
+      }
+      materials.set(source, material);
+    }
+    mesh.material = materials.get(source);
+    if (/Canopy/.test(mesh.name)) {
+      mesh.geometry.computeBoundingBox();
+      const bounds = mesh.geometry.boundingBox;
+      const size = bounds.getSize(new THREE.Vector3()).multiplyScalar(0.5);
+      const center = bounds.getCenter(new THREE.Vector3());
+      // Compute the template/normals once, not once for every loaded crown.
+      crownTemplate ||= makeLeafCrownGeometry();
+      const geometry = crownTemplate.clone();
+      geometry.scale(size.x, size.y, size.z);
+      geometry.translate(center.x, center.y, center.z);
+      geometries.add(geometry);
+      mesh.geometry = geometry;
+      mesh.castShadow = false;
+    }
+  });
+  crownTemplate?.dispose();
+  return () => {
+    materials.forEach(material => material.dispose());
+    geometries.forEach(geometry => geometry.dispose());
+  };
+}
+
 function getTreeAssets() {
   if (treeAssets) return treeAssets;
 
   const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x6b4423, roughness: 0.9 });
   const branchMaterial = new THREE.MeshStandardMaterial({ color: 0x81502a, roughness: 0.92 });
   const canopyMaterials = [
-    new THREE.MeshStandardMaterial({ color: 0x1e6338, roughness: 0.86, flatShading: true }),
-    new THREE.MeshStandardMaterial({ color: 0x2f8d43, roughness: 0.82, flatShading: true }),
-    new THREE.MeshStandardMaterial({ color: 0x55ad4b, roughness: 0.78, flatShading: true }),
+    new THREE.MeshStandardMaterial({ color: 0x789c75, vertexColors: true, roughness: 0.86, emissive: 0x243a2c, emissiveIntensity: 0.12 }),
+    new THREE.MeshStandardMaterial({ color: 0x9fbd83, vertexColors: true, roughness: 0.82, emissive: 0x243a2c, emissiveIntensity: 0.12 }),
+    new THREE.MeshStandardMaterial({ color: 0xb7d291, vertexColors: true, roughness: 0.78, emissive: 0x243a2c, emissiveIntensity: 0.12 }),
   ];
   const frondMaterials = [
     new THREE.MeshStandardMaterial({ color: 0x267541, roughness: 0.86, side: THREE.DoubleSide }),
@@ -110,7 +214,7 @@ function getTreeAssets() {
   treeAssets = {
     trunkGeometry: new THREE.CylinderGeometry(0.14, 0.22, 1.7, 9),
     branchGeometry: new THREE.CylinderGeometry(0.055, 0.09, 0.86, 7),
-    canopyGeometry: new THREE.DodecahedronGeometry(1, 1),
+    canopyGeometry: makeLeafCrownGeometry(),
     frondGeometry: new THREE.ShapeGeometry(frondShape),
     trunkMaterial,
     branchMaterial,

@@ -535,6 +535,9 @@ test('a wrong answer shows a visual explanation and the retry counts as assisted
 
 // ---- UI Phase 1.5 ------------------------------------------------------------------
 test('the 1024x682 target size keeps the adventure scene, destinations and HUD usable',async({page})=>{
+  // This test measures static layout. Stop continuous software-GPU animation
+  // while Playwright reads geometry; motion behavior is covered separately.
+  await page.emulateMedia({reducedMotion:'reduce'});
   await page.setViewportSize({width:1024,height:682});
   await page.goto('/?presentation=webgl');
   await expect(page.locator('#home canvas.webgl-canvas')).toHaveCount(1);

@@ -1,5 +1,38 @@
 import * as THREE from '../vendor/three/three.module.js';
 
+const authoredImages = new Map();
+let surfaceNotificationPending = false;
+// Keep a ready procedural surface until the packaged art decodes. Every scene
+// owns its texture; a late image load must never revive a disposed texture.
+function applyAuthoredSurface(canvas, texture, filename) {
+  const url = new URL('../assets/art/' + filename, import.meta.url).href;
+  let disposed = false;
+  const onDispose = () => { disposed = true; };
+  texture.addEventListener('dispose', onDispose);
+  if (!authoredImages.has(url)) {
+    authoredImages.set(url, new Promise(resolve => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => { authoredImages.delete(url); resolve(null); };
+      image.src = url;
+    }));
+  }
+  authoredImages.get(url).then(image => {
+    texture.removeEventListener('dispose', onDispose);
+    if (disposed || !image) return;
+    canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+    texture.needsUpdate = true;
+    if (!surfaceNotificationPending) {
+      surfaceNotificationPending = true;
+      setTimeout(() => {
+        surfaceNotificationPending = false;
+        window.dispatchEvent(new Event('bb:surface-ready'));
+      }, 0);
+    }
+  });
+}
+
+
 function canvasSurface(size = 256) {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
@@ -20,7 +53,7 @@ function surfaceTexture(canvas) {
 // Small deterministic textures add surface detail without downloads or more meshes.
 export function makeStoneMaterial({ color = 0xb7b28b, repeat = 1 } = {}) {
   const { canvas, context, random } = canvasSurface();
-  context.fillStyle = '#414735';
+  context.fillStyle = '#767764';
   context.fillRect(0, 0, 256, 256);
   for (let row = -1; row < 7; row++) {
     for (let col = -1; col < 5; col++) {
@@ -28,10 +61,11 @@ export function makeStoneMaterial({ color = 0xb7b28b, repeat = 1 } = {}) {
       const y = row * 43;
       const light = 64 + random() * 16;
       context.fillStyle = `hsl(48 12% ${light}%)`;
-      context.fillRect(x + 2, y + 2, 60, 39);
-      context.strokeStyle = 'rgba(255,250,209,0.3)';
-      context.lineWidth = 1;
-      context.strokeRect(x + 3, y + 3, 58, 37);
+      const inset = 0.7 + random() * 0.5;
+      context.fillRect(x + inset, y + inset, 64 - inset * 2, 43 - inset * 2);
+      context.strokeStyle = 'rgba(255,250,209,0.13)';
+      context.lineWidth = 0.6;
+      context.strokeRect(x + inset + 1, y + inset + 1, 61 - inset * 2, 40 - inset * 2);
       for (let fleck = 0; fleck < 22; fleck++) {
         context.fillStyle = fleck % 3 ? 'rgba(46,59,29,0.12)' : 'rgba(244,239,195,0.2)';
         context.fillRect(x + 4 + random() * 54, y + 4 + random() * 32, 2, 1);
@@ -40,7 +74,8 @@ export function makeStoneMaterial({ color = 0xb7b28b, repeat = 1 } = {}) {
   }
   const map = surfaceTexture(canvas);
   map.repeat.set(repeat, repeat);
-  return new THREE.MeshStandardMaterial({ color, map, bumpMap: map, bumpScale: 0.055, roughness: 0.9 });
+  applyAuthoredSurface(canvas, map, 'jungle-stone-albedo-v1.png');
+  return new THREE.MeshStandardMaterial({ color, map, bumpMap: map, bumpScale: 0.025, roughness: 0.86 });
 }
 
 export function makePlazaMaterial() {
@@ -100,10 +135,11 @@ export function makeWaterfallMaterial() {
     fragmentShader: `uniform float time; varying vec2 flowUv;
       void main() {
         float edge = smoothstep(0.0, 0.16, flowUv.x) * smoothstep(0.0, 0.16, 1.0 - flowUv.x);
-        float streak = pow(0.5 + 0.5 * sin(flowUv.x * 72.0 + sin(flowUv.y * 14.0 + time * 2.0)), 3.0);
-        float spray = pow(0.5 + 0.5 * sin(flowUv.y * 45.0 + time * 5.0 + flowUv.x * 9.0), 12.0);
-        vec3 color = mix(vec3(0.11, 0.55, 0.64), vec3(0.75, 0.97, 0.94), streak * 0.7 + spray * 0.3);
-        gl_FragColor = vec4(color, edge * (0.66 + streak * 0.26));
+        float streak = 0.5 + 0.5 * sin(flowUv.x * 28.0 + sin(flowUv.y * 9.0 + time * 2.0) * 2.5);
+        float spray = pow(0.5 + 0.5 * sin(flowUv.y * 33.0 + time * 5.0 + flowUv.x * 17.0), 8.0);
+        float foam = pow(1.0 - flowUv.y, 7.0);
+        vec3 color = mix(vec3(0.16, 0.57, 0.63), vec3(0.79, 0.96, 0.89), streak * 0.34 + spray * 0.2 + foam * 0.38);
+        gl_FragColor = vec4(color, edge * (0.56 + streak * 0.2 + foam * 0.18));
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
@@ -169,5 +205,6 @@ export function makeTerrainMaterial() {
   map.colorSpace = THREE.SRGBColorSpace;
   map.wrapS = map.wrapT = THREE.RepeatWrapping;
   map.repeat.set(12, 12);
+  applyAuthoredSurface(canvas, map, 'jungle-ground-albedo-v1.png');
   return new THREE.MeshStandardMaterial({ map, roughness: 0.97 });
 }

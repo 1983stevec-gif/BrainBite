@@ -1,9 +1,9 @@
 import * as THREE from '../vendor/three/three.module.js';
 import { mergeGeometries } from '../vendor/three/addons/utils/BufferGeometryUtils.js';
-import { makeMascot, makeTreeGrove, makeRock, makeAnswerDisc, disposeObject } from './props.mjs';
+import { makeMascot, makeTreeGrove, makeRock, makeAnswerDisc, disposeObject, polishAuthoredAsset } from './props.mjs';
 import { shouldReduceMotion } from './capability.mjs';
 import { loadGltfAsset, disposeGltfAsset } from './gltf-assets.mjs';
-import { addJungleBanks, makeWaterMaterial, fitSceneCamera, makeSkyDome } from './jungle-environment.mjs';
+import { addJungleBanks, makeWaterMaterial, fitSceneCamera, makeSkyDome, addJungleDepth, addWaterContact, makeNaturalRockGeometry } from './jungle-environment.mjs';
 import { createCharacterAnimation } from './character-animation.mjs';
 import { createQualityController } from './graphics-quality.mjs';
 import { createPerformanceBudget } from './performance-budget.mjs';
@@ -141,8 +141,9 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x70bdcb);
-  scene.fog = new THREE.Fog(0x81b9b1, 23, 49);
-  scene.add(makeSkyDome({ top: 0x67b5dc, horizon: 0xc4dfc6 }));
+  scene.fog = new THREE.Fog(0x83b6b3, 22, 54);
+  scene.add(makeSkyDome({ top: 0x67b5dc, horizon: 0xd9eacf }));
+  addJungleDepth(scene);
 
   const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 120);
   fitSceneCamera(camera, width / height, battleFraming(width / height));
@@ -169,6 +170,7 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
   water.rotation.x = -Math.PI / 2;
   water.receiveShadow = true;
   scene.add(water);
+  addWaterContact(scene, [[-2.6, -5.1], [2.8, -5.1], [-3.9, 0.1], [3.9, 0.1]]);
 
   // Pier
   const pierMat = makeTimberMaterial({ color: 0xe7c48a });
@@ -193,8 +195,8 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
 
   // Broken rocky ridges behind the shared stepped temple, not solid grey walls.
   const cliff = makeStoneMaterial({ color: 0x9fa67b, repeat: 2 });
-  const naturalRock = new THREE.MeshStandardMaterial({ color: 0x708373, roughness: 0.98 });
-  const ridgeGeometry = new THREE.DodecahedronGeometry(1, 1);
+  const naturalRock = new THREE.MeshStandardMaterial({ color: 0xc3d3cd, vertexColors: true, roughness: 0.96 });
+  const ridgeGeometry = makeNaturalRockGeometry();
   for (const [x, y, scale] of [[-8, 2.2, 3], [8, 2.1, 2.8], [-5, 1.5, 2.1], [5, 1.4, 2.1]]) {
     const ridge = new THREE.Mesh(ridgeGeometry, naturalRock);
     ridge.position.set(x, y, -9);
@@ -676,6 +678,7 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
   let frameTimingActive = false;
   const gltfRoots = new Set();
   const gltfOwnedMaterials = new Set();
+  const assetVisualDisposers = [];
   const applyQuality = createQualityController(renderer, scene, sun, host);
   applyQuality();
   const classObserver = new MutationObserver(() => {
@@ -684,6 +687,8 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
     if (reducedMotion) renderFrame();
   });
   classObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+  const onSurfaceReady = () => { if (reducedMotion) renderFrame(); };
+  window.addEventListener('bb:surface-ready', onSurfaceReady);
 
   function installAsset(asset, fallback, options, onInstall) {
     pendingAssetLoads += 1;
@@ -694,6 +699,7 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
         duration: Math.max(0, performanceClock.now() - assetStartedAt),
       });
       if (disposed || webglContextLost) return disposeGltfAsset(root);
+      assetVisualDisposers.push(polishAuthoredAsset(root));
       fallback?.traverse?.(child => { child.visible = false; });
       gltfRoots.add(root);
       scene.add(root);
@@ -708,6 +714,11 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
       console.warn(`[BrainBite] ${asset} GLB unavailable; keeping procedural fallback.`, error.message);
     }).finally(() => {
       pendingAssetLoads -= 1;
+      recordSceneReady();
+    });
+  }
+
+  function recordSceneReady() {
       if (!sceneReadyRecorded && pendingAssetLoads === 0) {
         sceneReadyRecorded = true;
         frameTimingActive = true;
@@ -716,7 +727,6 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
         performanceBudget.sampleRenderer();
         performanceBudget.recordSceneLoad(Math.max(0, performanceClock.now() - sceneStartedAt));
       }
-    });
   }
 
   // Shadows (UI Phase 2.5): only Bite and the answer pillars cast, onto the pier and water,
@@ -751,14 +761,14 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
       if ('ABCD'.includes(child.userData.answer_slot || '_')) root.userData.slotChildren.push(child);
       if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
       if (child.userData.brainbite_kind === 'answer_pillar_label') child.visible = false;
-      if (/pillar_(ring|shaft|base|cap)/.test(child.userData.brainbite_kind || '') && child.material) {
+      if (/pillar_(ring|shaft|base|cap|top|plate)/.test(child.userData.brainbite_kind || '') && child.material) {
         child.material = child.material.clone();
         gltfOwnedMaterials.add(child.material);
-        child.material.color.setHex(/shaft/.test(child.userData.brainbite_kind) ? 0xb8b58b : 0xc6c396);
+        child.material.color.setHex(/shaft/.test(child.userData.brainbite_kind) ? 0xb8bba0 : /top|plate/.test(child.userData.brainbite_kind) ? 0xd6cfab : 0xc6c7a2);
         child.material.map = cliff.map;
         child.material.bumpMap = cliff.bumpMap;
-        child.material.bumpScale = 0.045;
-        child.material.roughness = 0.9;
+        child.material.bumpScale = 0.025;
+        child.material.roughness = /top|plate/.test(child.userData.brainbite_kind) ? 0.78 : 0.91;
       }
     });
     setChoices(currentChoices, true);
@@ -806,6 +816,7 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
   function renderFrame() {
     if (disposed || webglContextLost || renderer.getContext().isContextLost()) return;
     renderer.render(scene, camera);
+    recordSceneReady();
   }
 
   function frame() {
@@ -894,6 +905,7 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
       window.removeEventListener('resize', onResize);
       motion.removeEventListener('change', onMotionChange);
       classObserver.disconnect();
+      window.removeEventListener('bb:surface-ready', onSurfaceReady);
       resizeObserver.disconnect();
       renderer.domElement.removeEventListener('pointerdown', onPointer);
       renderer.domElement.removeEventListener('webglcontextlost', contextLost);
@@ -909,6 +921,7 @@ export function createBattleScene(host, { onSelect, onContextLost, onContextRest
       cliff.map.dispose();
       cliff.dispose();
       for (const root of gltfRoots) disposeGltfAsset(root);
+      assetVisualDisposers.forEach(dispose => dispose());
       gltfRoots.clear();
       disposeObject(scene);
       sun.shadow.dispose();

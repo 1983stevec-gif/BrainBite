@@ -1,4 +1,4 @@
-const CACHE = 'brainbite-v2.0-shell-runtime-b842bab31ff121fc3ba46981368dfbd2b8c57ff6b38bfbbc3efeafc5c2068be5';
+const CACHE = 'brainbite-v2.0-shell-runtime-3b79ac34ed3faf2c5418872bf3cd38e9e2ef50a141ea3c2441e21a92b7895c48';
 const FALLBACK = './index.html';
 const CORE = [
   './',
@@ -78,6 +78,8 @@ const OFFLINE_CONTENT = [
   './content/words-question-bank-v1.9.json',
 ];
 const OPTIONAL_3D = [
+  './assets/art/jungle-stone-albedo-v1.png',
+  './assets/art/jungle-ground-albedo-v1.png',
   "./presentation/webgl-home.mjs",
   "./presentation/webgl-battle.mjs",
   './presentation/gltf-assets.mjs',

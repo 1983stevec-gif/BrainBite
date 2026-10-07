@@ -1,8 +1,8 @@
 import * as THREE from '../vendor/three/three.module.js';
-import { makeMascot, makeTreeGrove, makeRock, makeWorldSign, disposeObject } from './props.mjs';
+import { makeMascot, makeTreeGrove, makeRock, makeWorldSign, disposeObject, polishAuthoredAsset } from './props.mjs';
 import { shouldReduceMotion } from './capability.mjs';
 import { loadGltfAsset, disposeGltfAsset } from './gltf-assets.mjs';
-import { addJungleBanks, makeWaterMaterial, fitSceneCamera, makeBiteHouse, makeSkyDome } from './jungle-environment.mjs';
+import { addJungleBanks, makeWaterMaterial, fitSceneCamera, makeBiteHouse, makeSkyDome, addJungleDepth, addWaterContact, makeNaturalRockGeometry } from './jungle-environment.mjs';
 import { createCharacterAnimation } from './character-animation.mjs';
 import { createQualityController } from './graphics-quality.mjs';
 import { makeTerrainMaterial, makePortalEnergyMaterial, makeStoneMaterial, makePlazaMaterial, makeWaterfallMaterial } from './surface-textures.mjs';
@@ -45,8 +45,9 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(worldProfile.palette.sky);
-  scene.fog = new THREE.Fog(0x8cbeb6, 21, 49);
-  scene.add(makeSkyDome({ top: 0x62b9e7, horizon: 0xc9e6cf }));
+  scene.fog = new THREE.Fog(0x83b6b3, 18, 52);
+  scene.add(makeSkyDome({ top: 0x62b9e7, horizon: 0xd9eacf }));
+  if (worldProfile.id === 'jungle-circuit') addJungleDepth(scene);
 
   const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 120);
   fitSceneCamera(camera, width / height, homeFraming(width / height));
@@ -90,6 +91,7 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
   water.rotation.x = -Math.PI / 2;
   water.position.set(0.4, 0.03, -3.2);
   scene.add(water);
+  addWaterContact(scene, [[-4, -4.5], [4, -4.5], [1.6, -2.5]]);
   const bubbleReefKit = worldProfile.id === 'bubble-reef' ? createBubbleReefKit() : null;
   const bubbleReefRouteKit = worldProfile.id === 'bubble-reef' ? createBubbleReefRouteSceneKit() : null;
   const bubbleReefContribution = worldProfile.id === 'bubble-reef' ? createBubbleReefBaseContribution() : null;
@@ -291,13 +293,14 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
   host.appendChild(portalButton);
 
   // Ruins / cliff backdrop
-  const cliffMat = new THREE.MeshStandardMaterial({ color: 0x708875, roughness: 0.98 });
+  const cliffMat = new THREE.MeshStandardMaterial({ color: 0xc3d3cd, vertexColors: true, roughness: 0.96 });
+  const cliffGeometry = makeNaturalRockGeometry();
   for (const [x, z, w, h, d] of [
     [-7.5, -4.5, 3.2, 3.8, 2.2],
     [7.2, -4.2, 3.0, 3.4, 2.0],
     [0.5, -6.5, 8.5, 2.6, 2.4],
   ]) {
-    const cliff = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 1), cliffMat);
+    const cliff = new THREE.Mesh(cliffGeometry, cliffMat);
     cliff.scale.set(w * 0.6, h * 0.65, d);
     cliff.position.set(x, h / 2 - 0.1, z);
     scene.add(cliff);
@@ -357,6 +360,7 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
   let characterAnimation = null;
   let portalEnergyMaterial = null;
   const gltfRoots = new Set();
+  const assetVisualDisposers = [];
   let pendingAssetLoads = 0;
   let sceneReadyRecorded = false;
   let frameTimingActive = false;
@@ -368,6 +372,8 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
     if (reducedMotion) renderFrame();
   });
   classObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+  const onSurfaceReady = () => { if (reducedMotion) renderFrame(); };
+  window.addEventListener('bb:surface-ready', onSurfaceReady);
 
   function installAsset(asset, fallback, options, onInstall) {
     pendingAssetLoads += 1;
@@ -384,6 +390,7 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
       if (fallback) fallback.visible = false;
       gltfRoots.add(root);
       scene.add(root);
+      assetVisualDisposers.push(polishAuthoredAsset(root));
       onInstall?.(root);
       host.dispatchEvent(new CustomEvent('bb:webgl-asset-loaded', { detail: { asset } }));
       if (reducedMotion) renderFrame();
@@ -395,6 +402,11 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
       console.warn(`[BrainBite] ${asset} GLB unavailable; keeping procedural fallback.`, error.message);
     }).finally(() => {
       pendingAssetLoads -= 1;
+      recordSceneReady();
+    });
+  }
+
+  function recordSceneReady() {
       if (!sceneReadyRecorded && pendingAssetLoads === 0) {
         sceneReadyRecorded = true;
         frameTimingActive = true;
@@ -403,7 +415,6 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
         performanceBudget.sampleRenderer();
         performanceBudget.recordSceneLoad(Math.max(0, performanceClock.now() - sceneStartedAt));
       }
-    });
   }
 
   installAsset('mascot', mascotFallback, {
@@ -513,6 +524,7 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
   function renderFrame() {
     if (disposed || contextLost || renderer.getContext().isContextLost()) return;
     renderer.render(scene, camera);
+    recordSceneReady();
   }
 
   function frame() {
@@ -567,6 +579,7 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
       window.removeEventListener('resize', onResize);
       motionQuery.removeEventListener('change', onMotionChange);
       classObserver.disconnect();
+      window.removeEventListener('bb:surface-ready', onSurfaceReady);
       resizeObserver.disconnect();
       renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
       renderer.domElement.removeEventListener('webglcontextrestored', handleContextRestored);
@@ -574,6 +587,7 @@ export function createHomeScene(host, { onContextLost, onContextRestored, onPlay
       // GLTF clones share their geometry, original materials, textures, and skeleton data
       // with the parse cache. Detach them before disposing resources owned by this scene.
       for (const root of gltfRoots) disposeGltfAsset(root);
+      assetVisualDisposers.forEach(dispose => dispose());
       gltfRoots.clear();
       portalEnergyMaterial?.dispose();
       disposeObject(scene);

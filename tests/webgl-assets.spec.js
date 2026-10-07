@@ -7,9 +7,11 @@ test('world art is available from the install cache before an app visit', async 
     '/assets/art/number-nebula.svg',
     '/assets/art/wordwood.svg',
     '/assets/art/language-portals.svg',
+    '/assets/art/jungle-stone-albedo-v1.png',
+    '/assets/art/jungle-ground-albedo-v1.png',
   ];
 
-  // This page renders no world art, so only service-worker installation can cache the SVGs.
+  // This page renders no world art, so only service-worker installation can cache these assets.
   await page.goto('/privacy.html');
   await page.evaluate(async () => {
     await navigator.serviceWorker.register('/service-worker.js');
@@ -28,7 +30,7 @@ test('world art is available from the install cache before an app visit', async 
         path,
         ok: response.ok,
         contentType: response.headers.get('content-type'),
-        body: await response.text(),
+        bytes: Array.from(new Uint8Array(await response.arrayBuffer()).slice(0, 256)),
       };
     } catch (error) {
       return { path, error: String(error) };
@@ -38,8 +40,13 @@ test('world art is available from the install cache before an app visit', async 
   for (const result of results) {
     expect(result.error, result.path).toBeUndefined();
     expect(result.ok, result.path).toBe(true);
-    expect(result.contentType, result.path).toContain('image/svg+xml');
-    expect(result.body, result.path).toMatch(/<svg[\s>]/);
+    if (result.path.endsWith('.png')) {
+      expect(result.contentType, result.path).toContain('image/png');
+      expect(result.bytes.slice(0, 8), result.path).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+    } else {
+      expect(result.contentType, result.path).toContain('image/svg+xml');
+      expect(String.fromCharCode(...result.bytes), result.path).toMatch(/<svg[\s>]/);
+    }
   }
 });
 
@@ -222,4 +229,24 @@ test('live WebGL scenes expose frame and scene-load budget evidence', async ({ p
   expect(battleReport.assetTiming.count).toBeGreaterThan(0);
   const runtimeReport = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().runtime);
   expect(runtimeReport.metrics.save.count).toBeGreaterThan(0);
+});
+
+
+test('late material artwork updates live textures without reviving disposed textures', async ({ page }) => {
+  const held = [];
+  await page.route('**/jungle-*-albedo-v1.png', route => { held.push(route); });
+  await page.goto('/privacy.html');
+  await page.evaluate(async () => {
+    const { makeStoneMaterial, makeTerrainMaterial } = await import('/presentation/surface-textures.mjs');
+    const stone = makeStoneMaterial();
+    const ground = makeTerrainMaterial();
+    window.__surfaceProbe = { stone, ground, stoneVersion: stone.map.version, groundVersion: ground.map.version };
+    stone.map.dispose();
+    stone.dispose();
+  });
+  await expect.poll(() => held.length).toBe(2);
+  await Promise.all(held.map(route => route.continue()));
+  await expect.poll(() => page.evaluate(() => window.__surfaceProbe.ground.map.version > window.__surfaceProbe.groundVersion)).toBe(true);
+  expect(await page.evaluate(() => window.__surfaceProbe.stone.map.version)).toBe(await page.evaluate(() => window.__surfaceProbe.stoneVersion));
+  await page.evaluate(() => { window.__surfaceProbe.ground.map.dispose(); window.__surfaceProbe.ground.dispose(); });
 });

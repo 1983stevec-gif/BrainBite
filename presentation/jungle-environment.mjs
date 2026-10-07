@@ -236,24 +236,96 @@ export function makeWaterMaterial() {
   const context = canvas.getContext('2d');
   // A constant base wraps without a colour seam; a repeated diagonal gradient
   // made large checkerboard patches across the battle river.
-  context.fillStyle = '#197d87';
+  context.fillStyle = '#167f86';
   context.fillRect(0, 0, 256, 256);
-  for (let row = -1; row < 17; row++) {
+  for (let row = -1; row < 25; row++) {
     context.beginPath();
     for (let x = 0; x <= 256; x += 4) {
-      const y = row * 17 + Math.sin(x * Math.PI / 64 + row * 1.8) * 5
+      const y = row * 11 + Math.sin(x * Math.PI / 64 + row * 1.8) * 5
         + Math.sin(x * Math.PI / 32 + row * 2.3) * 2;
       if (x === 0) context.moveTo(x, y); else context.lineTo(x, y);
     }
-    context.strokeStyle = row % 3 === 0 ? 'rgba(192,249,221,0.38)' : 'rgba(117,222,218,0.22)';
-    context.lineWidth = row % 3 === 0 ? 0.8 : 1.4;
+    context.strokeStyle = row % 3 === 0 ? 'rgba(192,249,221,0.23)' : 'rgba(117,222,218,0.13)';
+    context.lineWidth = row % 3 === 0 ? 0.55 : 0.9;
     context.stroke();
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.repeat.set(4, 4);
-  return new THREE.MeshStandardMaterial({ map: texture, roughness: 0.25, metalness: 0.28, emissive: 0x0b4249, emissiveIntensity: 0.15 });
+  return new THREE.MeshStandardMaterial({ map: texture, bumpMap: texture, bumpScale: 0.035, roughness: 0.31, metalness: 0.18, emissive: 0x063c45, emissiveIntensity: 0.1 });
+}
+
+export function makeNaturalRockGeometry() {
+  const geometry = new THREE.SphereGeometry(1, 14, 10);
+  const position = geometry.getAttribute('position');
+  const colors = [];
+  for (let i = 0; i < position.count; i++) {
+    const x = position.getX(i), y = position.getY(i), z = position.getZ(i);
+    const noise = Math.sin(x * 8 + z * 4) * Math.cos(y * 9 - x * 3);
+    position.setXYZ(i, x * (1 + noise * 0.12), y * (1 + noise * 0.16), z * (1 + noise * 0.13));
+    const color = new THREE.Color(0x52768b).lerp(new THREE.Color(0xa8c3c6), Math.max(0, y * 0.5 + 0.4 + noise * 0.1));
+    colors.push(color.r, color.g, color.b);
+  }
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+// Three authored silhouettes add atmospheric depth even in the tall phone camera.
+// They remain behind the playable geometry and share one draw call per layer.
+export function addJungleDepth(scene) {
+  const group = new THREE.Group();
+  group.name = 'JungleDepth';
+  for (let layer = 0; layer < 3; layer++) {
+    const shape = new THREE.Shape();
+    shape.moveTo(-30, -2);
+    for (let i = 0; i <= 100; i++) {
+      const x = -30 + i * 0.6;
+      const canopy = Math.abs(Math.sin(i * 1.3 + layer * 1.6));
+      const height = 2.9 + layer * 0.75 + Math.sin(i * 0.16 + layer) * 0.25 + canopy * 0.35;
+      shape.quadraticCurveTo(x - 0.3, height + 0.35, x, height);
+    }
+    shape.lineTo(30, -2);
+    shape.closePath();
+    const geometry = new THREE.ShapeGeometry(shape);
+    const colors = [];
+    const positions = geometry.getAttribute('position');
+    for (let i = 0; i < positions.count; i++) {
+      const y = positions.getY(i), x = positions.getX(i);
+      const mist = Math.max(0, Math.min(1, y / 5.5 + Math.sin(x * 0.35 + layer) * 0.04));
+      const color = new THREE.Color([0x547f73, 0x759b90, 0x8caaa6][layer])
+        .lerp(new THREE.Color([0x94b9a5, 0xafcdbc, 0xc4daca][layer]), mist);
+      colors.push(color.r, color.g, color.b);
+    }
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    const material = new THREE.MeshBasicMaterial({ vertexColors: true });
+    const silhouette = new THREE.Mesh(geometry, material);
+    silhouette.position.z = -12 - layer * 6;
+    group.add(silhouette);
+  }
+  scene.add(group);
+  return group;
+}
+
+export function addWaterContact(scene, positions) {
+  const geometry = new THREE.RingGeometry(0.25, 0.36, 32);
+  const material = new THREE.MeshBasicMaterial({ color: 0xbcece0, transparent: true, opacity: 0.38, side: THREE.DoubleSide, depthWrite: false });
+  const rings = new THREE.InstancedMesh(geometry, material, positions.length * 3);
+  const transform = new THREE.Object3D();
+  positions.forEach(([x, z], index) => {
+    for (let ring = 0; ring < 3; ring++) {
+      transform.position.set(x + Math.sin(index * 2) * ring * 0.1, 0.07 + ring * 0.001, z);
+      transform.rotation.set(-Math.PI / 2, 0, index);
+      transform.scale.set(1.2 + ring * 0.85, 0.65 + ring * 0.45, 1);
+      transform.updateMatrix();
+      rings.setMatrixAt(index * 3 + ring, transform.matrix);
+    }
+  });
+  rings.instanceMatrix.needsUpdate = true;
+  rings.name = 'waterContactFoam';
+  scene.add(rings);
+  return rings;
 }
 
 export function fitSceneCamera(camera, aspect, { span, height, target, distance }) {
@@ -275,7 +347,7 @@ export function makeSkyDome({ top = 0x9fd8ff, horizon = 0xe9f6d8, radius = 60 } 
   const position = geometry.getAttribute('position');
   const mixed = new THREE.Color();
   for (let i = 0; i < position.count; i += 1) {
-    const k = Math.max(0, Math.min(1, position.getY(i) / radius * 1.6 + 0.15));
+    const k = Math.max(0, Math.min(1, position.getY(i) / radius * 3.5 + 0.55));
     mixed.copy(horizonColor).lerp(topColor, k);
     colors.push(mixed.r, mixed.g, mixed.b);
   }

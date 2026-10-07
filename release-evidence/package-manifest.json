@@ -1,6 +1,6 @@
 {
   "schema": "brainbite.package-manifest.v1",
-  "generatedAt": "2026-10-04T18:13:52.089Z",
+  "generatedAt": "2026-10-07T01:29:13.303Z",
   "files": {
     "app.js": {
       "sha256": "0b361a07178a5f075af825fd17b4126849dfed31b9ec6d34be5888ff098a3eb1",
@@ -13,6 +13,14 @@
     "assets/art/bloop.svg": {
       "sha256": "47ea3e6da562467932e091dad848ab17077a526d788a4b4d289b2a4f3d08a408",
       "bytes": 717
+    },
+    "assets/art/jungle-ground-albedo-v1.png": {
+      "sha256": "34ac85d4fb6ec00dc74fd079153ca6f50a93bda19f5de34732e28f9fa5f1141c",
+      "bytes": 782468
+    },
+    "assets/art/jungle-stone-albedo-v1.png": {
+      "sha256": "5a9b08c3be85668854bc6a73145424e7ac6ec55fba43376f4744ae1fc338eba2",
+      "bytes": 644740
     },
     "assets/art/language-portals.svg": {
       "sha256": "feb001413dd0b6fb6212dac09c61f77166fe9b3efa524de6a1bad03a1215cdf5",
@@ -315,8 +323,8 @@
       "bytes": 1632
     },
     "presentation/jungle-environment.mjs": {
-      "sha256": "39d32786cce0a0ce30fdbc7c849699cd6323b6bb4b673ca210103e0ca5502809",
-      "bytes": 12650
+      "sha256": "5da999de9798f6a07d66a2e5f10f0c170cbb604bd15355d61dc74d493021d1eb",
+      "bytes": 15935
     },
     "presentation/match-fx.mjs": {
       "sha256": "ebd0331643d0ae913db3a58445e09a0376b5ba74f3c741e38bf391acd736a215",
@@ -343,20 +351,20 @@
       "bytes": 2769
     },
     "presentation/props.mjs": {
-      "sha256": "cd0fae8aac62f97ec7291684a1dc2106dc4fe9064f23698e79bdc55ca5d362b7",
-      "bytes": 17782
+      "sha256": "3c64a69760df863cf06acd01edbb32c9a4ba37b163d78b73ce0dd787ec6bc2de",
+      "bytes": 22863
     },
     "presentation/surface-textures.mjs": {
-      "sha256": "694b259dcb9fad94221916a08aad1532cda3ad0ba70bfdb6c8e59ed11f88761f",
-      "bytes": 6887
+      "sha256": "8bf775c3e8a69063abf2f755a14757557c04c6b54422ec9f74c50c0795c333c5",
+      "bytes": 8455
     },
     "presentation/webgl-battle.mjs": {
-      "sha256": "ed12e1d2b722531de900d0843e6bb46ccf855d6e13cdff009e3f07f7e1343fcc",
-      "bytes": 39948
+      "sha256": "8bee48c6ec227dd148b3b0eac64a68e3d267edd444527baedf29f585ea9bb822",
+      "bytes": 40713
     },
     "presentation/webgl-home.mjs": {
-      "sha256": "6dd159edbb799dc59f584e05b87dbcec427b749ff91e82eed71f35c359d6cd01",
-      "bytes": 24265
+      "sha256": "e78b5941038fa5ce496f7b9f2d00b419f9b4a72ff79258b24b926655098f0026",
+      "bytes": 24966
     },
     "presentation/world-profiles.mjs": {
       "sha256": "dfe484696c6c56827433b9c44067030e0010acf71a83db41bb14c267b33dc290",
@@ -367,8 +375,8 @@
       "bytes": 3059
     },
     "service-worker.js": {
-      "sha256": "b64420fa7d5c8f231a1121747076d60a273808d2478fa56ab045ea4ee2f87b74",
-      "bytes": 5057
+      "sha256": "920b419f14fef2ade9cde3f233fc99bd04b47f06077483f47b3054a4073edee5",
+      "bytes": 5148
     },
     "styles.css": {
       "sha256": "93a430a550f327d71008c29920874fae774755971149ca38de53b844538637bc",
