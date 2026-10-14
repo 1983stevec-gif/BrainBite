@@ -14,10 +14,10 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      # Fail quickly on structural, content, and evidence regressions before longer tests.
+      - run: npm run check:static
       - run: npm run check:content
       - run: npm run check:content-review
-      - run: npm run check:static
       - run: npm run check:evidence:ci
       - run: npm run check:runtime
       - run: npm run check:release
@@ -26,17 +26,7 @@ jobs:
       - run: npm run check:final
       - run: npm run check:firebase:security
       - run: npm run native:verify
-      # Full release gate used locally; CI keeps content + e2e (DOM + MATCH).
       - run: npm run test:unit
-      - run: npm run test:e2e
-      - name: Upload Playwright report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: playwright-report
-          if-no-files-found: ignore
-          retention-days: 14
       # One runner owns the smoke inventory, starts its own server, and writes its report to
       # the git-ignored .playwright-results/ (tracked evidence changes only via evidence:refresh).
       - run: npm run smoke
@@ -46,6 +36,36 @@ jobs:
         with:
           name: smoke-report
           path: .playwright-results/smoke-report.json
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Test runs leave the tracked tree unchanged
+        run: git diff --exit-code --stat
+
+  browser:
+    name: browser (shard ${{ matrix.shard }}/3)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      # Preserve every shard verdict if another shard fails.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      # fully-parallel makes sharding test-level; workers=1 retains serial execution per shard.
+      - run: npm run test:e2e -- --fully-parallel --workers=1 --shard=${{ matrix.shard }}/3
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-shard-${{ matrix.shard }}
+          path: playwright-report
           if-no-files-found: ignore
           retention-days: 14
       - name: Test runs leave the tracked tree unchanged

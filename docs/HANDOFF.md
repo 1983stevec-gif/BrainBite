@@ -75,20 +75,26 @@ claimed.
 | Historical PR #2 remote CI | GitHub Actions | **211 browser tests, zero retries**, 11/11 smokes, clean tree, and Firestore job pass; historical only | Actions runs 36316190009 and 36316192782 |
 | Historical PR #2 native shell | `npm run native:verify` and `npm run native:verify:runtime` | 100 runtime files and zero TCP listeners; historical only | PR #2 records |
 
-Measured budgets (headless-judgeable, all passing):
+Latest recorded measurements (not guarantees; startup is load-sensitive and the Bubble
+Reef draw-call figures are from a single run):
 
 | Metric | Measured | Budget |
 |---|---:|---:|
-| Startup | ~720 ms | 3000 ms |
+| Startup (desktop) | 2,798 ms in one load-sensitive run | 3,000 ms |
 | Save latency (desktop p95 / max) | 6.6 ms / 7.2 ms | 250 ms / 1000 ms |
 | Save latency (mobile p95 / max) | 10.1 ms / 10.3 ms | 250 ms / 1000 ms |
-| Payload | 3,222 KB raw | 4,096 KB |
-| Memory | ~20 MB | 512 MB |
-| Draw calls | 117 home / 198 battle | 200 |
-| Triangles | 39,656 | 250,000 |
+| 3D payload (GLBs + authored raster surfaces) | 3,459,795 bytes raw | 4,194,304 bytes |
+| Memory | ~29 MB in one run | 512 MB |
+| Jungle draw calls | up to 174 home / 136 battle in one run | 200 |
+| Bubble Reef home draw calls | 143 desktop / 145 mobile in one run | 200 |
+| Triangles | up to ~126,000 in one run | 250,000 |
 
-`npm run measure:payload` additionally reports transfer size: the 3.2 MB of 3D assets
-compress to **769 KB gzip / 374 KB brotli**, which is why Draco was rejected (§7).
+The raw 3D total is 3,161,104 bytes of GLBs plus 298,691 bytes of authored textures;
+the textures were reduced from 1,427,208 bytes. This leaves 734,509 bytes below the raw
+budget. In this checkout, `npm run measure:payload`
+still reports only the five GLBs: **3,087 KB raw / 769 KB gzip / 374 KB brotli**. A
+compressed total for the complete GLB-plus-texture set is therefore not verified by that
+command and is not claimed here.
 
 Device-only metrics — frame pacing, long-task tails, scene load, asset load — are recorded as
 **unverified** in every probe run. They need real hardware.
@@ -185,7 +191,10 @@ approved, 0 rejected** (0 digest mismatches).
   before `app.js`) reports `web`, `capacitor`, `tauri`, or `simulated` (`?native=1`, tests
   only). In a native shell: no service worker, footer/outbound links need the family PIN,
   Android back is routed to `handleNativeBack()`, haptics follow the Vibration setting. The
-  web build is unchanged. `tests/native-shell.spec.js` covers it.
+  web build is unchanged. `tests/native-shell.spec.js` covers a **browser simulation**:
+  its mirror uses `localStorage`, Android back is dispatched directly, and `lastHaptic` is
+  recorded before any native plugin call. It does not verify interactive Capacitor
+  Preferences, Haptics, or App integration; that native behavior remains unverified.
 - **The service worker precache is a fixed list.** Adding a runtime asset means updating
   `service-worker.js` *and* the stage allowlist, then bumping the cache name
   (the current versioned cache name is defined in `service-worker.js`) so clients re-precache.

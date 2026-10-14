@@ -1,4 +1,5 @@
 import * as THREE from '../vendor/three/three.module.js';
+import { mergeGeometries } from '../vendor/three/addons/utils/BufferGeometryUtils.js';
 
 /**
  * Add group to a lit scene; the route runs from +Z to -Z, about 6 x 11 units.
@@ -21,6 +22,7 @@ export function createBubbleReefRouteKit({ seed = 731, reducedMotion = false } =
   group.userData = { worldProfile: 'bubble-reef', routeId: 'bubble-reef-preview-route', seed };
   const geometries = new Set();
   const materials = new Set();
+  const instances = new Set();
   const ownGeometry = value => { geometries.add(value); return value; };
   const finish = (color, extra = {}) => {
     const value = new THREE.MeshStandardMaterial({ color, roughness: 0.6, ...extra });
@@ -57,6 +59,53 @@ export function createBubbleReefRouteKit({ seed = 731, reducedMotion = false } =
     group.add(anchor);
     return anchor;
   }
+  function instanceMeshes(parent, sources) {
+    group.updateMatrixWorld(true);
+    const inverse = parent.matrixWorld.clone().invert();
+    const batches = new Map();
+    for (const source of sources) {
+      const key = `${source.name}:${source.geometry.uuid}:${source.material.uuid}`;
+      if (!batches.has(key)) batches.set(key, {
+        name: source.name, geometry: source.geometry, material: source.material, matrices: [],
+      });
+      batches.get(key).matrices.push(new THREE.Matrix4().multiplyMatrices(inverse, source.matrixWorld));
+    }
+    sources.forEach(source => source.removeFromParent());
+    for (const values of batches.values()) {
+      const batch = new THREE.InstancedMesh(values.geometry, values.material, values.matrices.length);
+      batch.name = values.name;
+      values.matrices.forEach((matrix, index) => batch.setMatrixAt(index, matrix));
+      batch.instanceMatrix.needsUpdate = true;
+      batch.computeBoundingBox();
+      batch.computeBoundingSphere();
+      parent.add(batch);
+      instances.add(batch);
+    }
+  }
+  function mergeStaticMeshes(parent, sources) {
+    group.updateMatrixWorld(true);
+    const inverse = parent.matrixWorld.clone().invert();
+    const batches = new Map();
+    for (const source of sources) {
+      if (!batches.has(source.material.uuid)) batches.set(source.material.uuid, {
+        material: source.material, parts: [], count: 0,
+      });
+      const values = batches.get(source.material.uuid);
+      const matrix = new THREE.Matrix4().multiplyMatrices(inverse, source.matrixWorld);
+      const part = source.geometry.index ? source.geometry.toNonIndexed() : source.geometry.clone();
+      values.parts.push(part.applyMatrix4(matrix));
+      values.count++;
+    }
+    sources.forEach(source => source.removeFromParent());
+    for (const values of batches.values()) {
+      const merged = ownGeometry(mergeGeometries(values.parts));
+      values.parts.forEach(part => part.dispose());
+      const batch = new THREE.Mesh(merged, values.material);
+      batch.name = 'route-static-batch';
+      batch.userData.sourceMeshCount = values.count;
+      parent.add(batch);
+    }
+  }
   const entry = landmark('reef-entry', 'Reef Entry', 'landmark', [0, 0, 4]);
   const current = landmark('bubble-current', 'Bubble Current', 'interaction', [0, 0, 0]);
   const exit = landmark('pearl-arch', 'Pearl Arch', 'landmark', [0, 0, -4]);
@@ -92,6 +141,11 @@ export function createBubbleReefRouteKit({ seed = 731, reducedMotion = false } =
       [radius, radius, radius]);
     bubbles.push({ item, base: item.position.clone(), phase: random() * Math.PI * 2 });
   }
+  const bubbleBatch = new THREE.InstancedMesh(sphere, bubbleFinish, bubbles.length);
+  bubbleBatch.name = 'current-bubble';
+  current.add(bubbleBatch);
+  instances.add(bubbleBatch);
+  bubbles.forEach(bubble => bubble.item.removeFromParent());
 
   // A raised semicircle and side pillars leave a real, unobstructed exit opening.
   mesh(exit, 'pearl-arch-crown', arch, pearl, [0, 1.25, 0], [1.5, 1.5, 1.5]);
@@ -111,6 +165,22 @@ export function createBubbleReefRouteKit({ seed = 731, reducedMotion = false } =
       [side * (2.05 + random() * 0.3), height * 0.5, 4 - Math.floor(i / 2) * 1.6],
       [0.25 + random() * 0.15, height, 0.3]);
   }
+  instanceMeshes(exit, exit.children.filter(item => item.isMesh));
+  mergeStaticMeshes(group, [
+    ...entry.children.filter(item => item.isMesh && item.name !== 'entry-landing'),
+    ...current.children.filter(item => item.isMesh && item !== bubbleBatch && item !== target),
+    ...group.children.filter(item => item.isMesh),
+  ]);
+  function syncBubbles() {
+    bubbles.forEach((bubble, index) => {
+      bubble.item.updateMatrix();
+      bubbleBatch.setMatrixAt(index, bubble.item.matrix);
+    });
+    bubbleBatch.instanceMatrix.needsUpdate = true;
+    bubbleBatch.computeBoundingBox();
+    bubbleBatch.computeBoundingSphere();
+  }
+  syncBubbles();
   let disposed = false;
   function update(timeSeconds = 0, motionReduced = reducedMotion) {
     if (disposed) return;
@@ -121,13 +191,16 @@ export function createBubbleReefRouteKit({ seed = 731, reducedMotion = false } =
         item.position.y += (Math.sin(time * 0.4 + phase) - Math.sin(phase)) * 0.16;
       }
     }
+    syncBubbles();
   }
   function dispose() {
     if (disposed) return;
     disposed = true;
     group.removeFromParent();
+    instances.forEach(value => value.dispose());
     geometries.forEach(value => value.dispose());
     materials.forEach(value => value.dispose());
+    instances.clear();
     geometries.clear();
     materials.clear();
     bubbles.length = 0;

@@ -7,7 +7,8 @@ import { createBubbleReefBaseContribution } from '../presentation/bubble-reef-ba
 function snapshot(group) {
   const result = [];
   group.traverse(item => result.push([item.name, item.visible, item.position.toArray(),
-    item.quaternion.toArray(), item.scale.toArray(), item.material?.opacity]));
+    item.quaternion.toArray(), item.scale.toArray(), item.material?.opacity,
+    item.instanceMatrix ? Array.from(item.instanceMatrix.array) : null]));
   return result;
 }
 
@@ -115,8 +116,9 @@ test('primitive ornament fits a bounded attachment and shares a small resource b
     effect.group.traverse(item => {
       if (!item.isMesh) return;
       shapes.add(item.geometry);
-      meshes++;
-      triangles += item.geometry.index.count / 3;
+      const amount = item.isInstancedMesh ? item.count : 1;
+      meshes += amount;
+      triangles += item.geometry.index.count / 3 * amount;
       for (const value of Object.values(item.material)) assert.ok(!value?.isTexture);
     });
     assert.equal(shapes.size, 3);

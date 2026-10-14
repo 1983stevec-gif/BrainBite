@@ -212,7 +212,7 @@ GPT-6.1 Sol implementation ownership stayed separated: presentation markup in `i
 
 ## Coordinator delivery verification — 2026-10-04
 
-The final Windows build contains the accepted public DOM/WebGL visual upgrade. A final browser check exposed hidden policy links on the redesigned home; the coordinator restored the visible footer, verified ordinary web navigation and native PIN gating, regenerated the runtime cache/manifest, and rebuilt both binaries. This is a stylized real-time scene upgrade, not a claim of one-to-one painted reference fidelity.
+The final Windows build contains the accepted public DOM/WebGL visual upgrade. A final browser check exposed hidden policy links on the redesigned home; the coordinator restored the visible footer, verified ordinary web navigation and **browser-simulated** native PIN gating, regenerated the runtime cache/manifest, and rebuilt both binaries. The Windows build was produced and launched for artifact/process verification, but interactive native Preferences, Haptics, and App integration remains unverified. This is a stylized real-time scene upgrade, not a claim of one-to-one painted reference fidelity.
 
 - `npm run check:static`: PASS. Final cache `brainbite-v2.0-shell-runtime-b842bab31ff121fc3ba46981368dfbd2b8c57ff6b38bfbbc3efeafc5c2068be5`; 100 staged files, 5,813,394 bytes, 97 precached URLs.
 - `npm run test:unit`: 291/291 PASS, zero failures/skips.

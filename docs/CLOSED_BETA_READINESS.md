@@ -19,8 +19,8 @@ Built by `npm run native:stage` (`scripts/stage-site.mjs`) from an explicit allo
 
 | Measure | Value |
 |---|---|
-| Staged files | 100 |
-| Staged size | ~5.4 MB |
+| Staged files | 105 |
+| Staged size | 6,215,201 bytes |
 | Contents | `index.html`, `app.js`, `brainbite-core.mjs`, `styles.css`, `fonts.css`, `sw-register.js`, `service-worker.js`, `manifest.webmanifest`, public pages, `assets/`, `audio/`, `content/`, `icons/`, `presentation/`, `vendor/` |
 | Excluded | `docs`, `tests`, `scripts`, `release-evidence`, `node_modules`, `.git`, `.github`, `.cursor`, `AGENTS.md`, `package.json` |
 
@@ -78,7 +78,7 @@ The installer is unsigned and is an internal closed-beta artifact.
 | Artifact | Produced by | Status |
 |---|---|---|
 | `release-evidence/smoke-report.json` | `npm run smoke` | Current local audit: 11/11 passed; report remains git-ignored unless deliberately promoted |
-| `release-evidence/package-manifest.json` | `npm run package:manifest` | Prior package check: 100 files, verified by `check:stage` |
+| `release-evidence/package-manifest.json` | `npm run package:manifest` | Current manifest: 105 files, 6,215,201 bytes |
 | `release-evidence/content-review-packet.{json,html}` | `npm run review:packet` | Prior packet: 75 pending records, 0 digest mismatches |
 | `test-results/performance-evidence/{desktop,mobile}.json` | `npm run probe:performance` | Prior Cycle 2 audit: zero headless budget violations |
 | `release-evidence/local-certification.json` | `npm run certify:local` | Historical: **17/17 stages**, 210 browser cases (2 passed on retry), 11/11 smokes, probe exit 0 with zero headless budget violations. The report was captured on `36887b9` with the final stylesheet/evidence changes in the worktree and records that initial tree as dirty; those changes are committed in `a6786aa`. No-retry follow-ups passed `tests/release.spec.js` 92/92 and BrainBase/MATCH 14/14 |
@@ -188,40 +188,46 @@ Historical PR #2 evidence for fully tested gameplay commit `3ebcf35d8bc7ea18d7c6
 
 | Item | Severity | Note |
 |---|---|---|
-| 3D payload: 53% of vertices are duplicated geometry | **Closed, no change made** | Measured; it compresses to 374 KB brotli and Draco measured as a wash. See section 5 |
+| GLB geometry: 53% of vertices are duplicated | **Closed, no geometry change made** | The GLBs alone measure 374 KB brotli and Draco measured as a wash. Authored raster surfaces are accounted for separately in section 5 |
 | Rebuilding the Blender kit is not byte-reproducible | P3 | Same Blender 5.2.40 and the same committed script: three of five GLBs rebuild byte-identically, the kraken differs by one accessor and 4,456 bytes, the mascot by 4 bytes. Verify assets against the committed manifest (`--verify-only`); do not expect a rebuild to match |
 | Device-only budgets unverified: frame pacing, long-task tails, scene load, asset load | P2 (external) | Recorded in every probe run; requires real hardware |
 | `app.js` remains a large classic script with a full re-render on save | P3 | Measured `render()` at 5–6 ms, so it is not a current bottleneck |
 
-## 5. 3D payload: measured, and deliberately not "fixed"
+## 5. 3D payload: full shipped set and measurement limitation
 
-The runtime package ships 3,183 KB of 3D assets, which is 78% of the 4,096 KB budget.
-Analysing the GLB accessors shows that over half of it is the same geometry copied
-instead of referenced, because every part is created with its own mesh datablock in the
-Blender pipeline.
+After optimization, the shipped 3D set is recorded as **3,459,795 raw bytes**:
+3,161,104 bytes of GLBs plus 298,691 bytes of authored raster surface assets. The textures
+were reduced from 1,427,208 bytes. Against the 4,194,304-byte budget, that leaves 734,509
+bytes of headroom. This is a byte-count result, not a
+startup or device-performance guarantee.
 
-| Asset | KB | primitives | distinct geometries | redundant vertices | largest duplicate group |
+The geometry analysis below applies only to the five GLBs. It shows that over half of
+their vertices are copied instead of referenced, because every part is created with its
+own mesh datablock in the Blender pipeline.
+
+| Asset | KiB | primitives | distinct geometries | redundant vertices | largest duplicate group |
 |---|---:|---:|---:|---:|---:|
 | mascot | 1,284 | 56 | 11 | 17,379 of 21,204 (82%) | 18× |
 | kraken | 898 | 64 | 13 | 11,760 of 21,463 (55%) | 16× |
 | answer pillars | 338 | 28 | 9 | 3,540 of 8,294 (43%) | 8× |
 | portal | 313 | 16 | 7 | 1,020 of 7,505 (14%) | 8× |
 | jungle props | 254 | 28 | 14 | 574 of 5,603 (10%) | 5× |
-| **total** | **3,183** | 192 | 54 | **34,273 of 64,069 (53%)** | |
+| **GLB total** | **3,087** | 192 | 54 | **34,273 of 64,069 (53%)** | |
 
 ### Why this is not worth a risky change
 
-`npm run measure:payload` reports what the assets cost to download:
+In this checkout, `npm run measure:payload` still reads only the five GLBs and prints:
 
 | | raw | gzip | brotli |
 |---|---:|---:|---:|
-| all five 3D assets | 3,087 KB | 769 KB | **374 KB** |
+| all five GLBs | 3,087 KB | 769 KB | **374 KB** |
 
-Compression removes 75% (gzip) and 88% (brotli) of the raw bytes, because the redundancy
-measured above is exactly what a compressor removes: duplicated spheres and repeated
-float32 buffers. GitHub Pages serves brotli, so the real download is about 374 KB. The
-probe deliberately gates the **raw** column, so the budget stays meaningful on a host that
-does not compress.
+Those compression figures do **not** include the authored PNG surfaces, so they must not
+be presented as the transfer size of the full shipped 3D set. A full-set gzip/brotli total
+remains unverified by this command. The standalone measurement still needs to include the
+raster surfaces before its compressed total can substantiate the complete set; the
+performance probe now gates all seven GLB-plus-texture assets. The raw budget above uses the
+complete GLB-plus-texture byte count.
 
 Draco was implemented, measured, and then reverted:
 
@@ -237,10 +243,14 @@ Blender-side mesh sharing cannot help either. `export_apply` has to stay on (the
 armature modifiers depend on it), and it makes the exporter evaluate every object
 separately, so sharing a mesh datablock deduplicates nothing in the exported GLB.
 
-The duplication therefore costs nothing measurable: triangles are 39,656 of 250,000 and
-memory is 20 MB of 512 MB. It is recorded here so a future session does not re-open it
-without new information — a decoder that is already present for another reason would
-change the arithmetic.
+The latest recorded single-run peak was about 126,000 triangles of the 250,000 ceiling and
+about 29 MB memory of the 512 MB ceiling. Jungle measured up to 174 home draw calls and 136
+battle draw calls. Bubble Reef home measured 143 desktop / 145 mobile against the 200
+ceiling in one run. Desktop
+startup measured 2,798 ms against 3,000 ms in one load-sensitive run, leaving only about
+200 ms of observed headroom, not a budget guarantee. The GLB duplication is retained here
+so it is not re-opened without new information; a decoder already present for another
+reason would change the Draco arithmetic.
 
 ## 6. External gates — not part of this package
 

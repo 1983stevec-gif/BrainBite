@@ -351,6 +351,91 @@ and the currency boundary where concurrent unreceipted score or unknown noncanon
 cannot be safely unioned. Invalid or negative decompositions retain the old maximum rather than
 guessing.
 
+## Round 6 — CI, October-7 additions and post-upgrade budgets
+
+Three read-only audits covered the CI/release harness, the October-7 additions and the performance
+budgets after the visual upgrade. The resulting harness and measurement fixes below have landed;
+Bubble Reef draw-call work and probe coverage are still in flight and are not claimed as verified.
+
+### R10 — CI and release harness
+
+1. **The monolithic CI job had little reliable margin.** One measured run took 21m18s against its
+   30-minute ceiling: the browser suite consumed 17m19s (81%), smoke 1m52s, unit 1m18s, static
+   checks about four seconds and native verification under one second. An identical-SHA run varied
+   by four minutes, while a previously observed 8m23s Chromium install would nearly exhaust the
+   ceiling. The earlier run under a 20-minute ceiling was cancelled and produced no verdict.
+2. **Six fake-pass shapes were found.** `certify:local` omitted `check:static` and `native:verify`,
+   so it could pass while CI failed; retry-recovered browser failures still certified despite flaky
+   groups already recorded in the artifact; and `gitSnapshot()` ignored command exit codes, allowing
+   empty status to become `workingTreeClean: true` and an empty branch to select the weaker evidence
+   policy. The performance probe could pass without measuring a claimed metric, un-awaited payload
+   body reads silently reduced the measured total, and a reused server was never proven to belong to
+   the intended checkout.
+3. **Two timing assumptions remain load-sensitive.** Smoke children have a fixed 120-second timeout
+   although the longest observed script took 56 seconds, and the probe allows five seconds for a
+   scene to settle. Device-only metrics remain advisory by design rather than local certification.
+
+CI now keeps non-browser checks in the fast job and distributes all 263 browser tests through a
+three-shard matrix: 88/88/87 with `--shard=N/3`, `--fully-parallel`, no hand-maintained spec list and
+`fail-fast: false`. The expected slowest shard is about 9–11 minutes; that expectation is not yet a
+recorded remote-CI result.
+
+### R11 — October-7 additions
+
+1. **The native-shell browser spec was overclaimed.** `tests/native-shell.spec.js` exercises
+   browser-simulated native behaviour, not packaged-shell plugins. The documentation now says so;
+   native PIN behaviour remains unverified by that spec.
+2. **The Firebase secret-field guard had weakened.** An explicit allowlist had become a search for
+   quoted names while the executable rules used unquoted cardinality access, so a secret-field
+   mutation produced only the generic digest error. Credential-shaped field names now produce a
+   named schema error against the executable rules, and the mutation regression is restored. The
+   supplied focused result is 28 passed / 1 skipped; the emulator-dependent case was skipped because
+   the emulator was unset.
+3. **A WebGL layout assertion could pass vacuously** by iterating a possibly empty `locator.all()`
+   result. The test now asserts the count first, and the vacuous-assertion scanner detects this shape.
+4. **Mobile naming and CSS scope remain narrower than their labels imply.** Some readability cases
+   in `tests/mobile-home-layout.spec.js` establish overflow and 44px sizing, not text clipping. The
+   CSS addition is live and no dead selector was found, but its `!important` overrides add cascade
+   duplication that the dead-CSS check cannot detect.
+
+### R12 — performance budgets after the visual upgrade
+
+The reported 3D payload was 4,588,312 bytes against a 4,194,304-byte ceiling, yet both measurement
+paths counted only GLBs and omitted 1,427,208 bytes of authored texture surfaces. Both paths now
+derive the complete 3D asset set from the package manifest, and missing save, startup or payload
+measurements fail explicitly instead of passing. The authored textures were reduced from 512 to 256
+and losslessly compressed from 1,427,208 to 291,098 bytes. The new raw 3D total is 3,452,202 bytes,
+about 742 KB below the ceiling. A visual spot-check was completed; loss of high-frequency detail
+above 256px is the stated residual risk.
+
+The same audit measured Bubble Reef's home scene at **435 draw calls against a 200 ceiling**. The
+standard probe never opened that scene, so the breach escaped the gate. Reduction and probe coverage
+are in flight and remain unverified. Other supplied desktop measurements were startup at 2,798 ms
+against 3,000 ms (load-sensitive), memory around 29 MB of 512 MB, and triangles up to about 126,000
+of 250,000. These bounded desktop observations are not physical-device performance certification.
+
+## Round 6 improvements selected
+
+| # | Improvement | Files | Acceptance |
+|---|---|---|---|
+| 28 | Split CI into a fast non-browser job and a complete three-shard browser matrix | `.github/workflows/ci.yml` | All 263 tests are assigned 88/88/87 without a manual spec list; one shard failure does not cancel the others |
+| 29 | Put static and native verification into local certification and guard against future omissions | `scripts/certify-local-release.mjs`, `scripts/check-certification-coverage.mjs` | `certify:local` cannot pass while either required CI stage is absent |
+| 30 | Reject failed git provenance commands and fail unmeasured performance claims | `scripts/certify-local-release.mjs`, `scripts/probe-performance.mjs` | Empty output from a failed command cannot become clean-tree evidence; missing save/startup/payload is a failure |
+| 31 | Make dead CSS fail by default and detect empty `locator.all()` assertion loops | `scripts/check-dead-css.mjs`, `scripts/check-vacuous-assertions.mjs`, `tests/mobile-home-layout.spec.js` | Dead selectors require an explicit report-only mode; the WebGL layout test proves at least one target exists |
+| 32 | Restore named credential-field rejection against executable Firebase rules | `scripts/validate-firebase-security.mjs`, `tests/firebase-security-rules.test.mjs`, `firebase/firestore.rules` | A secret-field mutation fails with the credential schema error, not only a digest mismatch |
+| 33 | Measure the manifest-defined 3D asset set in both budget paths | `scripts/measure-payload.mjs`, `scripts/probe-performance.mjs`, `release-evidence/package-manifest.json` | GLBs and authored textures are counted consistently; the raw total is 3,452,202 bytes |
+| 34 | Reduce authored texture payload while retaining a bounded visual check | `assets/art/jungle-stone-albedo-v1.png`, `assets/art/jungle-ground-albedo-v1.png` | Authored textures total 291,098 bytes after 512→256 lossless optimization |
+| 35 | Reduce Bubble Reef home below 200 draw calls and make the standard probe open it | `presentation/webgl-home.mjs`, `presentation/bubble-reef-kit.mjs`, `presentation/bubble-reef-route-kit.mjs`, `presentation/bubble-reef-base-contribution.mjs`, `scripts/probe-performance.mjs` | **In flight / unverified:** replace the observed 435-call result with a measured passing result |
+
+**In flight / unverified:** Bubble Reef's draw-call reduction and standard-probe coverage; the
+expected 9–11-minute slowest CI shard until remote CI records it; native PIN/plugin behaviour in a
+packaged shell; emulator execution for the one skipped Firebase case; closure of the
+retry-recovered-browser certification policy, for which no fix outcome was supplied; and all
+device-only metrics.
+
+Deferred to the owner: precise mobile-spec naming, removal or consolidation of the CSS `!important`
+cascade duplication, reused-server checkout provenance, and all previously recorded owner decisions.
+
 ## Not claimed
 
 Device, screen-reader, Spanish, legal, production Firebase, publishing, signing, and educator

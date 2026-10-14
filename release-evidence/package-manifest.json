@@ -1,6 +1,6 @@
 {
   "schema": "brainbite.package-manifest.v1",
-  "generatedAt": "2026-10-14T20:03:40.721Z",
+  "generatedAt": "2026-10-14T21:50:19.857Z",
   "files": {
     "app.js": {
       "sha256": "1ad97ad2a5fe55be0f82c1c1b41790e366285872e59579cf584ccfc9d64aa5b1",
@@ -15,12 +15,12 @@
       "bytes": 717
     },
     "assets/art/jungle-ground-albedo-v1.png": {
-      "sha256": "34ac85d4fb6ec00dc74fd079153ca6f50a93bda19f5de34732e28f9fa5f1141c",
-      "bytes": 782468
+      "sha256": "6e2bcc4d505223ec00ac4c41b0ba7532d5ee36f5061661771c80e09842ddc057",
+      "bytes": 161190
     },
     "assets/art/jungle-stone-albedo-v1.png": {
-      "sha256": "5a9b08c3be85668854bc6a73145424e7ac6ec55fba43376f4744ae1fc338eba2",
-      "bytes": 644740
+      "sha256": "7f2de1eccc9872ea8bdad2bd12aabb125d14af736c780fcfa43138198b697651",
+      "bytes": 137501
     },
     "assets/art/language-portals.svg": {
       "sha256": "feb001413dd0b6fb6212dac09c61f77166fe9b3efa524de6a1bad03a1215cdf5",
@@ -295,16 +295,16 @@
       "bytes": 4196
     },
     "presentation/bubble-reef-base-contribution.mjs": {
-      "sha256": "0a16e7dcf9f671ad9bd6fd46988b3f6ab10edc5dc665fe71985026b81cf88cf5",
-      "bytes": 5327
+      "sha256": "74f5f7d9806acb8433c5b4f16867970dc488df6481847f41495da38943a21864",
+      "bytes": 5999
     },
     "presentation/bubble-reef-kit.mjs": {
-      "sha256": "001effa527f19b0e5333a3d32aea70ad8297e43e3f43787a220fb2540b5e4709",
-      "bytes": 7103
+      "sha256": "fdfbeadc8c2543f2cb1f96a2d156473ce34fc2f6a5087ea79a270b00d4a49bfe",
+      "bytes": 11565
     },
     "presentation/bubble-reef-route-kit.mjs": {
-      "sha256": "4888e33c9289e36295bdbf8a90c2becc788e2554bb833a660f1ad3b73be67b87",
-      "bytes": 6313
+      "sha256": "b87945145f6f3fc2c264ff8f75c1ecc040a1a0fb0c6225d3972fcd8123d69eee",
+      "bytes": 9562
     },
     "presentation/capability.mjs": {
       "sha256": "4ff29d580ac61b150bf25bbc0ce6d4bb6c010a8e04f6b9ac3770aab24d68dc2d",
@@ -387,7 +387,7 @@
       "bytes": 3059
     },
     "service-worker.js": {
-      "sha256": "8d526088f6fdddb7664d2e3ceba80fba3048ead0390485f623f941ea85fcba6e",
+      "sha256": "c9ba7180ad88b8c6a49bab6d0bbfe8d790463b42b57b6349c859dce76efb3795",
       "bytes": 5262
     },
     "styles.css": {

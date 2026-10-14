@@ -21,6 +21,7 @@ export function createBubbleReefKit({ seed = 731, reducedMotion = false } = {}) 
   group.userData.seed = seed;
   const geometries = new Set();
   const materials = new Set();
+  const instances = new Set();
   const geometry = value => { geometries.add(value); return value; };
   const material = (color, extra = {}) => {
     const value = new THREE.MeshStandardMaterial({ color, roughness: 0.75, ...extra });
@@ -64,7 +65,44 @@ export function createBubbleReefKit({ seed = 731, reducedMotion = false } = {}) 
     item.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
     return item;
   }
+  function makeBatch(parent, sources, byName = true) {
+    group.updateMatrixWorld(true);
+    const inverse = parent.matrixWorld.clone().invert();
+    const batches = new Map();
+    for (const source of sources) {
+      const key = `${byName ? `${source.name}:` : ''}${source.geometry.uuid}:${source.material.uuid}`;
+      if (!batches.has(key)) batches.set(key, {
+        name: source.name, geometry: source.geometry, material: source.material,
+        castShadow: source.castShadow, receiveShadow: source.receiveShadow, matrices: [], names: new Map(),
+      });
+      const batch = batches.get(key);
+      batch.names.set(source.name, (batch.names.get(source.name) || 0) + 1);
+      batch.matrices.push(new THREE.Matrix4().multiplyMatrices(inverse, source.matrixWorld));
+    }
+    sources.forEach(source => source.removeFromParent());
+    for (const values of batches.values()) {
+      const batch = new THREE.InstancedMesh(values.geometry, values.material, values.matrices.length);
+      batch.name = values.name;
+      batch.userData.instanceNames = Object.fromEntries(values.names);
+      batch.castShadow = values.castShadow;
+      batch.receiveShadow = values.receiveShadow;
+      values.matrices.forEach((matrix, index) => batch.setMatrixAt(index, matrix));
+      batch.instanceMatrix.needsUpdate = true;
+      batch.computeBoundingBox();
+      batch.computeBoundingSphere();
+      for (const name of values.names.keys()) {
+        if (name !== batch.name) {
+          const alias = new THREE.Object3D();
+          alias.name = name;
+          batch.add(alias);
+        }
+      }
+      parent.add(batch);
+      instances.add(batch);
+    }
+  }
   const fans = [];
+  const bankGroups = [];
   // Asymmetric banks leave room for a host's character, route, or answer props.
   const banks = [[-4.1, -0.5, 1.25], [4.2, -1.1, 1.05], [-2.8, -3.7, 0.9], [2.1, -4.2, 1.2]];
   banks.forEach(([x, z, size], index) => {
@@ -73,6 +111,7 @@ export function createBubbleReefKit({ seed = 731, reducedMotion = false } = {}) 
     bank.position.set(x, 0, z);
     bank.rotation.y = (random() - 0.5) * 0.4;
     group.add(bank);
+    bankGroups.push(bank);
     mesh(bank, 'faceted-foundation', rock, stone, [0, -0.12, 0], [size * 1.35, 0.65, size]);
     mesh(bank, 'turquoise-terrace', shelf, ledge, [0, 0.18, 0], [size * 1.1, 0.3, size * 0.85]);
     mesh(bank, 'sand-cap', shelf, sand, [0, 0.35, 0], [size, 0.08, size * 0.76]);
@@ -110,6 +149,40 @@ export function createBubbleReefKit({ seed = 731, reducedMotion = false } = {}) 
         [(random() - 0.5) * 1.8, 0.43, (random() - 0.5) * 1.1], [0.16, 0.1, 0.12]);
     }
   });
+  const fanBatches = new Map();
+  for (const fan of fans) {
+    for (const source of fan.item.children.filter(item => item.isMesh)) {
+      const key = `${source.name}:${source.geometry.uuid}:${source.material.uuid}`;
+      if (!fanBatches.has(key)) fanBatches.set(key, {
+        name: source.name, geometry: source.geometry, material: source.material,
+        castShadow: source.castShadow, receiveShadow: source.receiveShadow, entries: [],
+      });
+      source.updateMatrix();
+      fanBatches.get(key).entries.push({ fan: fan.item, matrix: source.matrix.clone() });
+      source.removeFromParent();
+    }
+  }
+  for (const values of fanBatches.values()) {
+    values.batch = new THREE.InstancedMesh(values.geometry, values.material, values.entries.length);
+    values.batch.name = values.name;
+    values.batch.castShadow = values.castShadow;
+    values.batch.receiveShadow = values.receiveShadow;
+    group.add(values.batch);
+    instances.add(values.batch);
+  }
+  function syncFanInstances() {
+    group.updateMatrixWorld(true);
+    const inverse = group.matrixWorld.clone().invert();
+    for (const values of fanBatches.values()) {
+      values.entries.forEach(({ fan, matrix }, index) => values.batch.setMatrixAt(index,
+        new THREE.Matrix4().multiplyMatrices(inverse, fan.matrixWorld).multiply(matrix)));
+      values.batch.instanceMatrix.needsUpdate = true;
+      values.batch.computeBoundingBox();
+      values.batch.computeBoundingSphere();
+    }
+  }
+  syncFanInstances();
+  makeBatch(group, bankGroups.flatMap(bank => bank.children.filter(item => item.isMesh)), false);
   const bubbles = [];
   for (let i = 0; i < 16; i++) {
     const [x, z] = banks[i % banks.length];
@@ -117,13 +190,39 @@ export function createBubbleReefKit({ seed = 731, reducedMotion = false } = {}) 
     bubble.name = `pearl-bubble-${i}`;
     const radius = 0.09 + random() * 0.15;
     bubble.position.set(x + (random() - 0.5) * 1.8, 0.9 + random() * 2.7, z + random() * 0.8);
-    mesh(bubble, 'bubble-shell', sphere, pearl, [0, 0, 0], [radius, radius, radius]);
-    mesh(bubble, 'bubble-rim', rim, shine, [0, 0, 0], [radius, radius, radius]);
-    mesh(bubble, 'bubble-glint', sphere, shine, [-radius * 0.32, radius * 0.4, radius * 0.78],
-      [radius * 0.15, radius * 0.22, radius * 0.07]);
+    const parts = [mesh(bubble, 'bubble-shell', sphere, pearl, [0, 0, 0], [radius, radius, radius]),
+      mesh(bubble, 'bubble-rim', rim, shine, [0, 0, 0], [radius, radius, radius]),
+      mesh(bubble, 'bubble-glint', sphere, shine, [-radius * 0.32, radius * 0.4, radius * 0.78],
+        [radius * 0.15, radius * 0.22, radius * 0.07])];
     group.add(bubble);
-    bubbles.push({ item: bubble, base: bubble.position.clone(), phase: random() * Math.PI * 2 });
+    bubbles.push({ item: bubble, base: bubble.position.clone(), phase: random() * Math.PI * 2, parts });
   }
+  const bubbleBatches = [0, 1, 2].map(partIndex => {
+    const sources = bubbles.map(bubble => bubble.parts[partIndex]);
+    const batch = new THREE.InstancedMesh(sources[0].geometry, sources[0].material, sources.length);
+    batch.name = sources[0].name;
+    for (const source of sources) {
+      source.updateMatrix();
+      source.userData.localMatrix = source.matrix.clone();
+      source.removeFromParent();
+    }
+    group.add(batch);
+    instances.add(batch);
+    return { batch, partIndex };
+  });
+  function syncBubbleInstances() {
+    for (const { batch, partIndex } of bubbleBatches) {
+      bubbles.forEach((bubble, index) => {
+        bubble.item.updateMatrix();
+        batch.setMatrixAt(index, new THREE.Matrix4().multiplyMatrices(
+          bubble.item.matrix, bubble.parts[partIndex].userData.localMatrix));
+      });
+      batch.instanceMatrix.needsUpdate = true;
+      batch.computeBoundingBox();
+      batch.computeBoundingSphere();
+    }
+  }
+  syncBubbleInstances();
   let disposed = false;
   function update(timeSeconds = 0, motionReduced = reducedMotion) {
     if (disposed) return;
@@ -135,16 +234,20 @@ export function createBubbleReefKit({ seed = 731, reducedMotion = false } = {}) 
         item.position.y += (Math.sin(time * 0.4 + phase) - Math.sin(phase)) * 0.18;
       }
     }
+    syncBubbleInstances();
     for (const { item, phase } of fans) {
       item.rotation.z = motionReduced ? 0 : (Math.sin(time * 0.3 + phase) - Math.sin(phase)) * 0.035;
     }
+    syncFanInstances();
   }
   function dispose() {
     if (disposed) return;
     disposed = true;
     group.removeFromParent();
+    instances.forEach(value => value.dispose());
     geometries.forEach(value => value.dispose());
     materials.forEach(value => value.dispose());
+    instances.clear();
     geometries.clear();
     materials.clear();
     bubbles.length = 0;
