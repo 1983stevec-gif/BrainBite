@@ -26,6 +26,7 @@ jobs:
       - run: npm run check:final
       - run: npm run check:firebase:security
       - run: npm run native:verify
+      - run: npx playwright install --with-deps chromium
       - run: npm run test:unit
       # One runner owns the smoke inventory, starts its own server, and writes its report to
       # the git-ignored .playwright-results/ (tracked evidence changes only via evidence:refresh).
