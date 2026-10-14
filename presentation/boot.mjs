@@ -1,7 +1,9 @@
+import { initExpeditionUI } from './expedition-ui.mjs';
 import { PresentationAdapter } from './presentation-adapter.mjs';
 import { matchPreviewAllowed, matchNeedsPortraitFallback } from './capability.mjs';
 
 async function boot() {
+  await initExpeditionUI();
   window.BrainBitePresentation = PresentationAdapter;
   window.BrainBiteWorldPreview = Object.freeze({
     setProfile: (profileId) => PresentationAdapter.setWorldProfile(profileId),

@@ -1,5 +1,9 @@
 import { test, expect } from '@playwright/test';
 
+// Currency replication is the subject here; a long-lived PWA worker only adds an
+// unrelated shutdown race when a replica is deliberately taken offline.
+test.use({ serviceWorkers: 'block' });
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => { globalThis.__BRAINBITE_LAB__ = true; });
   await page.goto('/?match=0&webgl=0');
@@ -12,8 +16,19 @@ async function finishMission(page, id) {
   return page.evaluate(async missionId => {
     await PERSISTENCE_CHAIN;
     if (!window.BrainBiteGame.startMission(missionId)) throw new Error('Mission did not launch');
+    const waitUntilPlayable = async () => {
+      const deadline = Date.now() + 5000;
+      while (G?.paused && Date.now() < deadline) {
+        if (!document.getElementById('snackActions')?.hidden) {
+          document.getElementById('snackRestart')?.click();
+          await new Promise(resolve => setTimeout(resolve, 600));
+        } else await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      if (G?.paused) throw new Error('Mission did not resume after the expected damage pause');
+    };
     let accepted = 0;
     for (let index = 0; index < 30; index += 1) {
+      await waitUntilPlayable();
       const cell = G.cells.find(item => !item.eaten && item.correct);
       const challenge = G.activity?.challenge, values = activityValues(challenge), progress = activityProgress(challenge);
       const answer = challenge ? challenge.family === 'Target Smash'
@@ -30,9 +45,10 @@ async function finishMission(page, id) {
 }
 
 async function offlineReplica(browser, seed, missionId) {
-  const context = await browser.newContext();
+  const context = await browser.newContext({ serviceWorkers: 'block' });
+  let page;
   try {
-    const page = await context.newPage();
+    page = await context.newPage();
     await page.goto('/?match=0&webgl=0');
     await page.waitForFunction(() => !!P().currencyLedger);
     await page.evaluate(() => PERSISTENCE_CHAIN);
@@ -41,8 +57,17 @@ async function offlineReplica(browser, seed, missionId) {
     await expect.poll(() => page.evaluate(() => !!P().currencyLedger)).toBe(true);
     await page.evaluate(() => PERSISTENCE_CHAIN);
     await context.setOffline(true);
+    await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(false);
     return (await finishMission(page, missionId)).profile;
-  } finally { await context.close(); }
+  } finally {
+    await context.setOffline(false);
+    if (page && !page.isClosed()) {
+      await page.evaluate(() => PERSISTENCE_CHAIN);
+      await page.goto('about:blank', { waitUntil: 'commit' });
+      await page.close();
+    }
+    await context.close();
+  }
 }
 
 test('first and repeated real missions keep unique completion rewards and profile isolation', async ({ page }) => {
@@ -68,6 +93,7 @@ test('two actual offline replicas retain distinct mission rewards and every inde
     return { profile: merged, repeated: mergeProfiles(merged, right, { remoteCloud: true }) };
   }, { left, right });
   expect(result.profile.progression.completedMissionIds).toEqual([1, 11, 21]);
+  expect(result.profile.missionStars).toEqual({ 1: 3, 11: 3, 21: 3 });
   expect(result.profile.stars).toBe(9);
   expect(result.profile.spark).toBe(9);
   expect(result.profile.score).toBe(left.score + right.score - shared.profile.score);

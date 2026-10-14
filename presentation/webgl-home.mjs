@@ -20,7 +20,13 @@ import { createBubbleReefKit } from './bubble-reef-kit.mjs';
 import { createBubbleReefRouteKit as createBubbleReefRouteSceneKit } from './bubble-reef-route-kit.mjs';
 import { createBubbleReefBaseContribution } from './bubble-reef-base-contribution.mjs';
 
+let createExpeditionHomeScene = null;
+if (document.documentElement.dataset.ui === 'expedition') {
+  ({ createExpeditionHomeScene } = await import('./expedition-scene.mjs'));
+}
+
 export function createHomeScene(host, { onContextLost, onContextRestored, onPlay, worldProfile: worldProfileId = 'jungle-circuit' } = {}) {
+  if (document.documentElement.dataset.ui === 'expedition') return createExpeditionHomeScene(host, { onContextLost, onContextRestored, onPlay });
   const worldProfile = getWorldProfile(worldProfileId);
   const performanceClock = globalThis.performance || { now: () => Date.now() };
   const performanceBudget = createPerformanceBudget({

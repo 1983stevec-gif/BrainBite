@@ -10,6 +10,11 @@ import { createPerformanceBudget } from './performance-budget.mjs';
 import { createProgrammableBit } from './programmable-bit.mjs';
 import { makeStoneMaterial, makeTimberMaterial, makeWaterfallMaterial } from './surface-textures.mjs';
 
+let createExpeditionBattleScene = null;
+if (document.documentElement.dataset.ui === 'expedition') {
+  ({ createExpeditionBattleScene } = await import('./expedition-scene.mjs'));
+}
+
 // How long to wait for the browser to restore a lost WebGL context before falling back
 // to the DOM presentation. Long enough for a driver reset, short enough to stay snappy.
 const CONTEXT_RESTORE_WINDOW_MS = 1500;
@@ -119,6 +124,7 @@ function makePillar(value, { anisotropy = 4 } = {}) {
 }
 
 export function createBattleScene(host, { onSelect, onContextLost, onContextRestored } = {}) {
+  if (document.documentElement.dataset.ui === 'expedition') return createExpeditionBattleScene(host, { onSelect, onContextLost, onContextRestored });
   const performanceClock = globalThis.performance || { now: () => Date.now() };
   const performanceBudget = createPerformanceBudget({
     clock: performanceClock,

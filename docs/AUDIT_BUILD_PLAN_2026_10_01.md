@@ -289,6 +289,68 @@ Deferred to the owner: the reward-ledger design, review cadence, adaptive rotati
 prerequisite policy, undo-restore, the quarantine cap and retention rule, the store-size budget
 and compaction, and the broader eviction-warning workflow.
 
+## Round 5 — Expedition prototype and currency follow-through
+
+The previously unaudited Expedition prototype received a read-only source audit, and the Round 4
+currency-merge repair received its first focused verification. Browser verification remains pending.
+
+### R8 — the Expedition prototype
+
+1. **High — Expedition was the default on Tauri/Windows**, contradicting the prototype document's
+   promise that the ordinary URL retained the previous interface. Fixed: every platform now requires
+   explicit `?ui=expedition`; `?ui=classic` remains the opt-out. The ordinary URL otherwise keeps the
+   classic behaviour, and making Expedition the Windows default is now explicitly an owner decision.
+2. **Medium — classic WebGL statically imported the prototype scene**, so a broken
+   `expedition-scene.mjs` could force classic WebGL into DOM fallback. Fixed with conditional dynamic
+   imports in both classic scene modules.
+3. **Medium — a failed `expedition.css` request aborted boot** before the presentation adapter was
+   installed. Fixed: initialization catches the failure, removes the failed link, and continues with
+   the classic interface.
+4. **Low — the replacement header lacked landmark semantics.** Fixed with a semantic `header` and a
+   labelled `nav`.
+5. **Medium — fresh-install offline availability is unproven.** The prototype offline test warms the
+   shell before going offline, so this remains deferred.
+
+Packaging was verified by source/package checks: all three Expedition runtime files are present in
+the 105-file package; the UI module and CSS are mandatory precache entries; the scene and GLBs are
+best-effort optional entries; and the content-addressed cache key matched at audit time.
+
+### R9 — currency-merge verification
+
+The Round 4 loss is confirmed fixed for receipted saves: completed missions union, `missionStars`
+uses the per-ID maximum, ledger receipts union and recompute balances, same-mission merges do not
+double-grant, valid receipts override stale scalar balances, and independent score writers survive.
+
+Verification closed two gaps. `tests/currency-ledger.spec.js` had no `missionStars` assertion, so a
+rating regression would have passed; that assertion now exists. More importantly, two ledgerless
+legacy replicas with different three-star missions still merged to 3 stars and 3 spark rather than
+6 and 6. Ledgerless merging now removes known mission/preview earnings and cosmetic spending from
+each baseline, unions those canonical events, and reapplies them once over the larger residual
+baseline. It falls back to the previous maximum when the history cannot be safely decomposed. Core
+tests are 64/64; regression coverage checks distinct missions at 6/6, commutativity, and same-mission
+deduplication at 3/3.
+
+Focused Playwright runs on the maintainer host were **unverified**: navigation ended in
+`net::ERR_ABORTED`, and runs exceeded 120–300 seconds despite the same specs completing in minutes
+earlier that day. Browser verification of Round 5 is therefore pending; remote CI remains the
+authority.
+
+## Round 5 improvements selected
+
+| # | Improvement | Files | Acceptance |
+|---|---|---|---|
+| 22 | Make Expedition opt-in on every platform and record the Windows-default decision | `presentation/expedition-ui.mjs`, `docs/EXPEDITION_PROTOTYPE_2026_10_07.md`, `tests/expedition.spec.js` | Only `?ui=expedition` selects the prototype; the ordinary URL remains classic |
+| 23 | Isolate classic WebGL from the prototype with conditional dynamic imports | `presentation/webgl-home.mjs`, `presentation/webgl-battle.mjs`, `tests/expedition.spec.js` | Classic mode does not request `expedition-scene.mjs` |
+| 24 | Recover from a failed Expedition stylesheet before adapter startup | `presentation/expedition-ui.mjs`, `tests/expedition.spec.js` | The failed link is removed and classic initialization continues |
+| 25 | Give the replacement header and navigation landmark semantics | `presentation/expedition-ui.mjs`, `tests/expedition.spec.js` | A semantic header contains a labelled navigation landmark |
+| 26 | Assert that currency merges preserve per-mission ratings | `tests/currency-ledger.spec.js` | A lost `missionStars` entry fails the focused regression |
+| 27 | Reconstruct safely decomposable ledgerless currency from canonical history | `brainbite-core.mjs`, `tests/core.test.mjs` | Distinct missions merge to 6/6 in either order; a shared mission remains 3/3 |
+
+Deferred to the owner: whether Expedition becomes the Windows default, fresh-install offline proof,
+and the currency boundary where concurrent unreceipted score or unknown noncanonical legacy earnings
+cannot be safely unioned. Invalid or negative decompositions retain the old maximum rather than
+guessing.
+
 ## Not claimed
 
 Device, screen-reader, Spanish, legal, production Firebase, publishing, signing, and educator

@@ -98,7 +98,7 @@ try {
     // browser tests and still reported a clean sweep. check:certification-coverage now
     // fails if a spec in the Playwright testMatch is missing from this list.
     ['activity-browser', 'tests/activity-families.spec.js', 'tests/bubble-reef-preview.spec.js'],
-    ['webgl-browser', 'tests/webgl.spec.js', 'tests/webgl-accessibility.spec.js', 'tests/webgl-assets.spec.js'],
+    ['webgl-browser', 'tests/expedition.spec.js', 'tests/webgl.spec.js', 'tests/webgl-accessibility.spec.js', 'tests/webgl-assets.spec.js'],
     ['brainbase-match-browser', 'tests/brainbase.spec.js', 'tests/match.spec.js'],
     ['native-shell-browser', 'tests/native-shell.spec.js'],
   ];

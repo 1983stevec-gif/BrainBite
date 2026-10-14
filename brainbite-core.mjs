@@ -104,6 +104,27 @@ function currencyStaleBaseline(stale, current) {
     && [...stale.purchases].every((state, index) => state === '0' || current.purchases[index] === 'l')
     && (stale.preview === '0' || current.preview === 'l');
 }
+function knownLegacyCurrency(ledger, key) {
+  let earned = 0, spent = 0;
+  CURRENCY_MISSIONS.forEach((id, index) => {
+    if (ledger.missions[index] === 'l') earned += key === 'stars' ? 3 : EXPERIENCE_REGISTRY.getMission(id).boss ? 10 : 3;
+  });
+  if (ledger.preview === 'l') earned += 3;
+  if (key === 'spark') Object.values(CURRENCY_PURCHASES).forEach((cost, index) => {
+    if (ledger.purchases[index] === 'l') spent += cost;
+  });
+  return { earned, spent };
+}
+function mergeLegacyBalance(a, b, merged, key) {
+  if (key === 'score') return Math.max(a.legacy.score, b.legacy.score);
+  const left = knownLegacyCurrency(a, key), right = knownLegacyCurrency(b, key), union = knownLegacyCurrency(merged, key);
+  const leftBase = a.legacy[key] - left.earned + left.spent;
+  const rightBase = b.legacy[key] - right.earned + right.spent;
+  // Negative residuals mean an older save cannot prove how its net balance was formed.
+  if (leftBase < 0 || rightBase < 0) return Math.max(a.legacy[key], b.legacy[key]);
+  const combined = Math.max(leftBase, rightBase) + union.earned - union.spent;
+  return currencyInteger(combined) ? combined : Math.max(a.legacy[key], b.legacy[key]);
+}
 function mergeProfileCurrency(left, right, { cloud = false } = {}) {
   if (left?.id !== right?.id) throw new Error('Cannot merge currency across learner profiles.');
   const a = normalizeProfileCurrency(left), b = normalizeProfileCurrency(right);
@@ -126,11 +147,15 @@ function mergeProfileCurrency(left, right, { cloud = false } = {}) {
       || existing.sequence > incoming.sequence && existing.total < incoming.total)) throw new Error('Conflicting currency writer receipts.');
     if (!existing || incoming.sequence > existing.sequence) writers[id] = incoming;
   }
-  return projectProfileCurrency(left, { version: 1, profileId: left.id,
+  const merged = { version: 1, profileId: left.id,
     legacy: Object.fromEntries(['score', 'stars', 'spark'].map(key => [key, Math.max(a.legacy[key], b.legacy[key])])),
     missions: [...a.missions].map((state, index) => mergeState(state, b.missions[index])).join(''),
     preview: mergeState(a.preview, b.preview), purchases: [...a.purchases].map((state, index) => mergeState(state, b.purchases[index])).join(''),
-    writers: packCurrencyWriters(writers) });
+    writers: packCurrencyWriters(writers) };
+  if (left.currencyLedger === undefined && right.currencyLedger === undefined) {
+    merged.legacy = Object.fromEntries(['score', 'stars', 'spark'].map(key => [key, mergeLegacyBalance(a, b, merged, key)]));
+  }
+  return projectProfileCurrency(left, merged);
 }
 function recordCurrencyScore(profile, { originId, originSequence, points } = {}) {
   if (!currencyProfileId(originId) || !currencyInteger(originSequence, Number.MAX_SAFE_INTEGER) || !originSequence

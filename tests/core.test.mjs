@@ -1338,6 +1338,17 @@ test('currency legacy migration preserves net balances and zero-value completion
   assert.deepEqual(recordCurrencyMission(merged, 11).currencyLedger, merged.currencyLedger);
 });
 
+test('currency ledgerless replicas union distinct canonical mission rewards without replaying shared rewards', () => {
+  const left = currencyProfile({ stars: 3, spark: 3, completed: [1] });
+  const right = currencyProfile({ stars: 3, spark: 3, completed: [11] });
+  const merged = mergeProfileCurrency(left, right);
+  assert.deepEqual([merged.stars, merged.spark], [6, 6]);
+  assert.deepEqual(mergeProfileCurrency(right, left).currencyLedger, merged.currencyLedger);
+
+  const sameMission = mergeProfileCurrency(left, structuredClone(left));
+  assert.deepEqual([sameMission.stars, sameMission.spark], [3, 3]);
+});
+
 test('currency mixed-version cloud and ambiguous local progression fail with an actionable upgrade error', () => {
   const base = currencyProfile({ score: 100, stars: 3, spark: 3, completed: [1] });
   const upgraded = currencyScore(projectProfileCurrency(base), 'new-writer', 1, 100);

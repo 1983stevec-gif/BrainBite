@@ -1,4 +1,4 @@
-const CACHE = 'brainbite-v2.0-shell-runtime-3b79ac34ed3faf2c5418872bf3cd38e9e2ef50a141ea3c2441e21a92b7895c48';
+const CACHE = 'brainbite-v2.0-shell-runtime-8f11f78afe6174e46da70e8d071e8769283516aebe399c20aa993238c6f85889';
 const FALLBACK = './index.html';
 const CORE = [
   './',
@@ -37,6 +37,8 @@ const CORE = [
   './assets/art/language-portals.svg',
   './presentation/platform.js',
   './presentation/boot.mjs',
+  './presentation/expedition-ui.mjs',
+  './presentation/expedition.css',
   './presentation/presentation-adapter.mjs',
   './presentation/capability.mjs',
   './icons/icon-192.png',
@@ -78,6 +80,7 @@ const OFFLINE_CONTENT = [
   './content/words-question-bank-v1.9.json',
 ];
 const OPTIONAL_3D = [
+  './presentation/expedition-scene.mjs',
   './assets/art/jungle-stone-albedo-v1.png',
   './assets/art/jungle-ground-albedo-v1.png',
   "./presentation/webgl-home.mjs",
