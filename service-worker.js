@@ -1,4 +1,4 @@
-const CACHE = 'brainbite-v2.0-shell-v45-battle-draws';
+const CACHE = 'brainbite-v2.0-shell-runtime-fa43eb9aa0446a94b9bf31c71ad9141711f7a1012ef26286dd2f222d27fe15ca';
 const FALLBACK = './index.html';
 const CORE = [
   './',
@@ -32,8 +32,13 @@ const CORE = [
   './assets/art/bloop.svg',
   './assets/art/scout.svg',
   './assets/art/bite-village.svg',
+  './assets/art/number-nebula.svg',
+  './assets/art/wordwood.svg',
+  './assets/art/language-portals.svg',
   './presentation/platform.js',
   './presentation/boot.mjs',
+  './presentation/expedition-ui.mjs',
+  './presentation/expedition.css',
   './presentation/presentation-adapter.mjs',
   './presentation/capability.mjs',
   './icons/icon-192.png',
@@ -75,6 +80,9 @@ const OFFLINE_CONTENT = [
   './content/words-question-bank-v1.9.json',
 ];
 const OPTIONAL_3D = [
+  './presentation/expedition-scene.mjs',
+  './assets/art/jungle-stone-albedo-v1.png',
+  './assets/art/jungle-ground-albedo-v1.png',
   "./presentation/webgl-home.mjs",
   "./presentation/webgl-battle.mjs",
   './presentation/gltf-assets.mjs',
@@ -134,4 +142,3 @@ self.addEventListener('fetch', event => {
     return response;
   })));
 });
-

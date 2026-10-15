@@ -21,3 +21,5 @@ assets/intake/
 src-tauri/target/
 src-tauri/gen/
 .ui-captures/
+# Agent-swarm coordination material: not product source.
+.omnirush/

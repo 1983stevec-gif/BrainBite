@@ -17,6 +17,10 @@ function clone(value) {
   return structuredClone(value);
 }
 
+function withoutYamlComments(value) {
+  return value.split(/\r?\n/).map(line => line.replace(/#.*$/, '')).join('\n');
+}
+
 test('review manifest covers the reconciled Phase 3.2 inventory', () => {
   const manifest = getReviewManifest();
   assert.equal(manifest.version, '3.3.0');
@@ -54,6 +58,47 @@ test('production gate rejects educator approval without reviewer metadata', () =
   assert.ok(result.reasons.includes('educator-review-metadata-invalid'));
 });
 
+test('production gate rejects educator approval without a reviewed digest', () => {
+  const record = clone(getReviewRecord('generated-template:math-1-addition'));
+  record.educatorReview = {
+    status: 'approved',
+    reviewer: { id: 'educator-001', role: 'licensed-educator' },
+    reviewedAt: '2026-09-12T20:00:00.000Z',
+  };
+
+  const result = evaluateProductionGate(record, { currentDigest: record.digest.value });
+  assert.equal(result.eligible, false);
+  assert.ok(result.reasons.includes('educator-review-digest-invalid'));
+});
+
+test('production gate rejects malformed educator reviewed digests', () => {
+  const record = clone(getReviewRecord('generated-template:math-1-addition'));
+  record.educatorReview = {
+    status: 'approved',
+    reviewer: { id: 'educator-001', role: 'licensed-educator' },
+    reviewedAt: '2026-09-12T20:00:00.000Z',
+    reviewedDigest: 'not-a-sha256',
+  };
+
+  const result = evaluateProductionGate(record, { currentDigest: record.digest.value });
+  assert.equal(result.eligible, false);
+  assert.ok(result.reasons.includes('educator-review-digest-invalid'));
+});
+
+test('production gate rejects an educator reviewed digest for another source snapshot', () => {
+  const record = clone(getReviewRecord('generated-template:math-1-addition'));
+  record.educatorReview = {
+    status: 'approved',
+    reviewer: { id: 'educator-001', role: 'licensed-educator' },
+    reviewedAt: '2026-09-12T20:00:00.000Z',
+    reviewedDigest: '0'.repeat(64),
+  };
+
+  const result = evaluateProductionGate(record, { currentDigest: record.digest.value });
+  assert.equal(result.eligible, false);
+  assert.ok(result.reasons.includes('educator-review-digest-mismatch'));
+});
+
 test('quarantined JSON pack items cannot enter internal review', () => {
   const record = getReviewRecord('json-pack-item:math-question-bank-v1.7.json::$.sets[2]');
   const result = evaluateInternalReviewGate(record, { currentDigest: record.digest.value });
@@ -84,6 +129,7 @@ test('synthetic fully reviewed record can pass the production gate', () => {
       reviewedAt: '2026-09-12T20:00:00.000Z',
     },
     reviewedAt: '2026-09-12T20:00:00.000Z',
+    reviewedDigest: record.digest.value,
   };
 
   const result = evaluateProductionGate(record, { currentDigest: record.digest.value });
@@ -303,9 +349,9 @@ test('canonical generated support and taxonomy metadata remain bound to review',
 
 test('release and deployment workflows explicitly validate reviewed content before publishing', () => {
   const packageJson = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-  const ci = fs.readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
-  const pages = fs.readFileSync(new URL('../.github/workflows/pages.yml', import.meta.url), 'utf8');
+  const ci = withoutYamlComments(fs.readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8'));
+  const pages = withoutYamlComments(fs.readFileSync(new URL('../.github/workflows/pages.yml', import.meta.url), 'utf8'));
   for (const script of ['beta:check', 'rc:check', 'release:check']) assert.match(packageJson.scripts[script], /check:content-review/);
-  assert.match(ci, /npm run check:content-review/);
-  assert.match(pages, /set -euo pipefail[\s\S]*npm run check:content[\s\S]*npm run check:content-review[\s\S]*Stage static site/);
+  assert.match(ci, /^\s*-\s*run:\s*npm run check:content-review\s*$/m);
+  assert.match(pages, /^\s*set -euo pipefail\s*$[\s\S]*^\s*npm run check:content\s*$[\s\S]*^\s*npm run check:content-review\s*$[\s\S]*^\s*- name: Stage static site\s*$/m);
 });

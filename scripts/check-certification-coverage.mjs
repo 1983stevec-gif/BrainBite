@@ -28,22 +28,42 @@ if (!specs.length) {
 
 const certification = readFileSync(CERTIFICATION, 'utf8');
 const problems = [];
+const groupsBlock = certification.match(/const\s+browserGroups\s*=\s*\[([\s\S]*?)\n\s*\];/);
+if (!groupsBlock) {
+  console.error(`Could not read browserGroups from ${CERTIFICATION}; the coverage check cannot run.`);
+  process.exit(1);
+}
 
-for (const spec of specs) {
+// Only quoted spec paths inside literal browser-group entries count. In particular, a spec
+// name in a nearby comment is not evidence that the certification executes that spec.
+const certificationSpecs = [];
+const uncommentedGroups = groupsBlock[1].replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+for (const entry of uncommentedGroups.matchAll(/^\s*\[\s*(['"])[^'"\r\n]+\1\s*,([^\]\r\n]*)\]\s*,?\s*$/gm)) {
+  for (const spec of entry[2].matchAll(/(['"])(tests\/[^'"\r\n]+\.spec\.js)\1/g)) {
+    certificationSpecs.push(spec[2].replace(/^\.\//, '').replace(/^tests\//, ''));
+  }
+}
+const configuredSpecs = new Set(specs.map(spec => spec.replace(/^\.\//, '').replace(/^tests\//, '')));
+const coveredSpecs = new Set(certificationSpecs);
+
+for (const spec of configuredSpecs) {
   if (!existsSync(`tests/${spec}`)) {
     problems.push(`tests/${spec} is in the ${CONFIG} testMatch but does not exist`);
     continue;
   }
-  if (!certification.includes(spec)) {
+  if (!coveredSpecs.has(spec)) {
     problems.push(`tests/${spec} runs in the config but is in no certification group`);
   }
 }
+for (const spec of coveredSpecs) {
+  if (!configuredSpecs.has(spec)) problems.push(`tests/${spec} is in a certification group but not in the ${CONFIG} testMatch`);
+}
 
-console.log(`certification coverage: ${specs.length} configured spec(s) checked against ${CERTIFICATION}`);
+console.log(`certification coverage: ${configuredSpecs.size} configured spec(s), ${coveredSpecs.size} grouped spec(s)`);
 if (problems.length) {
-  console.error(`\n${problems.length} spec(s) the local certification would skip:`);
+  console.error(`\n${problems.length} certification coverage problem(s):`);
   for (const problem of problems) console.error(`  ${problem}`);
-  console.error('\nAdd the spec to a browser group in the certification runner.');
+  console.error('\nMake the literal browser-group spec paths exactly match the Playwright testMatch.');
   process.exit(1);
 }
-console.log('Every configured browser spec runs in the local certification.');
+console.log('The configured and certified browser spec sets match exactly.');

@@ -6,7 +6,8 @@ import { createBubbleReefRouteKit } from '../presentation/bubble-reef-route-kit.
 function snapshot(group) {
   const result = [];
   group.traverse(item => result.push([item.name, item.position.toArray(), item.quaternion.toArray(),
-    item.scale.toArray(), item.geometry?.type, item.material?.color.getHex()]));
+    item.scale.toArray(), item.geometry?.type, item.material?.color.getHex(),
+    item.instanceMatrix ? Array.from(item.instanceMatrix.array) : null]));
   return result;
 }
 
@@ -26,7 +27,18 @@ test('route has ordered, addressable landmarks and a clear Pearl Arch opening', 
     kit.group.updateMatrixWorld(true);
     const opening = new THREE.Box3(new THREE.Vector3(-1, 0.3, -4.1), new THREE.Vector3(1, 1.2, -3.9));
     exit.traverse(item => {
-      if (item.isMesh) assert.equal(new THREE.Box3().setFromObject(item).intersectsBox(opening), false, item.name);
+      if (!item.isMesh) return;
+      if (!item.isInstancedMesh) {
+        assert.equal(new THREE.Box3().setFromObject(item).intersectsBox(opening), false, item.name);
+        return;
+      }
+      item.geometry.computeBoundingBox();
+      for (let i = 0; i < item.count; i++) {
+        const matrix = new THREE.Matrix4();
+        item.getMatrixAt(i, matrix);
+        matrix.premultiply(item.matrixWorld);
+        assert.equal(item.geometry.boundingBox.clone().applyMatrix4(matrix).intersectsBox(opening), false, item.name);
+      }
     });
     kit.group.position.set(10, 2, 1);
     assert.deepEqual(exit.getWorldPosition(new THREE.Vector3()).toArray(), [10, 2, -3]);
@@ -43,13 +55,14 @@ test('layout is seeded, deterministic, bounded, and uses shared primitive resour
     let meshes = 0;
     kits[0].group.traverse(item => {
       if (!item.isMesh) return;
-      meshes++;
-      assert.match(item.geometry.type, /^(Cylinder|Sphere|Icosahedron|Torus|Cone)Geometry$/);
+      meshes += item.userData.sourceMeshCount || (item.isInstancedMesh ? item.count : 1);
+      assert.match(item.geometry.type, /^(Buffer|Cylinder|Sphere|Icosahedron|Torus|Cone)Geometry$/);
       for (const value of Object.values(item.material)) assert.ok(!value?.isTexture);
       geometries.add(item.geometry);
-      triangles += (item.geometry.index?.count ?? item.geometry.attributes.position.count) / 3;
+      triangles += (item.geometry.index?.count ?? item.geometry.attributes.position.count) / 3
+        * (item.isInstancedMesh ? item.count : 1);
     });
-    assert.equal(geometries.size, 6);
+    assert.equal(geometries.size, 9);
     assert.ok(meshes < 80, `meshes: ${meshes}`);
     assert.ok(triangles < 15000, `triangles: ${triangles}`);
     const bounds = new THREE.Box3().setFromObject(kits[0].group);

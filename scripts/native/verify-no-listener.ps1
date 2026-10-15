@@ -10,7 +10,7 @@ if (-not (Test-Path -LiteralPath $executablePath -PathType Leaf)) {
   throw "BrainBite executable not found: $executablePath. Run npm run native:build first."
 }
 
-$process = Start-Process -FilePath $executablePath -PassThru
+$process = Start-Process -FilePath $executablePath -WindowStyle Hidden -PassThru
 try {
   Start-Sleep -Seconds $StartupSeconds
   if ($process.HasExited) { throw "BrainBite exited during startup with code $($process.ExitCode)." }

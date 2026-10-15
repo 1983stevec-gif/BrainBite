@@ -5,6 +5,7 @@ import {
   createPerformanceBudget,
   DEFAULT_PAYLOAD_BUDGET,
   DEVICE_ONLY_BUDGETS,
+  MAX_PERFORMANCE_SAMPLES,
   recommendDeviceTier,
   summarizeAssetTimings,
   summarizeSamples,
@@ -32,6 +33,25 @@ test('empty samples have explicit null statistics and no violations', () => {
   });
   assert.deepEqual(report.violations, []);
   assert.equal(report.recommendation.tier, 'balanced');
+});
+
+test('measurement series retain a coherent latest-sample percentile window', () => {
+  const recorder = createPerformanceBudget();
+  for (let value = 0; value < MAX_PERFORMANCE_SAMPLES * 2; value += 1) {
+    recorder.recordFrame(value);
+    recorder.recordAssetTiming({ name: `/asset-${value}.glb`, duration: value, transferSize: value });
+  }
+
+  const report = recorder.report();
+  assert.deepEqual(report.sampleWindow, { limit: 600, retention: 'latest' });
+  assert.equal(report.metrics.frame.count, MAX_PERFORMANCE_SAMPLES);
+  assert.equal(report.metrics.frame.p95, 1169);
+  assert.equal(report.metrics.frame.p99, 1193);
+  assert.equal(report.metrics.frame.max, 1199);
+  assert.equal(report.assetTiming.count, MAX_PERFORMANCE_SAMPLES);
+  assert.equal(report.assetTiming.p95, report.metrics.assetLoad.p95);
+  assert.equal(report.assetTiming.p99, report.metrics.assetLoad.p99);
+  assert.deepEqual(report.assetTiming.slowest, { name: '/asset-1199.glb', duration: 1199 });
 });
 
 test('timers use the injected clock and report every exceeded budget', () => {

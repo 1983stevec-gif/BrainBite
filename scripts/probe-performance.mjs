@@ -1,17 +1,45 @@
 import { chromium } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { classifyBudgetViolations, DEFAULT_PAYLOAD_BUDGET, DEFAULT_PERFORMANCE_BUDGETS, DEVICE_ONLY_BUDGETS } from '../presentation/performance-budget.mjs';
 
 const probePort = Number(process.env.BRAINBITE_TEST_PORT || 4318);
 const baseURL = process.env.BB_BASE_URL || process.env.PLAYWRIGHT_BASE_URL || `http://127.0.0.1:${probePort}`;
+const repo = resolve(import.meta.dirname, '..');
 const output = resolve(process.env.BB_PERF_OUTPUT_DIR || 'test-results/performance-evidence');
+const durableOutput = resolve(repo, '.ui-captures', 'release-evidence', 'performance-evidence');
+const retention = {
+  mode: 'replace-per-run',
+  notice: 'This latest-run artifact is replaced by each performance probe run; use capturedAt to identify when it was produced.',
+};
+const packageManifest = JSON.parse(readFileSync(resolve(repo, 'release-evidence/package-manifest.json'), 'utf8'));
+const isPackaged3DAsset = path => (
+  /\.glb$/i.test(path)
+  || /^assets\/art\/.*\.(?:avif|bmp|gif|jpe?g|png|webp)$/i.test(path)
+);
+const expectedPayload = new Map(Object.entries(packageManifest.files ?? {})
+  .filter(([path]) => isPackaged3DAsset(path))
+  .sort(([left], [right]) => left.localeCompare(right))
+  .map(([path, entry]) => [path, entry.bytes]));
+if (!expectedPayload.size) throw new Error('Package manifest contains no packaged 3D assets');
 const viewports = [
   { name: 'desktop', width: 1280, height: 853 },
   { name: 'mobile', width: 390, height: 844 },
 ];
 
-await mkdir(output, { recursive: true });
+await Promise.all([
+  mkdir(output, { recursive: true }),
+  mkdir(durableOutput, { recursive: true }),
+]);
+
+async function writeArtifact(name, artifact) {
+  const contents = `${JSON.stringify(artifact, null, 2)}\n`;
+  const paths = [...new Set([resolve(output, name), resolve(durableOutput, name)])];
+  await Promise.all(paths.map(path => writeFile(path, contents)));
+  console.log(`Performance evidence wrote: ${paths.join(', ')}`);
+  return paths;
+}
 
 // Own the server when nothing is listening, so the probe cannot silently measure a
 // connection failure. This is how its earlier evidence was lost: it ran after another
@@ -31,15 +59,27 @@ if (!(await serverIsReady())) {
 const browser = await chromium.launch({ headless: true });
 const reports = [];
 
-async function waitForScene(page, scene) {
-  // A bounded settle window is more stable than waiting on two independent
-  // counters while WebGL and the service worker initialize together.
-  await page.waitForTimeout(5000);
-  const ready = await page.evaluate((name) => {
+async function waitForScene(page, scene, measuredWorkMs) {
+  // Scale the readiness margin from work already measured in this viewport. Polling exits
+  // as soon as the counters are ready, while the one-minute cap still catches a real hang.
+  const timeoutMs = Math.min(60000, Math.max(5000, Math.ceil((measuredWorkMs * 3 + 5000) / 250) * 250));
+  const startedAt = Date.now();
+  await page.waitForFunction((name) => {
     const report = window.BrainBitePresentation?.getPerformanceReport?.()[name];
     return (report?.metrics?.sceneLoad?.count || 0) >= 1 && (report?.assetTiming?.count || 0) >= 3;
-  }, scene);
-  if (!ready) throw new Error(`${scene} presentation did not reach the measured-ready state`);
+  }, scene, { timeout: timeoutMs });
+  const settle = { scene, measuredWorkMs, timeoutMs, durationMs: Date.now() - startedAt };
+  console.log(JSON.stringify({ sceneSettle: settle }));
+  return settle;
+}
+
+async function settlePayloadReads(page, tasks, measured, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  while (measured.size < expectedPayload.size && Date.now() < deadline) {
+    await Promise.allSettled([...tasks]);
+    if (measured.size < expectedPayload.size) await page.waitForTimeout(100);
+  }
+  await Promise.allSettled([...tasks]);
 }
 
 try {
@@ -64,31 +104,61 @@ try {
     const startedAt = Date.now();
     // Measure the 3D payload from the network layer: Resource Timing reports zero sizes
     // for these responses, and payload size is the environment-independent budget.
-    const payload = { bytes: 0, assets: [] };
-    page.on('response', async response => {
-      const url = response.url();
-      if (!/\.(glb|woff2)$/.test(new URL(url).pathname)) return;
-      try {
-        const buffer = await response.body();
-        payload.bytes += buffer.length;
-        payload.assets.push({ name: new URL(url).pathname.split('/').pop(), bytes: buffer.length });
-      } catch { /* a redirect or aborted body is not payload */ }
+    const payload = { bytes: 0, assets: [], bodyReadFailures: [], missingAssets: [] };
+    const payloadReads = [];
+    const payloadPathsStarted = new Set();
+    const measuredPayload = new Map();
+    const sceneSettles = [];
+    page.on('response', response => {
+      const path = decodeURIComponent(new URL(response.url()).pathname).replace(/^\/+/, '');
+      if (!expectedPayload.has(path) || payloadPathsStarted.has(path)) return;
+      payloadPathsStarted.add(path);
+      const task = response.body().then(buffer => {
+        measuredPayload.set(path, buffer.length);
+      }).catch(error => {
+        payload.bodyReadFailures.push({ name: path, error: error.message });
+      });
+      payloadReads.push(task);
     });
     let report;
     try {
+      const navigationStartedAt = Date.now();
       await page.goto(`${baseURL}/?presentation=webgl&probe=${Date.now()}`, { waitUntil: 'domcontentloaded' });
-      await waitForScene(page, 'home');
+      const navigationMs = Date.now() - navigationStartedAt;
+      const homeSettle = await waitForScene(page, 'home', navigationMs);
+      sceneSettles.push(homeSettle);
       await page.waitForTimeout(750);
       const home = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().home);
+
+      // Bubble Reef is a separate home composition with its own geometry budget. Keep the
+      // Jungle report above, then remount and gate the alternate scene too.
+      await page.evaluate(() => window.BrainBiteWorldPreview.setProfile('bubble-reef'));
+      const bubbleReefSettle = await waitForScene(page, 'home', Math.max(navigationMs, homeSettle.durationMs));
+      sceneSettles.push(bubbleReefSettle);
+      await page.waitForTimeout(750);
+      const bubbleReefHome = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().home);
 
       await page.evaluate(async () => {
         window.BrainBiteGame.startMission(1);
         await window.BrainBitePresentation?.syncFromScreen?.();
       });
-      await waitForScene(page, 'battle');
+      const battleSettle = await waitForScene(page, 'battle', Math.max(navigationMs, homeSettle.durationMs, bubbleReefSettle.durationMs));
+      sceneSettles.push(battleSettle);
       await page.waitForTimeout(750);
       const battle = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().battle);
       const runtime = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().runtime);
+
+      // Finish body reads before the DOM-only navigation can abort them. The package
+      // manifest defines the complete metric; an absent, unreadable, or size-mismatched
+      // asset means payload was not measured and must fail rather than silently pass.
+      await settlePayloadReads(page, payloadReads, measuredPayload);
+      payload.assets = [...measuredPayload].map(([name, bytes]) => ({ name, bytes }));
+      payload.bytes = payload.assets.reduce((sum, asset) => sum + asset.bytes, 0);
+      payload.missingAssets = [...expectedPayload.keys()].filter(path => !measuredPayload.has(path));
+      const payloadSizeMismatches = payload.assets.flatMap(asset => {
+        const expectedBytes = expectedPayload.get(asset.name);
+        return asset.bytes === expectedBytes ? [] : [{ name: asset.name, expectedBytes, actualBytes: asset.bytes }];
+      });
 
       // Measure save latency on the shipping DOM path. In a headless WebGL session the
       // persistence chain queues behind software-rasterized frames (measured ~600 ms of
@@ -114,12 +184,18 @@ try {
         return { median: pick(0.5), p95: pick(0.95), max: samples[samples.length - 1], samples: samples.length };
       });
 
-      const violations = [...(home?.violations || []), ...(battle?.violations || [])];
+      const violations = [
+        ...(home?.violations || []),
+        ...(bubbleReefHome?.violations || []),
+        ...(battle?.violations || []),
+      ];
       const gate = classifyBudgetViolations(violations);
       // Startup readiness and payload are measured outside the scene reports, so they are
       // checked here against the same budget constants.
-      const startupMs = Number(runtime?.readiness?.durationMs);
-      const startupViolation = Number.isFinite(startupMs) && startupMs > DEFAULT_PERFORMANCE_BUDGETS.startup.max
+      const rawStartupMs = runtime?.readiness?.durationMs;
+      const startupMs = rawStartupMs == null ? null : Number(rawStartupMs);
+      const startupMeasured = Number.isFinite(startupMs);
+      const startupViolation = startupMeasured && startupMs > DEFAULT_PERFORMANCE_BUDGETS.startup.max
         ? [{ metric: 'startup', statistic: 'max', actual: startupMs, budget: DEFAULT_PERFORMANCE_BUDGETS.startup.max, overBy: startupMs - DEFAULT_PERFORMANCE_BUDGETS.startup.max }]
         : [];
       const payloadViolation = payload.bytes > DEFAULT_PAYLOAD_BUDGET.assetBytes
@@ -133,36 +209,54 @@ try {
       if (saveStats && saveStats.max > saveBudget.max) {
         saveViolations.push({ metric: 'save', statistic: 'max', actual: saveStats.max, budget: saveBudget.max, overBy: saveStats.max - saveBudget.max });
       }
+      const saveStatistics = ['median', 'p95', 'max'];
+      const missingSaveStatistics = saveStatistics.filter(statistic => !Number.isFinite(saveStats?.[statistic]));
+      const measurementFailures = [
+        ...(!startupMeasured ? [{ metric: 'startup', reason: 'durationMs was not a finite number' }] : []),
+        ...missingSaveStatistics.map(statistic => ({ metric: 'save', statistic, reason: 'statistic was null or non-finite' })),
+        ...payload.bodyReadFailures.map(failure => ({ metric: 'assetBytes', asset: failure.name, reason: `body read failed: ${failure.error}` })),
+        ...payload.missingAssets.map(asset => ({ metric: 'assetBytes', asset, reason: 'asset response was not measured' })),
+        ...payloadSizeMismatches.map(mismatch => ({ metric: 'assetBytes', asset: mismatch.name, reason: `body was ${mismatch.actualBytes} bytes; package manifest says ${mismatch.expectedBytes}` })),
+      ];
       report = {
         schema: 'brainbite.performance-evidence.v1',
         capturedAt: new Date().toISOString(),
+        retention,
         baseURL,
         viewport,
         durationMs: Date.now() - startedAt,
         errors,
         warnings,
         resourceFailures,
-        performance: { home, battle, runtime },
+        sceneSettles,
+        performance: { home, bubbleReefHome, battle, runtime },
         payload,
-        startupMs: Number.isFinite(startupMs) ? startupMs : null,
+        startupMs: startupMeasured ? startupMs : null,
         saveMs: saveStats ? saveStats.median : null,
         saveStats,
         // Informational: these samples include cold-start saves, which are not what the
         // save budget describes. The controlled sample above is the gated one.
         runtimeReportedViolations: runtime?.violations || [],
-        budgetGate: { ...gate, headless: [...gate.headless, ...startupViolation, ...saveViolations, ...payloadViolation], pass: gate.pass && startupViolation.length === 0 && saveViolations.length === 0 && payloadViolation.length === 0 },
+        budgetGate: {
+          ...gate,
+          headless: [...gate.headless, ...startupViolation, ...saveViolations, ...payloadViolation],
+          measurementFailures,
+          pass: gate.pass && startupViolation.length === 0 && saveViolations.length === 0 && payloadViolation.length === 0 && measurementFailures.length === 0,
+        },
       };
     } catch (error) {
       errors.push(`probe: ${error.message}`);
       report = {
         schema: 'brainbite.performance-evidence.v1',
         capturedAt: new Date().toISOString(),
+        retention,
         baseURL,
         viewport,
         durationMs: Date.now() - startedAt,
         errors,
         warnings,
         resourceFailures,
+        sceneSettles,
         performance: null,
         budgetGate: null,
       };
@@ -170,7 +264,7 @@ try {
       await page.close();
     }
     reports.push(report);
-    await writeFile(resolve(output, `${viewport.name}.json`), `${JSON.stringify(report, null, 2)}\n`);
+    await writeArtifact(`${viewport.name}.json`, report);
     console.log(JSON.stringify({ viewport: viewport.name, errors: report.errors.length, warnings: report.warnings.length, durationMs: report.durationMs }));
   }
 } finally {
@@ -180,6 +274,7 @@ try {
 const summary = {
   schema: 'brainbite.performance-evidence-summary.v1',
   capturedAt: new Date().toISOString(),
+  retention,
   baseURL,
   deviceOnlyBudgets: DEVICE_ONLY_BUDGETS,
   reports: reports.map(report => ({
@@ -187,6 +282,7 @@ const summary = {
     errors: report.errors,
     warnings: report.warnings,
     resourceFailures: report.resourceFailures,
+    sceneSettles: report.sceneSettles,
     performance: report.performance,
     payload: report.payload,
     startupMs: report.startupMs,
@@ -196,7 +292,7 @@ const summary = {
     budgetGate: report.budgetGate,
   })),
 };
-await writeFile(resolve(output, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`);
+await writeArtifact('summary.json', summary);
 
 // Headless-judgeable budgets must pass. Frame pacing, long-task tails, and network/parse
 // timings are recorded as external evidence: they depend on host scheduling and container
@@ -214,6 +310,9 @@ for (const report of reports) {
   }
   for (const violation of gate.device) {
     console.log(`  device-only (unverified): ${violation.metric}.${violation.statistic} ${Math.round(violation.actual)} > ${violation.budget}`);
+  }
+  for (const failure of gate.measurementFailures || []) {
+    console.error(`  MEASUREMENT FAIL ${failure.metric}${failure.statistic ? `.${failure.statistic}` : ''}${failure.asset ? ` ${failure.asset}` : ''}: ${failure.reason}`);
   }
 }
 const failed = reports.some(report => report.errors.length || !report.performance || (report.budgetGate && !report.budgetGate.pass));

@@ -35,6 +35,12 @@ export const DEFAULT_PERFORMANCE_BUDGETS = Object.freeze({
 // the payload from the network layer instead of from page metrics.
 export const DEFAULT_PAYLOAD_BUDGET = Object.freeze({ assetBytes: 4 * MEBIBYTE });
 
+// A p99 needs at least 100 observations to represent a one-percent tail. Retaining the
+// latest 600 gives that tail six observations (and p95 thirty) while bounding a 60 FPS
+// frame series to roughly ten seconds. Once full, report statistics describe this rolling
+// window rather than the lifetime of the page.
+export const MAX_PERFORMANCE_SAMPLES = 600;
+
 // Which budgets a headless container can judge. Frame pacing and long-task tails depend on
 // host scheduling, and network/parse timings depend on container I/O, so those are
 // recorded as external evidence and must be confirmed on real hardware.
@@ -241,8 +247,13 @@ export function createPerformanceBudget({
   const sampledAssetKeys = new Set();
   const budgets = mergeBudgets(budgetOverrides);
 
+  function appendSample(series, value) {
+    series.push(value);
+    if (series.length > MAX_PERFORMANCE_SAMPLES) series.shift();
+  }
+
   function record(metric, value) {
-    samples[metricName(metric)].push(finiteNonNegative(value, `${metric} sample`));
+    appendSample(samples[metricName(metric)], finiteNonNegative(value, `${metric} sample`));
     return value;
   }
 
@@ -281,7 +292,7 @@ export function createPerformanceBudget({
   function recordAssetTiming(entry) {
     const timing = readAssetTiming(entry);
     if (timing == null) return null;
-    assetTimings.push(timing);
+    appendSample(assetTimings, timing);
     record('assetLoad', timing.duration);
     return timing;
   }
@@ -327,6 +338,7 @@ export function createPerformanceBudget({
     return {
       metrics,
       assetTiming,
+      sampleWindow: Object.freeze({ limit: MAX_PERFORMANCE_SAMPLES, retention: 'latest' }),
       budgets,
       violations: findBudgetViolations(metrics, budgets),
       recommendation: recommendDeviceTier(metrics, tiers),

@@ -30,6 +30,7 @@ export function createBubbleReefBaseContribution({ seed = 733, reducedMotion = f
   group.add(ornament);
   const geometries = new Set();
   const materials = new Set();
+  const instances = new Set();
   const geometry = value => { geometries.add(value); return value; };
   const material = (color, extra = {}) => {
     const value = new THREE.MeshStandardMaterial({ color, roughness: 0.48, ...extra });
@@ -66,6 +67,21 @@ export function createBubbleReefBaseContribution({ seed = 733, reducedMotion = f
     const z = Math.sin(angle) * 0.57;
     mesh(crown, 'coral-stem', disc, coral, [x, height / 2, z], [0.07, height, 0.07]);
     mesh(crown, 'coral-tip', sphere, coral, [x, height, z], [0.11, 0.14, 0.11]);
+  }
+  for (const name of ['coral-stem', 'coral-tip']) {
+    const sources = crown.children.filter(item => item.name === name);
+    const batch = new THREE.InstancedMesh(sources[0].geometry, sources[0].material, sources.length);
+    batch.name = name;
+    sources.forEach((source, index) => {
+      source.updateMatrix();
+      batch.setMatrixAt(index, source.matrix);
+      source.removeFromParent();
+    });
+    batch.instanceMatrix.needsUpdate = true;
+    batch.computeBoundingBox();
+    batch.computeBoundingSphere();
+    crown.add(batch);
+    instances.add(batch);
   }
   const heart = mesh(ornament, 'current-pearl', sphere, pearl, [0, 1.12, 0], [0.3, 0.3, 0.3]);
   const halo = mesh(ornament, 'current-halo', ring, glow, [0, 0.92, 0], [0.62, 0.62, 0.62]);
@@ -112,8 +128,10 @@ export function createBubbleReefBaseContribution({ seed = 733, reducedMotion = f
     if (disposed) return;
     disposed = true;
     group.removeFromParent();
+    instances.forEach(value => value.dispose());
     geometries.forEach(value => value.dispose());
     materials.forEach(value => value.dispose());
+    instances.clear();
     geometries.clear();
     materials.clear();
     bubbles.length = 0;

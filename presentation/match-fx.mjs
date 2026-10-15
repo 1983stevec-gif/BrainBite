@@ -1,9 +1,16 @@
 /** Lightweight FX overlays for MATCH plates */
 
+function setTextIfChanged(element, value) {
+  if (element && element.textContent !== value) element.textContent = value;
+}
+
+function setWidthIfChanged(element, value) {
+  if (element && element.style.width !== value) element.style.width = value;
+}
+
 export function mountMatchFx(stage, kind = 'home') {
   const fx = document.createElement('div');
   fx.className = `match-fx match-fx-${kind}`;
-  fx.setAttribute('aria-hidden', 'true');
 
   const sheen = document.createElement('div');
   sheen.className = 'match-sheen';
@@ -94,7 +101,9 @@ export function mountMatchFx(stage, kind = 'home') {
 
     const toast = document.createElement('div');
     toast.className = 'match-toast';
-    toast.hidden = true;
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
+    toast.setAttribute('aria-atomic', 'true');
     fx.appendChild(toast);
 
     const combo = document.createElement('div');
@@ -103,7 +112,6 @@ export function mountMatchFx(stage, kind = 'home') {
 
     const goal = document.createElement('div');
     goal.className = 'match-live-goal';
-    goal.setAttribute('aria-live', 'polite');
     goal.innerHTML = '<small>CURRENT GOAL</small><strong class="match-goal-title"></strong><div class="match-goal-bar"><span></span></div><p class="match-goal-text"></p>';
     fx.appendChild(goal);
 
@@ -114,15 +122,16 @@ export function mountMatchFx(stage, kind = 'home') {
 
     const boss = document.createElement('div');
     boss.className = 'match-live-boss';
-    boss.setAttribute('aria-live', 'polite');
     boss.innerHTML = '<strong class="match-boss-name"></strong><div class="match-boss-track"><span class="match-boss-fill"></span></div><p class="match-boss-phase"></p>';
     fx.appendChild(boss);
 
     const targets = document.createElement('div');
     targets.className = 'match-live-targets';
-    targets.setAttribute('aria-live', 'polite');
     fx.appendChild(targets);
   }
+
+  fx.querySelectorAll('.match-sheen, .match-portal-glow, .match-dust, .match-shafts, .match-mist, .match-falls, .match-water, .match-caustic, .match-select-ring, .match-sparks, .match-flash')
+    .forEach(element => element.setAttribute('aria-hidden', 'true'));
 
   stage.appendChild(fx);
   return fx;
@@ -164,10 +173,7 @@ export function pulseMatchResult(stage, ok) {
 export function showMatchToast(stage, text, ok = true) {
   const toast = stage?.querySelector('.match-toast');
   if (!toast || !text) return;
-  toast.hidden = false;
-  toast.setAttribute('role', 'status');
-  toast.setAttribute('aria-live', 'polite');
-  toast.textContent = text;
+  setTextIfChanged(toast, text);
   toast.classList.toggle('is-ok', ok);
   toast.classList.toggle('is-miss', !ok);
   toast.classList.remove('show');
@@ -182,7 +188,7 @@ export function syncMatchLiveHud(stage) {
   const combo = document.getElementById('combo')?.textContent?.trim();
   if (comboEl) {
     const n = Number(combo) || 0;
-    comboEl.textContent = n > 0 ? `Combo x${n}` : '';
+    setTextIfChanged(comboEl, n > 0 ? `Combo x${n}` : '');
     comboEl.classList.toggle('on', n > 0);
   }
 
@@ -194,11 +200,11 @@ export function syncMatchLiveHud(stage) {
     const t = goalRoot.querySelector('.match-goal-title');
     const p = goalRoot.querySelector('.match-goal-text');
     const fill = goalRoot.querySelector('.match-goal-bar span');
-    if (t) t.textContent = goalTitle;
-    if (p) p.textContent = goalText;
+    setTextIfChanged(t, goalTitle);
+    setTextIfChanged(p, goalText);
     const m = /^(\d+)\s*\/\s*(\d+)/.exec(eaten || '');
     const pct = m && Number(m[2]) ? Math.max(0, Math.min(100, (Number(m[1]) / Number(m[2])) * 100)) : 0;
-    if (fill) fill.style.width = `${pct}%`;
+    setWidthIfChanged(fill, `${pct}%`);
     goalRoot.classList.toggle('on', !!(goalTitle || goalText));
   }
 
@@ -207,8 +213,8 @@ export function syncMatchLiveHud(stage) {
   if (healthRoot) {
     const fill = healthRoot.querySelector('.match-health-fill');
     const text = healthRoot.querySelector('.match-health-text');
-    if (fill) fill.style.width = `${Math.max(0, Math.min(100, (lives / 3) * 100))}%`;
-    if (text) text.textContent = `${lives} / 3`;
+    setWidthIfChanged(fill, `${Math.max(0, Math.min(100, (lives / 3) * 100))}%`);
+    setTextIfChanged(text, `${lives} / 3`);
     healthRoot.classList.add('on');
   }
 
@@ -221,15 +227,15 @@ export function syncMatchLiveHud(stage) {
     const n = bossRoot.querySelector('.match-boss-name');
     const f = bossRoot.querySelector('.match-boss-fill');
     const p = bossRoot.querySelector('.match-boss-phase');
-    if (n) n.textContent = name;
-    if (f) f.style.width = `${pct}%`;
-    if (p) p.textContent = phase;
+    setTextIfChanged(n, name);
+    setWidthIfChanged(f, `${pct}%`);
+    setTextIfChanged(p, phase);
     bossRoot.classList.add('on');
   }
 
   const targetsEl = stage.querySelector('.match-live-targets');
   if (targetsEl) {
-    targetsEl.textContent = eaten ? `Targets ${eaten}` : '';
+    setTextIfChanged(targetsEl, eaten ? `Targets ${eaten}` : '');
     targetsEl.classList.toggle('on', !!eaten);
   }
 }

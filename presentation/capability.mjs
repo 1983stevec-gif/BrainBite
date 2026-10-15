@@ -53,4 +53,19 @@ export function canUseWebgl() {
   } catch { return false; }
 }
 export function shouldEnableWebgl() { return wantsWebgl() && canUseWebgl(); }
-export function shouldEnableMatch() { return wantsMatch(); }
+// Reference art contains illustrative names, rewards and HUD values. Keep it
+// inside the internal-review preview, never as a production learner surface.
+export function matchPreviewAllowed(control = globalThis.BrainBiteContentControl) {
+  try { return control?.getRuntimeMode?.() === 'internal-review'; }
+  catch { return false; }
+}
+export function matchNeedsPortraitFallback(viewport = globalThis) {
+  const width = Number(viewport.innerWidth);
+  const height = Number(viewport.innerHeight);
+  // Cover-scaled landscape plates crop their primary controls on portrait
+  // phones/tablets; the existing Classic shell keeps full-size touch controls.
+  return width > 0 && height > width && width <= 1024;
+}
+export function shouldEnableMatch() {
+  return wantsMatch() && matchPreviewAllowed() && !matchNeedsPortraitFallback();
+}

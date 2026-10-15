@@ -3,10 +3,16 @@
 **Revision:** this file describes the commit that last changed it
 (`git log -1 --format=%h -- docs/HANDOFF.md`). A hard-coded hash here was always one commit
 behind, because committing the file changes HEAD.
-**Written:** 2026-09-22 · **Updated:** 2026-09-27 (PR #2 CI runs 43–44, stable 211-case browser suite, fresh Windows installer and no-port verification; earlier: M2 native-shell readiness, audit F10/F11/F13, hygiene H1–H6, decisions D1–D14).
+**Written:** 2026-09-22 · **Updated:** 2026-10-15 (Round 7 harness provenance,
+adaptive timing, certification reporting, export/recovery hardening, CSS diagnostics and
+current package measurements; earlier evidence remains labelled historical below).
 
 This document is the entry point. It says what is verified, what is not, who owns what is
 left, and the operational details that are easy to get wrong. The other documents go deeper:
+
+**Latest local 3D build (2026-10-06):** live 3D foliage, atmosphere, water and authored material assets are finished and bundled in the Windows build. See [3D_POLISH_DELIVERY_2026_10_06.md](3D_POLISH_DELIVERY_2026_10_06.md) for exact artifact hashes, visual evidence and failed-run disposition. Final results: 291/291 units, 11/11 smoke, static/native checks passed; the full browser run passed 249/252 and all three remaining cases passed twice in focused verification. This is coverage of all 252 cases, not one clean full-suite invocation. The unsigned playable executable and installer are in `BrainBite-3D-Polish-2026-10-06` in the task outputs folder. No production deployment or merge is claimed.
+
+**Previous local visual build (2026-10-04):** the substantial public home/battle redesign and Windows executable are recorded in [AUDIT_BUILD_PLAN_2026_10_02.md](AUDIT_BUILD_PLAN_2026_10_02.md), including the coordinator delivery section. Current local results are 291/291 units, 11/11 smoke checks, all 251 browser cases covered with six corrected focused reruns, and 30/30 real Firestore emulator tests. The report distinguishes initial failures, final native artifacts and external rollout gates; the older counts below remain historical. The unsigned installer and playable executable are in the task outputs folder named `BrainBite-Visual-Upgrade-2026-10-04`. Production Firebase rules and clients require coordinated rollout; no production deployment or merge is claimed.
 
 | Document | Contents |
 |---|---|
@@ -17,24 +23,41 @@ left, and the operational details that are easy to get wrong. The other document
 
 `AGENTS.md` points here and nowhere else.
 
+**Round 7 operational refresh (2026-10-15):** test-server reuse now fails closed unless the
+server exposes the SHA-256 of this checkout's `index.html`; smoke runs print and persist their
+effective timeout budgets, and the performance probe polls readiness and prints each scene's
+budget. Local certification now distinguishes a clean pass from retry-recovered flakiness.
+Profile exports use an explicit field allowlist plus recursive credential redaction, and the
+unreadable-save quarantine retains only its newest bounded snapshots. These are implementation
+behaviours. Mobile-layout cases now assert text clipping and initial-viewport placement more
+directly; the CSS gate detects unallowlisted `!important` shadowing; and serverless workflow
+actions use verified Node-24-compatible majors. None of this is a new browser-suite,
+certification, device, production, or human-review result.
+See [`ENHANCEMENT_PLAN_2026_10_15.md`](ENHANCEMENT_PLAN_2026_10_15.md).
+
+**Independent follow-up (2026-09-27):** see
+[`AUDIT_BUILD_PLAN_2026_09_27.md`](AUDIT_BUILD_PLAN_2026_09_27.md). The review CLI
+still had mixed-batch partial writes and no rollback after validator failure;
+the manifest returned by `getReviewManifest()` still omitted approvals/findings
+despite the earlier description below. The follow-up fixes those issues, validates
+reviewer metadata and repairs Windows smoke readiness/cleanup. Independent
+subagent reviews then exposed linked-JSON rejection and harness synchronization
+gaps, also fixed. Final local verification records **267/267 unit, 220/220 browser (zero
+retries), 15/15 repeated targeted cases, and 11/11 smoke checks pass** after the final
+digest-gate acceptance fix. The current scoped recheck passes
+`node --test tests/content-review.test.mjs` (**25/25**) and
+`npm run check:content-review`; the full suite was not rerun in this pass. Earlier
+failed full runs remain recorded in the audit. No remote CI, native, device, educator, or
+external certification is claimed here.
+
 ---
 
 ## 1. Where the project stands
 
-The earlier baseline is merged to `main` (PR #1, merge commit `6b43a59`). The current
-closed-beta implementation stack is on [`mobile/runtime-readiness`](https://github.com/1983stevec-gif/BrainBite/tree/mobile/runtime-readiness)
-in [PR #2](https://github.com/1983stevec-gif/BrainBite/pull/2), open and mergeable to
-`main`. Latest fully tested gameplay commit is `3ebcf35d8bc7ea18d7c69b64b9015cdedd7201e6`; runtime/evidence
-implementation is based on `a6786aaa04ec09d1ffdda2420ffff30a59b07e4b` and browser-readiness
-changes are in `2cf4de6367d7d9cc90fb8549ef687013b5809331`. GitHub Actions runs
-[36316190009](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316190009) and
-[36316192782](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316192782) each
-passed the validators, native package check, 236 unit tests, all 211 browser tests with zero
-retries, 11/11 smoke checks, clean-tree guard, and Firestore emulator job. A fresh
-`npm run native:build` produced the unsigned internal installer at
-`src-tauri/target/release/bundle/nsis/BrainBite_2.0.0_x64-setup.exe`; the rebuilt executable
-passed `npm run native:verify:runtime` with no TCP listeners. Under decision D6, Steve
-performs the merge.
+The earlier baseline is merged to `main` (PR #1, merge commit `6b43a59`). The PR #2 branch
+and its CI/native results are historical evidence, retained below with that label; they are
+not current Cycle 2 verification. The current scoped result is the local content-review
+recheck recorded above. Under decision D6, Steve performs the eventual merge.
 
 Three items are deliberately **not** done:
 
@@ -51,36 +74,39 @@ Three items are deliberately **not** done:
 
 ## 2. Verified now
 
-Every row below is reproducible from this revision. Evidence files are committed.
+Rows labelled current are local audit results after the final digest-gate fix. Historical PR #2 rows are not current
+verification, and no remote CI, native, device, educator, or external certification is
+claimed.
 
 | Gate | Command | Result | Evidence |
 |---|---|---|---|
-| Static checks (10) | `npm run check:static` | PASS (includes `check:encoding`) | console |
-| Unit tests | `npm run test:unit` | **236/236** (Windows, Node 24.19.0) | local-certification report |
-| Browser suite | CI runs 36316190009 and 36316192782 | **211 passed, zero retries** in each run. Both include the short-landscape prompt and direct 3D pointer-to-answer parity. The earlier Windows certification recorded two retry-only cases; their groups were rerun without retries at 92/92 and 14/14. The latest targeted reload-sensitive rerun passed 2/2 | Playwright CI artifacts; `release-evidence/local-certification.json`; focused reruns |
-| Smoke inventory | `npm run certify:local` | **11/11** | `release-evidence/smoke-report.json` |
-| Performance probe | `npm run certify:local` | exit 0, **0 headless budget violations**; device-only results remain unverified | `release-evidence/local-certification.json` |
-| Local certification | `npm run certify:local` | **17/17 stages passed** on Windows; 210 browser cases, 11/11 smokes, and zero headless budget violations. The report snapshot is based on `36887b9` with the final stylesheet/evidence changes later committed in `a6786aa`; it records the initial tree as dirty | `release-evidence/local-certification.json` |
-| Release evidence | `npm run check:evidence:ci` on the PR branch | PASS | GitHub Actions runs 36316190009 and 36316192782; local certification |
-| Package integrity | `npm run check:stage` | 100 runtime files, no developer material | `release-evidence/package-manifest.json` |
-| Content review gate | `npm run check:content-review` | PASS, 0 digest mismatches | console |
-| Native shell | `npm run native:verify` and `npm run native:verify:runtime` | 100 runtime files; rebuilt native window and child processes open with zero TCP listeners; shell CSP matches `index.html` | CI runs 36316190009 and 36316192782 and Windows console |
-| Remote CI | GitHub Actions | **success** on PR #2; 211 browser tests with zero retries, 11/11 smokes, clean tree, and Firestore job pass | Actions runs 36316190009 and 36316192782 |
+| Focused content-review tests | `node --test tests/content-review.test.mjs` | **25/25** in the current scoped recheck | local console |
+| Content review gate | `npm run check:content-review` | PASS, 105 records and 0 digest mismatches | local console |
+| Current integrated unit run | `npm run test:unit` | **267/267**, zero failed/skipped | final local audit |
+| Current smoke inventory | `npm run smoke` | **11/11**, including Chrome+Edge Windows matrix | final local audit |
+| Current browser suite | Local audit run | **220/220, zero retries** | final local audit |
+| Historical local certification | `npm run certify:local` | **17/17 stages**, 210 browser cases, 11/11 smokes | historical `release-evidence/local-certification.json` |
+| Historical PR #2 remote CI | GitHub Actions | **211 browser tests, zero retries**, 11/11 smokes, clean tree, and Firestore job pass; historical only | Actions runs 36316190009 and 36316192782 |
+| Historical PR #2 native shell | `npm run native:verify` and `npm run native:verify:runtime` | 100 runtime files and zero TCP listeners; historical only | PR #2 records |
 
-Measured budgets (headless-judgeable, all passing):
+Latest recorded measurements (not guarantees; startup is load-sensitive and the Bubble
+Reef draw-call figures are from a single run):
 
 | Metric | Measured | Budget |
 |---|---:|---:|
-| Startup | ~720 ms | 3000 ms |
+| Startup (desktop) | 2,798 ms in one load-sensitive run | 3,000 ms |
 | Save latency (desktop p95 / max) | 6.6 ms / 7.2 ms | 250 ms / 1000 ms |
 | Save latency (mobile p95 / max) | 10.1 ms / 10.3 ms | 250 ms / 1000 ms |
-| Payload | 3,222 KB raw | 4,096 KB |
-| Memory | ~20 MB | 512 MB |
-| Draw calls | 117 home / 198 battle | 200 |
-| Triangles | 39,656 | 250,000 |
+| 3D payload (five GLBs + two authored raster surfaces) | 3,459,795 bytes raw / 1,085,948 bytes gzip / 681,340 bytes brotli | 4,194,304 bytes raw |
+| Memory | ~29 MB in one run | 512 MB |
+| Jungle draw calls | up to 174 home / 136 battle in one run | 200 |
+| Bubble Reef home draw calls | 143 desktop / 145 mobile in one run | 200 |
+| Triangles | up to ~126,000 in one run | 250,000 |
 
-`npm run measure:payload` additionally reports transfer size: the 3.2 MB of 3D assets
-compress to **769 KB gzip / 374 KB brotli**, which is why Draco was rejected (§7).
+The 2026-10-15 `npm run measure:payload` output covers all seven packaged 3D assets and reports
+**3,459,795 bytes raw / 1,085,948 bytes gzip / 681,340 bytes brotli** (rounded: **3,379 KB /
+1,060 KB / 665 KB**). The raw total is within its 4,194,304-byte budget by 734,509 bytes.
+These are transfer-size measurements, not startup or physical-device performance claims.
 
 Device-only metrics — frame pacing, long-task tails, scene load, asset load — are recorded as
 **unverified** in every probe run. They need real hardware.
@@ -173,14 +199,26 @@ approved, 0 rejected** (0 digest mismatches).
   lives in `content/storage-copies.js` and is unit-tested. Store apps add a fourth copy
   outside the WebView (`bb-core-v3-native-mirror`, Capacitor Preferences), used only when
   all three web generations are unreadable at boot.
+- **Exports are allowlisted and credential-aware.** Exported profiles are reconstructed from
+  an explicit field allowlist and then recursively scrubbed using case-insensitive,
+  synonym-aware credential detection. Unknown future profile fields are intentionally omitted
+  until the schema and tests are updated: confidentiality is preferred over automatic forward
+  compatibility for undeclared fields.
+- **Unreadable-save retention is bounded.** `bb-core-v3-unreadable-quarantine` retains the
+  three newest corruption-event snapshots, prunes oldest first, and records pruning diagnostics
+  (including counts, generation keys, byte lengths and fingerprints). The newest snapshot is
+  preserved when older data is migrated or a replacement write cannot be completed.
 - **Native shells are detected in one place.** `presentation/platform.js` (classic script,
   before `app.js`) reports `web`, `capacitor`, `tauri`, or `simulated` (`?native=1`, tests
   only). In a native shell: no service worker, footer/outbound links need the family PIN,
   Android back is routed to `handleNativeBack()`, haptics follow the Vibration setting. The
-  web build is unchanged. `tests/native-shell.spec.js` covers it.
+  web build is unchanged. `tests/native-shell.spec.js` covers a **browser simulation**:
+  its mirror uses `localStorage`, Android back is dispatched directly, and `lastHaptic` is
+  recorded before any native plugin call. It does not verify interactive Capacitor
+  Preferences, Haptics, or App integration; that native behavior remains unverified.
 - **The service worker precache is a fixed list.** Adding a runtime asset means updating
   `service-worker.js` *and* the stage allowlist, then bumping the cache name
-  (`brainbite-v2.0-shell-v44-native-ready`) so clients re-precache.
+  (the current versioned cache name is defined in `service-worker.js`) so clients re-precache.
 - **Fonts are self-hosted and the CSP is strict** (`script-src 'self'`, `worker-src 'self'`,
   no `unsafe-eval`, no wasm compilation). Any new dependency must fit inside that; Draco did
   not (§7).
@@ -218,6 +256,25 @@ Two things were measured and deliberately **rejected**:
 
 ## 8. Operational gotchas
 
+- **Harness server reuse is provenance-checked.** `scripts/serve.mjs` exposes
+  `/.brainbite-test-provenance` with the local `index.html` SHA-256. Playwright global setup
+  verifies it when `BRAINBITE_REUSE_TEST_SERVER=1`; `npm run smoke` verifies it whenever the
+  configured URL is already answering. A missing or different fingerprint aborts instead of
+  testing a stale checkout. Let the harness start its own server unless deliberate reuse is
+  required.
+- **Smoke timeouts are adaptive and visible.** Run `npm run smoke`; use
+  `npm run smoke -- --only <name>` for a focused smoke or `--timeout <ms>` for an explicit
+  per-script override. By default each script gets four times its previously measured duration
+  plus 60 seconds, with later scripts allowed to scale for observed host slowdown and every
+  budget capped at 600 seconds. Each `BUDGET` line and the JSON report record the effective
+  timeout and basis. `npm run probe:performance` polls scene readiness rather than sleeping for
+  one fixed interval and prints each effective scene-settle budget.
+- **Read certification status literally.** `npm run certify:local` writes top-level `status`
+  and `summary.flaky`. `passed` means every stage passed without a retry-recovered browser test;
+  `passed-with-retries` means no stage failed but at least one browser test passed only on retry;
+  `failed` means at least one stage failed. Retry-recovered tests currently do not make the
+  command fail; whether they should is an owner decision. Certification still does not close
+  external gates.
 - **`check:evidence` needs a clean tree.** Commit before running it, or it fails by design.
   Test and smoke runs no longer write tracked files (they write to `.playwright-results/`),
   so `release:check` can be run twice in a row. To update the committed screenshots in
@@ -250,16 +307,19 @@ Two things were measured and deliberately **rejected**:
   `npm run package:manifest`.
 - **After changing any packaged file**, run `npm run package:manifest`; `check:stage` will
   tell you, and it now names the right command for a stale digest.
+- **CSS checks distinguish blockers from inventory.** `npm run check:css` fails on a new,
+  unallowlisted overlapping `!important` shadow. Run
+  `node scripts/check-dead-css.mjs --verbose` to print the complete duplicate-declaration
+  diagnostic; the current output reports 134 duplicate selector declarations.
 
 ---
 
 ## 9. Next moves, in order
 
-0. **Review and merge [PR #2](https://github.com/1983stevec-gif/BrainBite/pull/2)** (Steve,
-   per D6). The branch is pushed, mergeable, and its full CI plus Firestore rules jobs pass.
-   Windows verification completed with `npm ci` and `npm run certify:local`; the latter is
-   the branch-safe local release gate. `npm run release:check` invokes the main-only,
-   clean-tree evidence check, so use `npm run check:evidence:ci` on a feature branch.
+0. **Review and merge the implementation** (Steve, per D6). PR #2's pushed/mergeable state
+   and its CI, Firestore, and Windows certification results are historical records, not
+   current verification. `npm run release:check` invokes the main-only, clean-tree evidence
+   check, so use `npm run check:evidence:ci` on a feature branch.
 1. **Enable GitHub Pages** (Steve, one setting). Then confirm the `pages` workflow goes green
    on `main` and the app is reachable.
 2. **Circulate the review packet** and run `review:approve` / `review:reject` for the 75
@@ -273,6 +333,16 @@ Two things were measured and deliberately **rejected**:
 Engineering work that is *not* blocked but is also not required: `app.js` is still a large
 classic script (measured `render()` at 5–6 ms, so not a current bottleneck), and the 3D
 payload could be revisited only if a decoder arrives for another reason.
+
+### Known follow-ups
+
+- Use [`CSS_CASCADE_REVIEW_2026_10_15.md`](CSS_CASCADE_REVIEW_2026_10_15.md) as the companion
+  review; classify the current 134 duplicate CSS declarations rather than deleting them
+  mechanically.
+- Resolve the owner decisions already recorded in
+  [`ENHANCEMENT_PLAN_2026_10_15.md`](ENHANCEMENT_PLAN_2026_10_15.md) and the dated audit/build
+  plans, including retry policy, Expedition/offline policy, currency legacy boundaries,
+  review-write atomicity, and the external gates.
 
 ---
 

@@ -6,7 +6,8 @@ import { createBubbleReefKit } from '../presentation/bubble-reef-kit.mjs';
 function snapshot(group) {
   const result = [];
   group.traverse(item => result.push([item.name, item.position.toArray(), item.quaternion.toArray(),
-    item.scale.toArray(), item.geometry?.type, item.material?.color.getHex()]));
+    item.scale.toArray(), item.geometry?.type, item.material?.color.getHex(),
+    item.instanceMatrix ? Array.from(item.instanceMatrix.array) : null]));
   return result;
 }
 
@@ -21,19 +22,30 @@ test('reef composition is deterministic, seeded, bounded, and primitive-only', (
     const counts = new Map();
     const geometries = new Set();
     let triangles = 0;
+    let meshes = 0;
     a.group.traverse(item => {
-      counts.set(item.name, (counts.get(item.name) || 0) + 1);
-      if (!item.isMesh) return;
+      if (!item.isMesh) {
+        counts.set(item.name, (counts.get(item.name) || 0) + 1);
+        return;
+      }
+      const amount = item.isInstancedMesh ? item.count : 1;
+      const names = item.userData.instanceNames || { [item.name]: amount };
+      for (const [name, count] of Object.entries(names)) counts.set(name, (counts.get(name) || 0) + count);
+      meshes++;
       assert.match(item.geometry.type, /^(Sphere|Icosahedron|Cylinder|Cone|Torus)Geometry$/);
       assert.equal(item.material.map, null);
       geometries.add(item.geometry);
-      triangles += (item.geometry.index?.count ?? item.geometry.attributes.position.count) / 3;
+      triangles += (item.geometry.index?.count ?? item.geometry.attributes.position.count) / 3 * amount;
     });
     assert.equal(counts.get('coral-trunk'), 4);
     assert.equal(counts.get('reef-crystal'), 16);
     assert.equal(counts.get('bubble-shell'), 16);
     assert.equal(counts.get('golden-sea-fan'), 4);
+    assert.equal(counts.get('fan-ray'), 28);
+    assert.equal(counts.get('reef-pebble'), 16);
     assert.equal(geometries.size, 6);
+    assert.equal(meshes, 12);
+    assert.equal(a.group.getObjectByName('coral-trunk').isInstancedMesh, true);
     assert.ok(triangles < 50000, `triangle budget: ${triangles}`);
     const bounds = new THREE.Box3().setFromObject(a.group);
     assert.ok(bounds.min.x > -7 && bounds.max.x < 7);
@@ -83,13 +95,20 @@ test('disposal releases each owned resource once and preserves other kit and hos
   resources.forEach(resource => resource.addEventListener('dispose', () => {
     calls.set(resource, (calls.get(resource) || 0) + 1);
   }));
+  const instances = [];
+  a.group.traverse(item => {
+    if (item.isInstancedMesh) {
+      instances.push(item);
+      item.addEventListener('dispose', () => calls.set(item, (calls.get(item) || 0) + 1));
+    }
+  });
   let otherDisposals = 0;
   b.group.traverse(item => item.material?.addEventListener('dispose', () => otherDisposals++));
   const before = snapshot(b.group);
   a.dispose();
   a.dispose();
   a.update(4);
-  assert.equal(calls.size, resources.size);
+  assert.equal(calls.size, resources.size + instances.length);
   assert.ok([...calls.values()].every(count => count === 1));
   assert.equal(a.group.parent, null);
   assert.equal(a.group.children.length, 0);

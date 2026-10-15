@@ -32,18 +32,20 @@ export async function parentDestination(page, name, pin = '654321') {
 /** Return to the child hub from the parent area. */
 export async function leaveParentArea(page) {
   await page.getByRole('button', { name: 'Back to kid hub' }).click();
-  await page.locator('#childDock').waitFor({ state: 'visible' });
+  await page.locator('#home.show').waitFor({ state: 'visible' });
 }
 
 /** Open a world list (Number Nebula, Wordwood, Spanish Portal). */
 export async function openWorld(page, name) {
-  await page.locator('#childDock button[data-screen="worlds"]').click();
+  const homeWorlds=page.locator('#home .adventure-destinations button[data-screen="worlds"]');
+  if(await homeWorlds.isVisible())await homeWorlds.click();
+  else await page.locator('#childDock button[data-screen="worlds"]').click();
   await page.getByRole('button', { name, exact: true }).click();
 }
 
 /** Open the child Settings screen. */
 export async function openSettings(page) {
-  await page.locator('#childDock button[data-screen="home"]').click();
+  if(!(await page.locator('#home.show').isVisible()))await page.locator('#childDock button[data-screen="home"]').click();
   await page.locator('.dash-quick-actions button[data-screen="settings"]').click();
   await page.locator('#settings.show').waitFor();
 }

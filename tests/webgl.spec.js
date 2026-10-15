@@ -167,12 +167,20 @@ test('a restored WebGL context keeps the live 3D scene and the active mission',a
   // recovers from the browser's own restore, and that the 1.5s fallback window is cancelled.
   const lost=await canvas.evaluate(node=>{
     const gl=node.getContext('webgl2')||node.getContext('webgl');
-    window.__bbLoseContext=gl.getExtension('WEBGL_lose_context');
-    window.__bbLoseContext.loseContext();
+    const extension=gl.getExtension('WEBGL_lose_context');
+    window.__bbContextEvents={lost:0,restored:0};
+    node.addEventListener('webglcontextrestored',()=>{window.__bbContextEvents.restored++},{once:true});
+    node.addEventListener('webglcontextlost',()=>{
+      window.__bbContextEvents.lost++;
+      // Allow every loss handler (including preventDefault) to finish, then
+      // restore in-page without spending the fallback window on a round trip.
+      setTimeout(()=>extension.restoreContext(),0);
+    },{once:true});
+    extension.loseContext();
     return gl.isContextLost();
   });
   expect(lost).toBe(true);
-  await canvas.evaluate(()=>window.__bbLoseContext.restoreContext());
+  await expect.poll(()=>page.evaluate(()=>window.__bbContextEvents)).toEqual({lost:1,restored:1});
   await expect(page.locator('html')).toHaveClass(/presentation-webgl/);
   await expect(page.locator('#game canvas.webgl-canvas')).toHaveCount(1);
   await expect(page.locator('#feedback')).toContainText('reconnected');
@@ -254,7 +262,7 @@ for(const [layout,width,height] of [['desktop',1280,853],['short laptop',1280,60
   });
 }
 
-test('desktop portal stays clear of side HUD panels after resize',async({page})=>{
+test('desktop portal stays inside its hero and clear of live controls after resize',async({page})=>{
   await page.emulateMedia({reducedMotion:'reduce'});
   await page.setViewportSize({width:1280,height:853});
   await page.goto('/?presentation=webgl');
@@ -265,14 +273,22 @@ test('desktop portal stays clear of side HUD panels after resize',async({page})=
     await page.setViewportSize({width,height});
     await expect.poll(()=>page.evaluate(()=>{
       const button=document.querySelector('.webgl-home-portal').getBoundingClientRect();
-      const rail=document.querySelector('#home .home-rail').getBoundingClientRect();
+      const hero=document.querySelector('#home .home-stage').getBoundingClientRect();
+      const copy=document.querySelector('#home .adventure-hero-copy').getBoundingClientRect();
+      const play=document.querySelector('#continueBtn').getBoundingClientRect();
       const sidebar=document.querySelector('#home .home-right').getBoundingClientRect();
+      const doesNotOverlap=rect=>button.right<=rect.left||button.left>=rect.right||button.bottom<=rect.top||button.top>=rect.bottom;
       const hit=document.elementFromPoint(button.x+button.width/2,button.y+button.height/2);
-      return button.left>rail.right && button.right<sidebar.left && Boolean(hit?.closest('.webgl-home-portal'));
+      return button.left>=hero.left && button.right<=hero.right
+        && button.top>=hero.top && button.bottom<=hero.bottom
+        && button.width>=44 && button.height>=44
+        && doesNotOverlap(copy) && doesNotOverlap(play) && doesNotOverlap(sidebar)
+        && Boolean(hit?.closest('.webgl-home-portal'));
     })).toBe(true);
   }
   await portal.click();
   await expect(page.locator('#game canvas.webgl-canvas')).toHaveCount(1);
+  await expect.poll(()=>page.evaluate(()=>window.BrainBiteGame.getState()?.m?.id)).toBe(1);
 });
 
 test('phone HUD stays compact without hiding subject navigation or answer controls',async({page})=>{
@@ -355,8 +371,11 @@ for(const [width,height] of [[360,740],[390,844],[1024,682],[1280,800]]){
 
 test('the arrival status clears so the prompt card shows only the prompt',async({page})=>{
   await page.goto('/?presentation=webgl');
-  await page.evaluate(()=>window.BrainBiteGame.startMission(1));
-  await expect(page.locator('#feedback')).toContainText('Entering');
+  const arrival=await page.evaluate(()=>{
+    window.BrainBiteGame.startMission(1);
+    return document.getElementById('feedback').textContent;
+  });
+  expect(arrival).toContain('Entering');
   await expect(page.locator('#feedback')).toHaveText('',{timeout:3000});
   await expect(page.locator('#feedback')).toHaveAttribute('role','status');
 });
@@ -515,7 +534,10 @@ test('a wrong answer shows a visual explanation and the retry counts as assisted
 });
 
 // ---- UI Phase 1.5 ------------------------------------------------------------------
-test('the 1024x682 target size gets the floating desktop HUD, not the stacked layout',async({page})=>{
+test('the 1024x682 target size keeps the adventure scene, destinations and HUD usable',async({page})=>{
+  // This test measures static layout. Stop continuous software-GPU animation
+  // while Playwright reads geometry; motion behavior is covered separately.
+  await page.emulateMedia({reducedMotion:'reduce'});
   await page.setViewportSize({width:1024,height:682});
   await page.goto('/?presentation=webgl');
   await expect(page.locator('#home canvas.webgl-canvas')).toHaveCount(1);
@@ -524,12 +546,22 @@ test('the 1024x682 target size gets the floating desktop HUD, not the stacked la
   expect(box.y+box.height).toBeLessThanOrEqual(682+1);
   const menu=await page.locator('#home .home-rail').boundingBox();
   const rail=await page.locator('#home .home-right').boundingBox();
-  expect(menu.x+menu.width).toBeLessThan(512);
-  expect(rail.x).toBeGreaterThan(512);
-  expect(await page.evaluate(()=>document.documentElement.scrollHeight)).toBeLessThanOrEqual(682+1);
+  expect(menu.y).toBeGreaterThanOrEqual(box.y+box.height);
+  expect(menu.x+menu.width).toBeLessThanOrEqual(rail.x);
+  expect(rail.x+rail.width).toBeLessThanOrEqual(1024);
+  for(const button of await page.locator('#home .adventure-destinations button').all()){
+    await expect(button).toBeVisible();
+    await expect(button).toBeEnabled();
+    const target=await button.boundingBox();
+    expect(target.height).toBeGreaterThanOrEqual(44);
+    expect(target.y+target.height).toBeLessThanOrEqual(682);
+  }
+  await expect(page.locator('footer a[href="privacy.html"]')).toBeVisible();
   await page.evaluate(()=>window.BrainBiteGame.startMission(1));
   const map=await page.locator('#game .minimap-card').boundingBox();
-  expect(map.y).toBeGreaterThan(682/2);
+  expect(map.y).toBeGreaterThanOrEqual(0);
+  expect(map.x+map.width).toBeLessThanOrEqual(1024);
+  expect(map.y+map.height).toBeLessThanOrEqual(682);
 });
 
 // ---- UI Phase 2 + gameplay G2/G6.1 --------------------------------------------------
@@ -593,17 +625,47 @@ test('the scene locks input only during the hop and re-enables it within 700 ms'
   await expect.poll(()=>page.evaluate(()=>window.BrainBiteGame.getState().correct)).toBe(2);
 });
 
-test('reduced motion shows the answer state without a hop or particles',async({page})=>{
+test('reduced motion preserves correct/wrong answer states and gameplay counters',async({page},testInfo)=>{
   await page.emulateMedia({reducedMotion:'reduce'});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  const diagnostics={events:[],attempts:[]};
+  await page.addInitScript(()=>{
+    window.__bbAnswerDiagnostics=[];
+    for(const type of ['bb:answer','bb:presentation-fallback','bb:presentation-restored']){
+      window.addEventListener(type,event=>window.__bbAnswerDiagnostics.push({type,detail:event.detail,at:performance.now()}));
+    }
+    for(const type of ['webglcontextlost','webglcontextrestored']){
+      document.addEventListener(type,()=>window.__bbAnswerDiagnostics.push({type,at:performance.now()}),true);
+    }
+  });
+  try {
   await page.goto('/?presentation=webgl');
+  await waitForPresentationReady(page);
   await page.evaluate(()=>window.BrainBiteGame.startMission(1));
+  await page.evaluate(()=>window.BrainBitePresentation.syncFromScreen());
   await expect(page.locator('#game .battle-frame')).toHaveAttribute('data-answer-discs','4');
-  await answerCorrect(page);
+  const attempt=correct=>page.evaluate(correct=>{
+    const game=window.BrainBiteGame,g=game.getState();
+    const choices=game.pillarChoices(),slot=game.nibblerState()?.slot;
+    const value=correct?(choices.find((v,i)=>g.webglRemaining.includes(v)&&i!==slot)||choices.find(v=>g.webglRemaining.includes(v))||g.webglRemaining[0]):g.m.wrong[0];
+    const accepted=game.tryAnswer(value);
+    return {value,accepted,correct:g.correct,wrong:g.wrong,eaten:g.eaten,combo:g.combo,lives:g.lives,lastAnswer:document.querySelector('#game .battle-frame')?.dataset.lastAnswer,mode:window.BrainBitePresentation.mode};
+  },correct);
+  diagnostics.attempts.push(await attempt(true));
+  expect(diagnostics.attempts[0]).toMatchObject({accepted:true,correct:1,wrong:0,eaten:1,combo:1,lives:3,mode:'webgl'});
   await expect(page.locator('#game .battle-frame')).toHaveAttribute('data-last-answer','correct');
-  await answerWrong(page);
+  diagnostics.attempts.push(await attempt(false));
+  // tryAnswer returns correctness: a false result must still record the wrong attempt.
+  expect(diagnostics.attempts[1]).toMatchObject({accepted:false,correct:1,wrong:1,eaten:1,combo:0,lives:2,mode:'webgl'});
   await expect(page.locator('#game .battle-frame')).toHaveAttribute('data-last-answer','wrong');
   expect(errors).toEqual([]);
+  } catch(error) {
+    diagnostics.errors=errors;
+    diagnostics.events=await page.evaluate(()=>window.__bbAnswerDiagnostics||[]).catch(()=>[]);
+    diagnostics.presentation=await page.evaluate(()=>({mode:window.BrainBitePresentation?.mode,report:window.BrainBitePresentation?.getPerformanceReport?.(),frame:document.querySelector('#game .battle-frame')?.dataset})).catch(()=>null);
+    await testInfo.attach('reduced-motion-diagnostics',{body:JSON.stringify(diagnostics,null,2),contentType:'application/json'});
+    throw error;
+  }
 });
 
 test('three in a row flashes the combo panel and announces the streak',async({page})=>{
@@ -716,7 +778,7 @@ test('the route map is an illustrated path with a pin, checks, a boss badge and 
 
 test('home menu and utility orbs use the illustrated icon sprite, hidden from assistive tech',async({page})=>{
   await page.goto('/?presentation=webgl');
-  await expect(page.locator('#home .home-rail .rail-icon svg.ui-icon')).toHaveCount(6);
+  await expect(page.locator('#home .adventure-main .rail-icon svg.ui-icon')).toHaveCount(6);
   await expect(page.locator('#home .orb-glyph svg.ui-icon')).toHaveCount(3);
   for(const name of ['Continue Adventure','Practice Lab','Worlds','BrainBase','My Bites','Code']){
     await expect(page.getByRole('button',{name,exact:true}).first()).toBeVisible();

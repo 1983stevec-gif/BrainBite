@@ -1,7 +1,18 @@
 {
   "schema": "brainbite.smoke-report.v1",
-  "capturedAt": "2026-09-27T08:22:26.077Z",
+  "capturedAt": "2026-10-15T14:02:53.170Z",
+  "retention": {
+    "mode": "replace-per-run",
+    "notice": "This latest-run artifact is replaced by each smoke run; use capturedAt to identify when it was produced."
+  },
   "baseURL": "http://127.0.0.1:4318",
+  "timeoutPolicy": {
+    "maximumMs": 600000,
+    "measuredDurationSources": [
+      "release-evidence\\smoke-report.json"
+    ],
+    "overrideMs": null
+  },
   "totals": {
     "scripts": 11,
     "passed": 11,
@@ -11,7 +22,9 @@
     {
       "script": "smoke-completion-pusher.mjs",
       "status": "pass",
-      "durationMs": 8323,
+      "durationMs": 28120,
+      "timeoutMs": 94000,
+      "timeoutBasis": "8323ms measured in release-evidence\\smoke-report.json; 4.00x + 60000ms",
       "exitCode": 0,
       "signal": null,
       "tail": "] | SMOKE PASS"
@@ -19,7 +32,9 @@
     {
       "script": "smoke-export-a11y.mjs",
       "status": "pass",
-      "durationMs": 6377,
+      "durationMs": 16368,
+      "timeoutMs": 104000,
+      "timeoutBasis": "6377ms measured in release-evidence\\smoke-report.json; 6.76x + 60000ms",
       "exitCode": 0,
       "signal": null,
       "tail": "} | EXPORT/A11Y PREP PASS"
@@ -27,7 +42,9 @@
     {
       "script": "smoke-export-only.mjs",
       "status": "pass",
-      "durationMs": 4127,
+      "durationMs": 6757,
+      "timeoutMs": 88000,
+      "timeoutBasis": "4127ms measured in release-evidence\\smoke-report.json; 6.76x + 60000ms",
       "exitCode": 0,
       "signal": null,
       "tail": "} | EXPORT_SMOKE PASS"
@@ -35,7 +52,9 @@
     {
       "script": "smoke-gate84-viewports.mjs",
       "status": "pass",
-      "durationMs": 10615,
+      "durationMs": 15670,
+      "timeoutMs": 132000,
+      "timeoutBasis": "10615ms measured in release-evidence\\smoke-report.json; 6.76x + 60000ms",
       "exitCode": 0,
       "signal": null,
       "tail": "] | MATRIX PASS"
@@ -43,7 +62,9 @@
     {
       "script": "smoke-gate84-windows.mjs",
       "status": "pass",
-      "durationMs": 16910,
+      "durationMs": 20919,
+      "timeoutMs": 175000,
+      "timeoutBasis": "16910ms measured in release-evidence\\smoke-report.json; 6.76x + 60000ms",
       "exitCode": 0,
       "signal": null,
       "tail": "} | GATE84 WINDOWS CHROME+EDGE PASS"
@@ -51,7 +72,9 @@
     {
       "script": "smoke-match-lifecycle.mjs",
       "status": "pass",
-      "durationMs": 5194,
+      "durationMs": 9537,
+      "timeoutMs": 96000,
+      "timeoutBasis": "5194ms measured in release-evidence\\smoke-report.json; 6.76x + 60000ms",
       "exitCode": 0,
       "signal": null,
       "tail": "} | MATCH LIFECYCLE SMOKE PASS"
@@ -59,7 +82,9 @@
     {
       "script": "smoke-match-multiworld.mjs",
       "status": "pass",
-      "durationMs": 11464,
+      "durationMs": 11284,
+      "timeoutMs": 138000,
+      "timeoutBasis": "11464ms measured in release-evidence\\smoke-report.json; 6.76x + 60000ms",
       "exitCode": 0,
       "signal": null,
       "tail": "} | MATCH_MULTIWORLD PASS"
@@ -67,7 +92,9 @@
     {
       "script": "smoke-offline-reload.mjs",
       "status": "pass",
-      "durationMs": 13797,
+      "durationMs": 14160,
+      "timeoutMs": 154000,
+      "timeoutBasis": "13797ms measured in release-evidence\\smoke-report.json; 6.76x + 60000ms",
       "exitCode": 0,
       "signal": null,
       "tail": "} | OFFLINE RELOAD SMOKE PASS"
@@ -75,7 +102,9 @@
     {
       "script": "smoke-parent-practice-privacy.mjs",
       "status": "pass",
-      "durationMs": 4788,
+      "durationMs": 8881,
+      "timeoutMs": 93000,
+      "timeoutBasis": "4788ms measured in release-evidence\\smoke-report.json; 6.76x + 60000ms",
       "exitCode": 0,
       "signal": null,
       "tail": "} | PARENT_PRACTICE_PRIVACY PASS"
@@ -83,7 +112,9 @@
     {
       "script": "smoke-pwa-installability.mjs",
       "status": "pass",
-      "durationMs": 44391,
+      "durationMs": 16582,
+      "timeoutMs": 360000,
+      "timeoutBasis": "44391ms measured in release-evidence\\smoke-report.json; 6.76x + 60000ms",
       "exitCode": 0,
       "signal": null,
       "tail": "} | PWA INSTALLABILITY CHROME+EDGE PASS"
@@ -91,7 +122,9 @@
     {
       "script": "smoke-webgl-boot.mjs",
       "status": "pass",
-      "durationMs": 32267,
+      "durationMs": 31751,
+      "timeoutMs": 279000,
+      "timeoutBasis": "32267ms measured in release-evidence\\smoke-report.json; 6.76x + 60000ms",
       "exitCode": 0,
       "signal": null,
       "tail": "} | WEBGL BOOT SMOKE PASS"

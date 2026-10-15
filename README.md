@@ -55,6 +55,6 @@ Before launch, run the real-project two-browser procedure in `MANUAL_LAUNCH_GATE
 
 ## Data and privacy
 
-Gameplay is local-first. Cloud sync is opt-in and parent-authenticated, and sends only a minimized progress projection. Worksheet images and worksheet text are never synchronized. Parent PIN verifiers, play-time ledgers, integration credentials, and authentication tokens remain device-local. Parent-authorized recovery exports are versioned and may preserve legacy Snap-to-Game records created by earlier builds. Account deletion deletes the signed-in family's cloud profile documents and then the Firebase Authentication account.
+Gameplay is local-first. Cloud sync is opt-in and parent-authenticated, and sends only a minimized progress projection. Worksheet images and worksheet text are never synchronized. Parent PIN verifiers, play-time ledgers, integration credentials, and authentication tokens remain device-local. Parent-authorized recovery exports are versioned and may preserve legacy Snap-to-Game records created by earlier builds. Cloud data and Firebase Authentication account deletion is not available in the browser client under the shipped rules. The parent-authorized deletion-status action makes no changes and explains that a privileged deletion service is still required.
 
 See `TEST_RESULTS.md`, `RELEASE_NOTES.md`, `MANUAL_LAUNCH_GATES.md`, and `DEPLOYMENT.md` for release evidence and launch steps.

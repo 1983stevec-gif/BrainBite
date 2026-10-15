@@ -15,7 +15,7 @@ test('BrainBase greybox flow runs end-to-end and persists the hub upgrade', asyn
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
 
-  await page.locator('#childDock button[data-screen="brainbase"]').click();
+  await page.locator('#home .adventure-destinations button[data-screen="brainbase"]').click();
   await expect(page.locator('#brainbase-root')).toContainText('BrainBase');
   await expect(page.locator('#brainbase-root')).toContainText('Child profile dock');
 
@@ -45,9 +45,12 @@ test('BrainBase greybox flow runs end-to-end and persists the hub upgrade', asyn
 
   await page.locator('#brainbase-root').getByRole('button', { name: 'Save', exact: true }).click();
   await page.locator('#brainbase-root').getByRole('button', { name: 'Exit', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'BrainBite' })).toBeVisible();
+  await expect(page.locator('#home.show')).toBeVisible();
+  await expect(page.locator('#homeProfileName')).toHaveText('Kid 1');
+  await expect(page.locator('#continueBtn')).toBeVisible();
+  await expect(page.locator('#continueBtn')).toBeEnabled();
 
-  await page.locator('#childDock button[data-screen="brainbase"]').click();
+  await page.locator('#home .adventure-destinations button[data-screen="brainbase"]').click();
   await expect(page.locator('#brainbase-root')).toContainText('Kraken Brainifact installed');
 
   expect(errors).toEqual([]);

@@ -1,22 +1,17 @@
 # BrainBite Closed-Beta Readiness
 
-Date: 2026-09-27
+Date: 2026-10-15
 Scope: Phase 4.3 of `docs/BRAINBITE_PRODUCTION_GOAL.md` — package, defect ledger,
 external gates, and rollback.
 
 This document is the honest state of the closed-beta candidate. It separates what is
 verified locally from what is not, and it does not claim external gates.
 
-The current implementation is on `mobile/runtime-readiness` in [PR #2](https://github.com/1983stevec-gif/BrainBite/pull/2),
-open and mergeable to `main`. Latest fully tested gameplay commit
-`3ebcf35d8bc7ea18d7c69b64b9015cdedd7201e6` includes runtime/evidence baseline
-`a6786aaa04ec09d1ffdda2420ffff30a59b07e4b` and
-browser-readiness commit `2cf4de6367d7d9cc90fb8549ef687013b5809331`. GitHub Actions runs
-[36316190009](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316190009) and
-[36316192782](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316192782) each
-passed all validators, native package verification, 236 unit tests, 211 browser tests with
-zero retries, 11/11 smoke checks, the clean-tree guard, and the Firestore emulator job. Steve
-owns the merge under decision D6.
+The PR #2 implementation and its CI/native results are historical evidence, not current
+verification. The current local audit, including the final digest-gate acceptance fix,
+passes the focused content-review checks and the integrated unit, browser, and smoke gates
+listed below. No remote CI, native, device, educator, or external certification is claimed.
+Steve owns the eventual merge under decision D6.
 
 ## 1. Runtime package
 
@@ -24,8 +19,8 @@ Built by `npm run native:stage` (`scripts/stage-site.mjs`) from an explicit allo
 
 | Measure | Value |
 |---|---|
-| Staged files | 100 |
-| Staged size | ~5.4 MB |
+| Package-manifest files | 105 |
+| Package-manifest size | 6,216,993 bytes |
 | Contents | `index.html`, `app.js`, `brainbite-core.mjs`, `styles.css`, `fonts.css`, `sw-register.js`, `service-worker.js`, `manifest.webmanifest`, public pages, `assets/`, `audio/`, `content/`, `icons/`, `presentation/`, `vendor/` |
 | Excluded | `docs`, `tests`, `scripts`, `release-evidence`, `node_modules`, `.git`, `.github`, `.cursor`, `AGENTS.md`, `package.json` |
 
@@ -35,6 +30,10 @@ package no longer matches `release-evidence/package-manifest.json`. Regenerate t
 manifest with `npm run package:manifest` whenever the runtime allowlist or a runtime file
 changes. The check exists because `fonts.css`, `sw-register.js`, and both font files were
 silently missing from the package before it was written.
+
+The 2026-10-15 manifest read reports **105 files / 6,216,993 bytes**. A fresh
+`npm run check:stage` attempt was blocked before validation by an `EPERM` lock on
+`.native-site-check`, so this refresh does not claim a new successful staging check.
 
 `CHECKSUMS.json` was retired in this cycle. It was hand-maintained and had drifted to 45
 entries pointing at files that no longer exist (old `.wav` audio, removed tests and
@@ -61,30 +60,39 @@ npm run native:build               # produces the installer under src-tauri/targ
 
 The installer is unsigned and is an internal closed-beta artifact.
 
-## 2. Verified locally
+## 2. Historical and current local evidence
 
-| Area | Evidence |
-|---|---|
-| Unit tests | `236/236` on Windows with the locked install |
-| Browser suite | Latest CI runs 43 and 44: **211 passed with zero retries**. These runs include the landscape rotation prompt and direct 3D pointer-to-answer regression. Earlier Windows certification recorded two retry-only attempts; group reruns passed `tests/release.spec.js` `92/92` and BrainBase/MATCH `14/14`; latest reload-sensitive rerun passed `2/2` |
-| Smoke checks | `11/11` via local certification, evidence in `release-evidence/smoke-report.json` |
-| Repository validators | content, content-review, static (10 checks), runtime, release, Firebase, launch, final, Firebase security, native package, and release evidence — all PASS |
-| Performance budgets (headless-judgeable) | 0 headless budget violations; 26 device-only measurements remain unverified |
-| Offline | service worker precaches 90 assets; offline reload, offline 3D reopen, and PWA installability pass on Chrome and Edge |
-| Profile isolation | unit and browser coverage, plus the cross-tab reconciliation tests in all three lock modes |
-| Native runtime | Fresh `npm run native:build`; `npm run native:verify:runtime` opened BrainBite and its child processes with zero TCP listeners |
-| Content safety | production mode fails closed; 30 reviewed registry missions ship; 75 records remain quarantined or non-production |
-| Accessibility | axe: zero serious/critical violations across 21 primary screens plus the live battle HUD |
+| Area | Source | Evidence |
+|---|---|---|
+| Current focused content-review tests | `node --test tests/content-review.test.mjs` | **25/25** |
+| Current content-review validator | `npm run check:content-review` | **PASS**, 105 records, 0 digest mismatches |
+| Current integrated unit run | `npm run test:unit` | **267/267**, zero failed/skipped |
+| Current browser suite | Local audit run | **220/220, zero retries** |
+| Current smoke checks | Local audit run | **11/11**, including Chrome+Edge Windows matrix |
+| Historical repository validators | Prior Cycle 2 audit | content, content-review, static (10 checks), runtime, release, Firebase, launch, final, Firebase security, native package, and release evidence — all PASS |
+| Historical performance budgets | Prior Cycle 2 audit | 0 headless budget violations; device-only measurements remain unverified |
+| Offline | Static inventory and historical browser checks | 94 precached URLs; offline reload, offline 3D reopen, and PWA installability are historical Chrome/Edge results |
+| Profile isolation | Prior unit and browser coverage | Cross-tab reconciliation tests in all three lock modes |
+| Historical native runtime | Prior PR #2 local record | Fresh `npm run native:build`; `npm run native:verify:runtime` opened BrainBite and its child processes with zero TCP listeners |
+| Content safety | Current manifest and gate contract | Production mode fails closed; 30 registry missions are production-eligible; 75 records remain quarantined or non-production |
+| Historical automated accessibility | Prior PR #2 local record | axe: zero serious/critical violations across 21 primary screens plus the live battle HUD |
 
 ## 3. Evidence inventory
 
 | Artifact | Produced by | Status |
 |---|---|---|
-| `release-evidence/smoke-report.json` | `npm run smoke` | Current: 11/11 passed |
-| `release-evidence/package-manifest.json` | `npm run package:manifest` | Current: 100 files, verified by `check:stage` |
-| `release-evidence/content-review-packet.{json,html}` | `npm run review:packet` | Current: 75 pending records, 0 digest mismatches |
-| `test-results/performance-evidence/{desktop,mobile}.json` | `npm run probe:performance` | Current: zero headless budget violations |
-| `release-evidence/local-certification.json` | `npm run certify:local` | Current: **17/17 stages**, 210 browser cases (2 passed on retry), 11/11 smokes, probe exit 0 with zero headless budget violations. The report was captured on `36887b9` with the final stylesheet/evidence changes in the worktree and records that initial tree as dirty; those changes are committed in `a6786aa`. No-retry follow-ups passed `tests/release.spec.js` 92/92 and BrainBase/MATCH 14/14 |
+| `.ui-captures/release-evidence/smoke-report.json` | `npm run smoke` | Durable git-ignored latest-run report outside Playwright result directories; replaced on each run, with `capturedAt` and an in-file retention notice |
+| `release-evidence/smoke-report.json` | `npm run evidence:refresh` (or smoke `--promote`) | Tracked validator input remains at this path; deliberate promotion replaces it with the promoted run |
+| `release-evidence/package-manifest.json` | `npm run package:manifest` | Manifest read on 2026-10-15: 105 files, 6,216,993 bytes; fresh staging validation not claimed in this refresh |
+| `release-evidence/content-review-packet.{json,html}` | `npm run review:packet` | Prior packet: 75 pending records, 0 digest mismatches |
+| `.ui-captures/release-evidence/performance-evidence/{desktop,mobile,summary}.json` | `npm run probe:performance` | Durable git-ignored latest-run reports outside Playwright result directories; replaced on each run, with `capturedAt` and an in-file retention notice |
+| `test-results/performance-evidence/{desktop,mobile,summary}.json` | `npm run probe:performance` | Compatibility output retained at its existing path; transient because Playwright can clear `test-results/` |
+| `release-evidence/local-certification.json` | `npm run certify:local` | Historical: **17/17 stages**, 210 browser cases (2 passed on retry), 11/11 smokes, probe exit 0 with zero headless budget violations. The report was captured on `36887b9` with the final stylesheet/evidence changes in the worktree and records that initial tree as dirty; those changes are committed in `a6786aa`. No-retry follow-ups passed `tests/release.spec.js` 92/92 and BrainBase/MATCH 14/14 |
+
+`.ui-captures/release-evidence/` is the shared durable local evidence root: it is already
+git-ignored, neither harness deletes it, and Playwright cleanup does not manage that directory.
+These files preserve the latest run rather than an archive; copy a timestamped snapshot elsewhere
+when multiple historical runs must be retained.
 
 ## 4. Defect ledger
 
@@ -175,6 +183,28 @@ WebGL mount or reload timeout failed a twenty-minute run. They now match CI, and
 records passed/flaky/failed counts parsed from the Playwright JSON report, so a test that
 only passes on retry is visible as flaky rather than hidden.
 
+The top-level certification report now aggregates those retry recoveries as `summary.flaky`
+and emits one of three statuses: `passed` (no failed stage and no retry-recovered browser
+test), `passed-with-retries` (no failed stage, but at least one retry recovery), or `failed`
+(at least one failed stage). Retry recovery currently remains exit-success policy; whether it
+should fail certification is deliberately deferred to the owner. This describes report
+semantics only; certification was not rerun for this documentation refresh.
+
+### Harness provenance and adaptive timing
+
+The development server exposes `/.brainbite-test-provenance`, containing a SHA-256 of the
+checkout's `index.html`. Playwright verifies it when server reuse is explicitly requested,
+and the smoke runner verifies it whenever it finds an answering server. A stale or generic
+server now aborts the run instead of being silently trusted.
+
+Run `npm run smoke` for the inventory, optionally adding `-- --only <name>` or
+`-- --timeout <ms>`. Default per-script budgets start from four times the recorded duration
+plus 60 seconds, adapt to observed host slowdown, and are capped at 600 seconds. The runner
+prints a `BUDGET` line for every smoke and persists the timeout and its basis. Run
+`npm run probe:performance` separately; it polls scene readiness and prints/persists each
+effective scene-settle budget instead of relying on one fixed delay. Neither harness run was
+repeated for this documentation refresh.
+
 ### CI found two cross-platform bugs the Windows workstation could not see
 
 The first pull request ran the real workflow for the first time. Both failures were
@@ -185,46 +215,61 @@ Windows-only blind spots:
 | `check:static` failed on six package manifest digests (app.js, index.html, boot.mjs, capability.mjs, service-worker.js, three.module.js) | The manifest hashed raw working-copy bytes; the Windows copy had mixed CRLF/LF endings while CI checked out LF | `.gitattributes` normalizes text to LF in the repository and every checkout; text hashing is line-ending independent and binaries are still hashed byte for byte |
 | `smoke-pwa-installability` failed 10/11 | It hardcoded `D:/Codex/Brainbite` as the repository root, so every manifest icon lookup failed on Linux | The root is derived from the module location; `check:host-paths` joined `check:static` to prevent a recurrence |
 
-The fully tested gameplay commit `3ebcf35d8bc7ea18d7c69b64b9015cdedd7201e6` is green: [CI run 43](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316190009) and [CI run 44](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316192782) each passed all validators, native package verification, 236 unit tests, 211 browser tests with zero retries, 11/11 smoke checks, the clean-tree guard, and the Firestore emulator job. The 3D pointer regression is exercised in the full suite. Runs 41/42 exposed two test races: the local-storage tab check read rotating snapshots before persistence reconciliation, and the Classic Practice Lab test deduplicated repeated correct cells. Both were fixed; runs 43/44 pass without retries.
+Historical PR #2 evidence for fully tested gameplay commit `3ebcf35d8bc7ea18d7c69b64b9015cdedd7201e6` is recorded in [CI run 43](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316190009) and [CI run 44](https://github.com/1983stevec-gif/BrainBite/actions/runs/36316192782): each passed all validators, native package verification, 236 unit tests, 211 browser tests with zero retries, 11/11 smoke checks, the clean-tree guard, and the Firestore emulator job. This is not current Cycle 2 verification. The 3D pointer regression was exercised in that historical suite. Runs 41/42 exposed two test races: the local-storage tab check read rotating snapshots before persistence reconciliation, and the Classic Practice Lab test deduplicated repeated correct cells. Both were fixed before runs 43/44.
 
 ### Open, non-blocking
 
 | Item | Severity | Note |
 |---|---|---|
-| 3D payload: 53% of vertices are duplicated geometry | **Closed, no change made** | Measured; it compresses to 374 KB brotli and Draco measured as a wash. See section 5 |
+| GLB geometry: 53% of vertices are duplicated | **Closed, no geometry change made** | The GLBs alone measure 374 KB brotli and Draco measured as a wash. Authored raster surfaces are accounted for separately in section 5 |
 | Rebuilding the Blender kit is not byte-reproducible | P3 | Same Blender 5.2.40 and the same committed script: three of five GLBs rebuild byte-identically, the kraken differs by one accessor and 4,456 bytes, the mascot by 4 bytes. Verify assets against the committed manifest (`--verify-only`); do not expect a rebuild to match |
 | Device-only budgets unverified: frame pacing, long-task tails, scene load, asset load | P2 (external) | Recorded in every probe run; requires real hardware |
 | `app.js` remains a large classic script with a full re-render on save | P3 | Measured `render()` at 5–6 ms, so it is not a current bottleneck |
 
-## 5. 3D payload: measured, and deliberately not "fixed"
+### Known follow-ups
 
-The runtime package ships 3,183 KB of 3D assets, which is 78% of the 4,096 KB budget.
-Analysing the GLB accessors shows that over half of it is the same geometry copied
-instead of referenced, because every part is created with its own mesh datablock in the
-Blender pipeline.
+- Use [`CSS_CASCADE_REVIEW_2026_10_15.md`](CSS_CASCADE_REVIEW_2026_10_15.md) as the companion
+  review when it lands. The current verbose dead-CSS diagnostic reports 134 duplicate selector
+  declarations; they need classification, not blind removal.
+- Work through the deferred owner decisions in
+  [`ENHANCEMENT_PLAN_2026_10_15.md`](ENHANCEMENT_PLAN_2026_10_15.md) and the dated audit/build
+  plans. They include retry policy, Expedition/offline policy, currency legacy boundaries,
+  concurrent review writes, and the external gates in section 6.
 
-| Asset | KB | primitives | distinct geometries | redundant vertices | largest duplicate group |
+## 5. 3D payload: full shipped set
+
+After optimization, the shipped 3D set is recorded as **3,459,795 raw bytes**:
+3,161,104 bytes of GLBs plus 298,691 bytes of authored raster surface assets. The textures
+were reduced from 1,427,208 bytes. Against the 4,194,304-byte budget, that leaves 734,509
+bytes of headroom. This is a byte-count result, not a
+startup or device-performance guarantee.
+
+The geometry analysis below applies only to the five GLBs. It shows that over half of
+their vertices are copied instead of referenced, because every part is created with its
+own mesh datablock in the Blender pipeline.
+
+| Asset | KiB | primitives | distinct geometries | redundant vertices | largest duplicate group |
 |---|---:|---:|---:|---:|---:|
 | mascot | 1,284 | 56 | 11 | 17,379 of 21,204 (82%) | 18× |
 | kraken | 898 | 64 | 13 | 11,760 of 21,463 (55%) | 16× |
 | answer pillars | 338 | 28 | 9 | 3,540 of 8,294 (43%) | 8× |
 | portal | 313 | 16 | 7 | 1,020 of 7,505 (14%) | 8× |
 | jungle props | 254 | 28 | 14 | 574 of 5,603 (10%) | 5× |
-| **total** | **3,183** | 192 | 54 | **34,273 of 64,069 (53%)** | |
+| **GLB total** | **3,087** | 192 | 54 | **34,273 of 64,069 (53%)** | |
 
 ### Why this is not worth a risky change
 
-`npm run measure:payload` reports what the assets cost to download:
+The 2026-10-15 `npm run measure:payload` output reads the five GLBs and two authored raster
+surfaces:
 
 | | raw | gzip | brotli |
 |---|---:|---:|---:|
-| all five 3D assets | 3,087 KB | 769 KB | **374 KB** |
+| complete seven-asset set | 3,459,795 bytes | 1,085,948 bytes | 681,340 bytes |
 
-Compression removes 75% (gzip) and 88% (brotli) of the raw bytes, because the redundancy
-measured above is exactly what a compressor removes: duplicated spheres and repeated
-float32 buffers. GitHub Pages serves brotli, so the real download is about 374 KB. The
-probe deliberately gates the **raw** column, so the budget stays meaningful on a host that
-does not compress.
+The same output rounds those totals to **3,379 KB raw / 1,060 KB gzip / 665 KB brotli**, and
+reports the raw payload within the 4,194,304-byte budget by 734,509 bytes. These figures now
+cover the complete measured asset set, but remain byte-count/transfer measurements rather
+than physical-device performance evidence.
 
 Draco was implemented, measured, and then reverted:
 
@@ -240,10 +285,14 @@ Blender-side mesh sharing cannot help either. `export_apply` has to stay on (the
 armature modifiers depend on it), and it makes the exporter evaluate every object
 separately, so sharing a mesh datablock deduplicates nothing in the exported GLB.
 
-The duplication therefore costs nothing measurable: triangles are 39,656 of 250,000 and
-memory is 20 MB of 512 MB. It is recorded here so a future session does not re-open it
-without new information — a decoder that is already present for another reason would
-change the arithmetic.
+The latest recorded single-run peak was about 126,000 triangles of the 250,000 ceiling and
+about 29 MB memory of the 512 MB ceiling. Jungle measured up to 174 home draw calls and 136
+battle draw calls. Bubble Reef home measured 143 desktop / 145 mobile against the 200
+ceiling in one run. Desktop
+startup measured 2,798 ms against 3,000 ms in one load-sensitive run, leaving only about
+200 ms of observed headroom, not a budget guarantee. The GLB duplication is retained here
+so it is not re-opened without new information; a decoder already present for another
+reason would change the Draco arithmetic.
 
 ## 6. External gates — not part of this package
 
@@ -271,6 +320,9 @@ The runtime is a static package plus local storage, so rollback is bounded and o
    a distinct known-good snapshot automatically on load; a parent can also use
    Parent → Recovery → Restore Backup, which first writes a pre-operation rollback snapshot
    to `bb-core-v3-pre-operation-rollback`.
+   If all generations are unreadable, `bb-core-v3-unreadable-quarantine` retains only the
+   three newest corruption-event snapshots. It prunes oldest first and records bounded
+   pruning diagnostics so retention changes remain inspectable.
 3. **Content**: production content is fail-closed by digest. Removing an approval from
    `content/content-review-manifest.js` immediately returns that record to non-production
    without touching the content itself.
@@ -282,8 +334,19 @@ The runtime is a static package plus local storage, so rollback is bounded and o
 
 ## 8. What is deliberately not claimed
 
-- No device, educator, legal, language, or store certification.
-- No production-cloud verification.
+- No physical-device, educator, legal, Spanish/language, screen-reader, publishing, signing,
+  or store certification.
+- No production Firebase or other production-cloud verification.
 - No claim that the 3D presentation matches the approved reference art.
 - No claim of sustained device performance; the headless budgets above are the only
   performance numbers that are asserted.
+
+## 9. Export boundary
+
+Parent-authorized profile, full-backup, cloud-snapshot, and release-backup export paths now
+construct profiles from an explicit field allowlist and recursively redact credential-like
+keys case-insensitively, including known synonyms. The deliberate trade-off is fail-closed:
+an unknown future profile field is omitted until the export schema and its round-trip tests
+are intentionally updated. This improves confidentiality but does not promise forward
+compatibility for undeclared fields, and it is not legal/privacy approval or production
+Firebase export verification.
