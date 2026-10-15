@@ -3,7 +3,9 @@
 **Revision:** this file describes the commit that last changed it
 (`git log -1 --format=%h -- docs/HANDOFF.md`). A hard-coded hash here was always one commit
 behind, because committing the file changes HEAD.
-**Written:** 2026-09-22 · **Updated:** 2026-09-27 (historical PR #2 CI runs 43–44, historical Windows/native evidence, and the Cycle 2 local audit; earlier: M2 native-shell readiness, audit F10/F11/F13, hygiene H1–H6, decisions D1–D14).
+**Written:** 2026-09-22 · **Updated:** 2026-10-15 (Round 7 harness provenance,
+adaptive timing, certification reporting, export/recovery hardening, CSS diagnostics and
+current package measurements; earlier evidence remains labelled historical below).
 
 This document is the entry point. It says what is verified, what is not, who owns what is
 left, and the operational details that are easy to get wrong. The other documents go deeper:
@@ -20,6 +22,18 @@ left, and the operational details that are easy to get wrong. The other document
 | `docs/archive/` | Superseded plans, audits and handoffs (history only; do not act on them) |
 
 `AGENTS.md` points here and nowhere else.
+
+**Round 7 operational refresh (2026-10-15):** test-server reuse now fails closed unless the
+server exposes the SHA-256 of this checkout's `index.html`; smoke runs print and persist their
+effective timeout budgets, and the performance probe polls readiness and prints each scene's
+budget. Local certification now distinguishes a clean pass from retry-recovered flakiness.
+Profile exports use an explicit field allowlist plus recursive credential redaction, and the
+unreadable-save quarantine retains only its newest bounded snapshots. These are implementation
+behaviours. Mobile-layout cases now assert text clipping and initial-viewport placement more
+directly; the CSS gate detects unallowlisted `!important` shadowing; and serverless workflow
+actions use verified Node-24-compatible majors. None of this is a new browser-suite,
+certification, device, production, or human-review result.
+See [`ENHANCEMENT_PLAN_2026_10_15.md`](ENHANCEMENT_PLAN_2026_10_15.md).
 
 **Independent follow-up (2026-09-27):** see
 [`AUDIT_BUILD_PLAN_2026_09_27.md`](AUDIT_BUILD_PLAN_2026_09_27.md). The review CLI
@@ -83,18 +97,16 @@ Reef draw-call figures are from a single run):
 | Startup (desktop) | 2,798 ms in one load-sensitive run | 3,000 ms |
 | Save latency (desktop p95 / max) | 6.6 ms / 7.2 ms | 250 ms / 1000 ms |
 | Save latency (mobile p95 / max) | 10.1 ms / 10.3 ms | 250 ms / 1000 ms |
-| 3D payload (GLBs + authored raster surfaces) | 3,459,795 bytes raw | 4,194,304 bytes |
+| 3D payload (five GLBs + two authored raster surfaces) | 3,459,795 bytes raw / 1,085,948 bytes gzip / 681,340 bytes brotli | 4,194,304 bytes raw |
 | Memory | ~29 MB in one run | 512 MB |
 | Jungle draw calls | up to 174 home / 136 battle in one run | 200 |
 | Bubble Reef home draw calls | 143 desktop / 145 mobile in one run | 200 |
 | Triangles | up to ~126,000 in one run | 250,000 |
 
-The raw 3D total is 3,161,104 bytes of GLBs plus 298,691 bytes of authored textures;
-the textures were reduced from 1,427,208 bytes. This leaves 734,509 bytes below the raw
-budget. In this checkout, `npm run measure:payload`
-still reports only the five GLBs: **3,087 KB raw / 769 KB gzip / 374 KB brotli**. A
-compressed total for the complete GLB-plus-texture set is therefore not verified by that
-command and is not claimed here.
+The 2026-10-15 `npm run measure:payload` output covers all seven packaged 3D assets and reports
+**3,459,795 bytes raw / 1,085,948 bytes gzip / 681,340 bytes brotli** (rounded: **3,379 KB /
+1,060 KB / 665 KB**). The raw total is within its 4,194,304-byte budget by 734,509 bytes.
+These are transfer-size measurements, not startup or physical-device performance claims.
 
 Device-only metrics — frame pacing, long-task tails, scene load, asset load — are recorded as
 **unverified** in every probe run. They need real hardware.
@@ -187,6 +199,15 @@ approved, 0 rejected** (0 digest mismatches).
   lives in `content/storage-copies.js` and is unit-tested. Store apps add a fourth copy
   outside the WebView (`bb-core-v3-native-mirror`, Capacitor Preferences), used only when
   all three web generations are unreadable at boot.
+- **Exports are allowlisted and credential-aware.** Exported profiles are reconstructed from
+  an explicit field allowlist and then recursively scrubbed using case-insensitive,
+  synonym-aware credential detection. Unknown future profile fields are intentionally omitted
+  until the schema and tests are updated: confidentiality is preferred over automatic forward
+  compatibility for undeclared fields.
+- **Unreadable-save retention is bounded.** `bb-core-v3-unreadable-quarantine` retains the
+  three newest corruption-event snapshots, prunes oldest first, and records pruning diagnostics
+  (including counts, generation keys, byte lengths and fingerprints). The newest snapshot is
+  preserved when older data is migrated or a replacement write cannot be completed.
 - **Native shells are detected in one place.** `presentation/platform.js` (classic script,
   before `app.js`) reports `web`, `capacitor`, `tauri`, or `simulated` (`?native=1`, tests
   only). In a native shell: no service worker, footer/outbound links need the family PIN,
@@ -235,6 +256,25 @@ Two things were measured and deliberately **rejected**:
 
 ## 8. Operational gotchas
 
+- **Harness server reuse is provenance-checked.** `scripts/serve.mjs` exposes
+  `/.brainbite-test-provenance` with the local `index.html` SHA-256. Playwright global setup
+  verifies it when `BRAINBITE_REUSE_TEST_SERVER=1`; `npm run smoke` verifies it whenever the
+  configured URL is already answering. A missing or different fingerprint aborts instead of
+  testing a stale checkout. Let the harness start its own server unless deliberate reuse is
+  required.
+- **Smoke timeouts are adaptive and visible.** Run `npm run smoke`; use
+  `npm run smoke -- --only <name>` for a focused smoke or `--timeout <ms>` for an explicit
+  per-script override. By default each script gets four times its previously measured duration
+  plus 60 seconds, with later scripts allowed to scale for observed host slowdown and every
+  budget capped at 600 seconds. Each `BUDGET` line and the JSON report record the effective
+  timeout and basis. `npm run probe:performance` polls scene readiness rather than sleeping for
+  one fixed interval and prints each effective scene-settle budget.
+- **Read certification status literally.** `npm run certify:local` writes top-level `status`
+  and `summary.flaky`. `passed` means every stage passed without a retry-recovered browser test;
+  `passed-with-retries` means no stage failed but at least one browser test passed only on retry;
+  `failed` means at least one stage failed. Retry-recovered tests currently do not make the
+  command fail; whether they should is an owner decision. Certification still does not close
+  external gates.
 - **`check:evidence` needs a clean tree.** Commit before running it, or it fails by design.
   Test and smoke runs no longer write tracked files (they write to `.playwright-results/`),
   so `release:check` can be run twice in a row. To update the committed screenshots in
@@ -267,6 +307,10 @@ Two things were measured and deliberately **rejected**:
   `npm run package:manifest`.
 - **After changing any packaged file**, run `npm run package:manifest`; `check:stage` will
   tell you, and it now names the right command for a stale digest.
+- **CSS checks distinguish blockers from inventory.** `npm run check:css` fails on a new,
+  unallowlisted overlapping `!important` shadow. Run
+  `node scripts/check-dead-css.mjs --verbose` to print the complete duplicate-declaration
+  diagnostic; the current output reports 134 duplicate selector declarations.
 
 ---
 
@@ -289,6 +333,16 @@ Two things were measured and deliberately **rejected**:
 Engineering work that is *not* blocked but is also not required: `app.js` is still a large
 classic script (measured `render()` at 5–6 ms, so not a current bottleneck), and the 3D
 payload could be revisited only if a decoder arrives for another reason.
+
+### Known follow-ups
+
+- Use [`CSS_CASCADE_REVIEW_2026_10_15.md`](CSS_CASCADE_REVIEW_2026_10_15.md) as the companion
+  review; classify the current 134 duplicate CSS declarations rather than deleting them
+  mechanically.
+- Resolve the owner decisions already recorded in
+  [`ENHANCEMENT_PLAN_2026_10_15.md`](ENHANCEMENT_PLAN_2026_10_15.md) and the dated audit/build
+  plans, including retry policy, Expedition/offline policy, currency legacy boundaries,
+  review-write atomicity, and the external gates.
 
 ---
 

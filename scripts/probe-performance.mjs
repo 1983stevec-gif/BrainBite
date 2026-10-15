@@ -6,8 +6,13 @@ import { classifyBudgetViolations, DEFAULT_PAYLOAD_BUDGET, DEFAULT_PERFORMANCE_B
 
 const probePort = Number(process.env.BRAINBITE_TEST_PORT || 4318);
 const baseURL = process.env.BB_BASE_URL || process.env.PLAYWRIGHT_BASE_URL || `http://127.0.0.1:${probePort}`;
-const output = resolve(process.env.BB_PERF_OUTPUT_DIR || 'test-results/performance-evidence');
 const repo = resolve(import.meta.dirname, '..');
+const output = resolve(process.env.BB_PERF_OUTPUT_DIR || 'test-results/performance-evidence');
+const durableOutput = resolve(repo, '.ui-captures', 'release-evidence', 'performance-evidence');
+const retention = {
+  mode: 'replace-per-run',
+  notice: 'This latest-run artifact is replaced by each performance probe run; use capturedAt to identify when it was produced.',
+};
 const packageManifest = JSON.parse(readFileSync(resolve(repo, 'release-evidence/package-manifest.json'), 'utf8'));
 const isPackaged3DAsset = path => (
   /\.glb$/i.test(path)
@@ -23,7 +28,18 @@ const viewports = [
   { name: 'mobile', width: 390, height: 844 },
 ];
 
-await mkdir(output, { recursive: true });
+await Promise.all([
+  mkdir(output, { recursive: true }),
+  mkdir(durableOutput, { recursive: true }),
+]);
+
+async function writeArtifact(name, artifact) {
+  const contents = `${JSON.stringify(artifact, null, 2)}\n`;
+  const paths = [...new Set([resolve(output, name), resolve(durableOutput, name)])];
+  await Promise.all(paths.map(path => writeFile(path, contents)));
+  console.log(`Performance evidence wrote: ${paths.join(', ')}`);
+  return paths;
+}
 
 // Own the server when nothing is listening, so the probe cannot silently measure a
 // connection failure. This is how its earlier evidence was lost: it ran after another
@@ -205,6 +221,7 @@ try {
       report = {
         schema: 'brainbite.performance-evidence.v1',
         capturedAt: new Date().toISOString(),
+        retention,
         baseURL,
         viewport,
         durationMs: Date.now() - startedAt,
@@ -232,6 +249,7 @@ try {
       report = {
         schema: 'brainbite.performance-evidence.v1',
         capturedAt: new Date().toISOString(),
+        retention,
         baseURL,
         viewport,
         durationMs: Date.now() - startedAt,
@@ -246,7 +264,7 @@ try {
       await page.close();
     }
     reports.push(report);
-    await writeFile(resolve(output, `${viewport.name}.json`), `${JSON.stringify(report, null, 2)}\n`);
+    await writeArtifact(`${viewport.name}.json`, report);
     console.log(JSON.stringify({ viewport: viewport.name, errors: report.errors.length, warnings: report.warnings.length, durationMs: report.durationMs }));
   }
 } finally {
@@ -256,6 +274,7 @@ try {
 const summary = {
   schema: 'brainbite.performance-evidence-summary.v1',
   capturedAt: new Date().toISOString(),
+  retention,
   baseURL,
   deviceOnlyBudgets: DEVICE_ONLY_BUDGETS,
   reports: reports.map(report => ({
@@ -273,7 +292,7 @@ const summary = {
     budgetGate: report.budgetGate,
   })),
 };
-await writeFile(resolve(output, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`);
+await writeArtifact('summary.json', summary);
 
 // Headless-judgeable budgets must pass. Frame pacing, long-task tails, and network/parse
 // timings are recorded as external evidence: they depend on host scheduling and container

@@ -172,15 +172,19 @@ test('app reward merge cannot import another profile reward payload', () => {
 });
 
 test('Bubble Reef preview completion grants and persists the active profile reward through the shipping trigger', { timeout: 120_000 }, async () => {
-  const port = Number(process.env.BRAINBITE_TEST_PORT || 4318);
-  const baseUrl = `http://127.0.0.1:${port}`;
+  // This test owns its server, so avoid colliding with a developer or another harness on
+  // the shared default port. An explicit test port remains available for diagnostics.
+  const port = Number(process.env.BRAINBITE_TEST_PORT || 0);
   const server = await createBrainBiteServer({ port });
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  const baseUrl = `http://127.0.0.1:${address.port}`;
   let browser;
   try {
     browser = await chromium.launch({ headless: true });
     const context = await browser.newContext();
     const page = await context.newPage();
-    await page.goto(`${baseUrl}/?presentation=webgl&contentMode=internal-review&bubble-reward-bust=${Date.now()}`);
+    await page.goto(`${baseUrl}/?presentation=webgl&contentMode=internal-review&bubble-reward-bust=${Date.now()}`, { waitUntil: 'domcontentloaded' });
     await page.evaluate(() => localStorage.clear());
     await page.reload();
     await page.waitForFunction(() => typeof window.BrainBiteWorldPreview?.setProfile === 'function');

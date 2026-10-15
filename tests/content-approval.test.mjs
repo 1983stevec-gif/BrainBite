@@ -1,9 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { resolve } from 'node:path';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { basename, resolve } from 'node:path';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
 import { digest, validateContentReview } from '../scripts/validate-content-review.mjs';
 import { planApprovals, planRejections, replaceDataBlock } from '../scripts/review-content.mjs';
 import { loadSources, repoRoot, resolveRecordValue } from '../scripts/lib/content-sources.mjs';
@@ -15,6 +25,7 @@ const sources = await loadSources();
 const byIdentity = new Map(records.map(record => [record.identity, record]));
 
 const TEMPLATE = 'generated-template:math-k-counting';
+const OTHER_TEMPLATE = 'generated-template:math-1-addition';
 const LINKED_JSON = records.find(record => record.kind === 'json-pack-item' && record.taxonomy?.linkage === 'linked').identity;
 const QUARANTINED = records.find(record => record.quarantine?.status === 'quarantined').identity;
 const REVIEWER = { id: 'reviewer-001', role: 'Grade K teacher' };
@@ -22,7 +33,7 @@ const REVIEWED_AT = '2026-09-22T00:00:00.000Z';
 
 // Run the actual command against disposable content, never educator data in the checkout.
 function reviewFixture(t) {
-  const parent = resolve(repoRoot, '.playwright-results');
+  const parent = resolve(repoRoot, '.content-approval-test-results');
   mkdirSync(parent, { recursive: true });
   const root = mkdtempSync(resolve(parent, 'review-cli-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -36,6 +47,18 @@ function reviewFixture(t) {
   ], { cwd: root, encoding: 'utf8', timeout: 60000 });
   const run = (...args) => runRaw('--reviewer', REVIEWER.id, '--role', REVIEWER.role, ...args);
   return { root, file, original, run, runRaw };
+}
+
+function spawnResult(command, args, options) {
+  return new Promise((resolveResult, reject) => {
+    const child = spawn(command, args, options);
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', chunk => { stdout += chunk; });
+    child.stderr.on('data', chunk => { stderr += chunk; });
+    child.on('error', reject);
+    child.on('close', status => resolveResult({ status, stdout, stderr }));
+  });
 }
 
 for (const mode of ['approve', 'reject']) {
@@ -67,6 +90,119 @@ test('review CLI dry run preserves bytes and successful fixture approval/rejecti
   const updated = createRequire(resolve(fixture.root, 'fixture.cjs'))(fixture.file);
   assert.equal(updated.approvals[TEMPLATE], undefined);
   assert.equal(updated.reviewerFindings[TEMPLATE].reason, 'fixture finding');
+});
+
+test('concurrent review CLI writes preserve both decisions or one fails with the lock message', async t => {
+  const fixture = reviewFixture(t);
+  const markerDirectory = resolve(fixture.root, 'concurrent-write-markers');
+  const preload = resolve(fixture.root, 'concurrent-write-barrier.cjs');
+  mkdirSync(markerDirectory);
+  // Against the old direct-write implementation, hold both processes immediately before
+  // writeFileSync(MANIFEST, updated). Both have therefore read the same original manifest,
+  // making its silent lost-update behavior deterministic. Atomic temp writes do not need this
+  // test barrier; the exclusive lock makes one process fail before reaching a write.
+  writeFileSync(preload, `
+const fs = require('node:fs');
+const path = require('node:path');
+const { syncBuiltinESMExports } = require('node:module');
+const originalWriteFileSync = fs.writeFileSync;
+let waited = false;
+fs.writeFileSync = function (file, ...args) {
+  if (!waited && typeof file === 'string' && path.resolve(file) === path.resolve(process.env.REVIEW_BARRIER_TARGET)) {
+    waited = true;
+    originalWriteFileSync(path.join(process.env.REVIEW_BARRIER_MARKERS, String(process.pid)), 'ready');
+    const deadline = Date.now() + 10000;
+    while (fs.readdirSync(process.env.REVIEW_BARRIER_MARKERS).length < 2 && Date.now() < deadline) {
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);
+    }
+    if (fs.readdirSync(process.env.REVIEW_BARRIER_MARKERS).length < 2) throw new Error('concurrent write barrier timed out');
+  }
+  return originalWriteFileSync.call(this, file, ...args);
+};
+syncBuiltinESMExports();
+`);
+  const env = {
+    ...process.env,
+    NODE_OPTIONS: `${process.env.NODE_OPTIONS || ''} --require=${preload}`.trim(),
+    REVIEW_BARRIER_TARGET: fixture.file,
+    REVIEW_BARRIER_MARKERS: markerDirectory,
+  };
+  const command = resolve(fixture.root, 'scripts/review-content.mjs');
+  const launch = (identity, reviewer) => spawnResult(process.execPath, [
+    command,
+    '--reviewer', reviewer,
+    '--role', REVIEWER.role,
+    '--ids', identity,
+  ], { cwd: fixture.root, env });
+
+  const results = await Promise.all([
+    launch(TEMPLATE, 'concurrent-reviewer-a'),
+    launch(OTHER_TEMPLATE, 'concurrent-reviewer-b'),
+  ]);
+  const failed = results.filter(result => result.status !== 0);
+  if (failed.length) {
+    assert.ok(results.some(result => result.status === 0), JSON.stringify(results));
+    for (const result of failed) {
+      assert.match(result.stderr, /Another content review write is in progress; nothing was written/);
+    }
+  } else {
+    const updated = createRequire(resolve(fixture.root, 'concurrent-result.cjs'))(fixture.file);
+    assert.ok(updated.approvals[TEMPLATE], 'the first concurrent decision must survive');
+    assert.ok(updated.approvals[OTHER_TEMPLATE], 'the second concurrent decision must survive');
+  }
+});
+
+test('an interrupted atomic replacement leaves the original manifest intact', t => {
+  const fixture = reviewFixture(t);
+  const preload = resolve(fixture.root, 'interrupt-before-rename.cjs');
+  writeFileSync(preload, `
+const fs = require('node:fs');
+const path = require('node:path');
+const { syncBuiltinESMExports } = require('node:module');
+const originalRenameSync = fs.renameSync;
+fs.renameSync = function (source, target) {
+  if (path.resolve(target) === path.resolve(process.env.REVIEW_INTERRUPT_TARGET)) process.exit(86);
+  return originalRenameSync.call(this, source, target);
+};
+syncBuiltinESMExports();
+`);
+  const env = {
+    ...process.env,
+    NODE_OPTIONS: `${process.env.NODE_OPTIONS || ''} --require=${preload}`.trim(),
+    REVIEW_INTERRUPT_TARGET: fixture.file,
+  };
+  const result = spawnSync(process.execPath, [
+    resolve(fixture.root, 'scripts/review-content.mjs'),
+    '--reviewer', REVIEWER.id,
+    '--role', REVIEWER.role,
+    '--ids', TEMPLATE,
+  ], { cwd: fixture.root, env, encoding: 'utf8', timeout: 60000 });
+  assert.equal(result.status, 86, result.stderr);
+  assert.equal(readFileSync(fixture.file, 'utf8'), fixture.original);
+  assert.equal(existsSync(`${fixture.file}.lock`), false, 'process exit must release the write lock');
+  assert.ok(
+    readdirSync(resolve(fixture.root, 'content')).some(name => (
+      name.startsWith(`${basename(fixture.file)}.`) && name.endsWith('.tmp')
+    )),
+    'the abrupt exit should occur after the complete temporary file is present',
+  );
+});
+
+test('a fresh review lock fails clearly and a ten-minute-old lock is recoverable', t => {
+  const fixture = reviewFixture(t);
+  const lock = `${fixture.file}.lock`;
+  writeFileSync(lock, '{"pid":999999,"token":"fixture"}\n');
+  const blocked = fixture.run('--ids', TEMPLATE);
+  assert.equal(blocked.status, 1, blocked.stderr);
+  assert.match(blocked.stderr, /Another content review write is in progress; nothing was written/);
+  assert.equal(readFileSync(fixture.file, 'utf8'), fixture.original);
+
+  const staleTime = new Date(Date.now() - 11 * 60 * 1000);
+  utimesSync(lock, staleTime, staleTime);
+  const recovered = fixture.run('--ids', TEMPLATE);
+  assert.equal(recovered.status, 0, recovered.stderr);
+  assert.match(recovered.stdout, /Approved 1 record\(s\); content-review validation passed/);
+  assert.equal(existsSync(lock), false, 'the recovered write must release its replacement lock');
 });
 
 for (const mode of ['approve', 'reject']) {

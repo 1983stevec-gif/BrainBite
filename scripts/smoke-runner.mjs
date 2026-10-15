@@ -3,9 +3,10 @@
 //
 // The smoke scripts each expected a server to already be listening, so they were never
 // exercised by any gate. This runner starts one server, executes each smoke against it,
-// records pass/fail with timing, and writes a report. By default the report and every
-// screenshot go to the git-ignored .playwright-results/; `--promote` (used by
-// `npm run evidence:refresh` and certify:local) writes the tracked evidence instead.
+// records pass/fail with timing, and writes a report. The latest report is also retained in
+// git-ignored .ui-captures/release-evidence/, which Playwright does not clear. By default the
+// compatibility report and every screenshot go to .playwright-results/; `--promote` (used
+// by `npm run evidence:refresh` and certify:local) writes the tracked evidence instead.
 //
 // Usage:
 //   npm run smoke                      # every scripts/smoke-*.mjs
@@ -22,6 +23,7 @@ import { promoteEvidence, releaseEvidenceDir } from './lib/evidence-paths.mjs';
 if (promoteEvidence) process.env.BRAINBITE_PROMOTE_EVIDENCE = '1';
 
 const repoRoot = resolve(import.meta.dirname, '..');
+const durableEvidenceDir = resolve(repoRoot, '.ui-captures', 'release-evidence');
 const port = Number(process.env.BRAINBITE_TEST_PORT || 4318);
 const baseURL = process.env.BB_BASE || process.env.PLAYWRIGHT_BASE_URL || `http://127.0.0.1:${port}`;
 
@@ -71,6 +73,7 @@ if (await serverIsReady()) {
 
 async function loadMeasuredDurations() {
   const candidates = [
+    resolve(durableEvidenceDir, 'smoke-report.json'),
     resolve(releaseEvidenceDir, 'smoke-report.json'),
     resolve(repoRoot, 'release-evidence', 'smoke-report.json'),
   ];
@@ -154,6 +157,10 @@ const failed = results.filter(result => result.status !== 'pass');
 const report = {
   schema: 'brainbite.smoke-report.v1',
   capturedAt: new Date().toISOString(),
+  retention: {
+    mode: 'replace-per-run',
+    notice: 'This latest-run artifact is replaced by each smoke run; use capturedAt to identify when it was produced.',
+  },
   baseURL,
   timeoutPolicy: {
     maximumMs: MAX_PER_SCRIPT_TIMEOUT_MS,
@@ -164,12 +171,21 @@ const report = {
   results,
 };
 const outputDir = releaseEvidenceDir;
-await mkdir(outputDir, { recursive: true });
-await writeFile(resolve(outputDir, 'smoke-report.json'), `${JSON.stringify(report, null, 2)}\n`);
+const reportPaths = [...new Set([
+  resolve(outputDir, 'smoke-report.json'),
+  resolve(durableEvidenceDir, 'smoke-report.json'),
+])];
+await Promise.all([
+  mkdir(outputDir, { recursive: true }),
+  mkdir(durableEvidenceDir, { recursive: true }),
+]);
+await Promise.all(reportPaths.map(path => writeFile(path, `${JSON.stringify(report, null, 2)}\n`)));
 
 if (server) await new Promise(done => { server.close(done); server.closeAllConnections?.(); });
 
-console.log(`\n${report.totals.passed}/${report.totals.scripts} smoke checks passed; report in ${relative(repoRoot, resolve(outputDir, 'smoke-report.json'))}${promoteEvidence ? '' : ' (run npm run evidence:refresh to update release-evidence/)'}`);
+console.log(`\n${report.totals.passed}/${report.totals.scripts} smoke checks passed`);
+console.log(`Smoke report wrote: ${reportPaths.join(', ')}`);
+if (!promoteEvidence) console.log('Run npm run evidence:refresh to update release-evidence/smoke-report.json.');
 if (failed.length) {
   console.error(`Failed: ${failed.map(result => result.script).join(', ')}`);
   process.exitCode = 1;

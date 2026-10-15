@@ -18,16 +18,118 @@
 //   node scripts/review-content.mjs --reviewer <id> --role <role> --ids <file|id,id> [--dry-run]
 //   node scripts/review-content.mjs --reject --reason "<finding>" --reviewer <id> --role <role> --ids <file|id,id> [--dry-run]
 //   node scripts/review-content.mjs --list          # print pending identities
-import { readFileSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  fsyncSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { digest, isPlainObject } from './validate-content-review.mjs';
 import { loadSources, repoRoot, resolveRecordValue } from './lib/content-sources.mjs';
 
 const MANIFEST = resolve(repoRoot, 'content/content-review-manifest.js');
 const require = createRequire(import.meta.url);
+export const REVIEW_LOCK_STALE_MS = 10 * 60 * 1000;
+
+function lockBusyError(lockPath) {
+  return new Error(
+    `Another content review write is in progress; nothing was written. `
+    + `If the prior process crashed, its lock becomes stale after 10 minutes. Lock: ${lockPath}`,
+  );
+}
+
+// The lock covers manifest loading, planning, writing, validation, and any rollback. A lock
+// whose mtime is at least ten minutes old is considered stale and may be removed. Review writes
+// normally take seconds, so this bounds recovery time after a process is killed without letting
+// a recently-created lock be mistaken for abandoned work.
+export function acquireManifestWriteLock(manifestPath = MANIFEST) {
+  const lockPath = `${manifestPath}.lock`;
+  const token = randomUUID();
+  const metadata = `${JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString(), token })}\n`;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    let descriptor;
+    try {
+      descriptor = openSync(lockPath, 'wx', 0o600);
+      try {
+        writeFileSync(descriptor, metadata, 'utf8');
+        fsyncSync(descriptor);
+      } finally {
+        closeSync(descriptor);
+      }
+
+      let released = false;
+      const release = () => {
+        if (released) return;
+        released = true;
+        process.removeListener('exit', release);
+        try {
+          // Only remove the lock created by this invocation. This prevents an old cleanup
+          // callback from deleting a successor's lock after stale-lock recovery.
+          if (readFileSync(lockPath, 'utf8') === metadata) unlinkSync(lockPath);
+        } catch (error) {
+          if (error.code !== 'ENOENT') throw error;
+        }
+      };
+      process.once('exit', release);
+      return release;
+    } catch (error) {
+      if (descriptor !== undefined) {
+        try { closeSync(descriptor); } catch { /* already closed */ }
+      }
+      if (error.code !== 'EEXIST') throw error;
+
+      let stale = false;
+      try {
+        stale = Date.now() - statSync(lockPath).mtimeMs >= REVIEW_LOCK_STALE_MS;
+      } catch (statError) {
+        if (statError.code === 'ENOENT') continue;
+        throw statError;
+      }
+      if (!stale || attempt > 0) throw lockBusyError(lockPath);
+      try {
+        unlinkSync(lockPath);
+      } catch (unlinkError) {
+        if (unlinkError.code !== 'ENOENT') throw lockBusyError(lockPath);
+      }
+    }
+  }
+  throw lockBusyError(lockPath);
+}
+
+// Keep the old target intact until a complete, flushed replacement exists beside it. Rename is
+// then the single filesystem operation that publishes the new manifest.
+function atomicReplaceFile(target, contents) {
+  const temporary = `${target}.${process.pid}.${randomUUID()}.tmp`;
+  let descriptor;
+  try {
+    descriptor = openSync(temporary, 'wx', statSync(target).mode);
+    try {
+      writeFileSync(descriptor, contents, 'utf8');
+      fsyncSync(descriptor);
+    } finally {
+      closeSync(descriptor);
+      descriptor = undefined;
+    }
+    renameSync(temporary, target);
+  } finally {
+    if (descriptor !== undefined) {
+      try { closeSync(descriptor); } catch { /* already closed */ }
+    }
+    try { unlinkSync(temporary); } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+  }
+}
 
 const USAGE = [
   'Usage: node scripts/review-content.mjs --reviewer <id> --role <role> --ids <file|id,id> [--dry-run]',
@@ -170,6 +272,25 @@ try {
   return;
 }
 
+let releaseLock;
+if (!options.listOnly && !options.dryRun) {
+  try {
+    releaseLock = acquireManifestWriteLock();
+  } catch (error) {
+    console.error(error.message);
+    process.exitCode = 1;
+    return;
+  }
+}
+
+try {
+await executeReview(options);
+} finally {
+  releaseLock?.();
+}
+}
+
+async function executeReview(options) {
 const reviewManifest = require(MANIFEST);
 for (const name of ['approvals', 'reviewerFindings']) {
   if (!isPlainObject(reviewManifest[name])) {
@@ -210,7 +331,8 @@ try {
   requested = [...new Set(requested.map(value => value.trim()))];
 } catch (error) {
   console.error(`Invalid review identities: ${error.message}`);
-  process.exit(2);
+  process.exitCode = 2;
+  return;
 }
 
 const sources = await loadSources();
@@ -238,7 +360,7 @@ if (refused.length) {
 }
 if (!accepted.length || dryRun) {
   if (dryRun && accepted.length) console.log('\nDry run: no changes written.');
-  process.exit(process.exitCode ?? 0);
+  return;
 }
 
 // Rewrite the hand-maintained data blocks.
@@ -275,16 +397,17 @@ if (rejectMode) {
 }
 if (!updated) {
   console.error('Could not locate the EDUCATOR_APPROVALS or REVIEWER_FINDINGS block; the manifest was not modified.');
-  process.exit(1);
+  process.exitCode = 1;
+  return;
 }
-writeFileSync(MANIFEST, updated);
+atomicReplaceFile(MANIFEST, updated);
 
 // Prove the result is internally consistent before reporting success.
 try {
   execFileSync(process.execPath, [resolve(repoRoot, 'scripts/validate-content-review.mjs')], { stdio: 'pipe' });
   console.log(`\n${rejectMode ? 'Rejected' : 'Approved'} ${accepted.length} record(s); content-review validation passed.`);
 } catch (error) {
-  writeFileSync(MANIFEST, source);
+  atomicReplaceFile(MANIFEST, source);
   console.error(`\n${rejectMode ? 'Rejection' : 'Approval'} content-review validation FAILED; original manifest restored:`);
   console.error([error.stdout, error.stderr].map(value => String(value || '')).filter(Boolean).join('\n') || error.message);
   process.exitCode = 1;

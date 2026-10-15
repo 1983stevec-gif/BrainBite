@@ -327,10 +327,6 @@ nav button:hover{background:rgba(255,255,255,.14);opacity:1}
 .home-rail button span:last-child{display:grid;gap:2px}
 .home-rail button small{opacity:.82;font-weight:500}
 .rail-icon{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.08);font-size:1.05rem;font-weight:900}
-.rail-brain{background:linear-gradient(135deg,#2e84de,#1f63b8)!important}
-.rail-base{background:linear-gradient(135deg,#d08b25,#a05f10)!important}
-.rail-shop{background:linear-gradient(135deg,#0b8f9b,#0e6178)!important}
-.rail-worlds{background:linear-gradient(135deg,#183b78,#203a59)!important}
 .home-scene{display:grid;gap:12px}
 .home-stage{
   position:relative;
@@ -1750,8 +1746,6 @@ html.presentation-webgl .battle-target *{min-width:0}
 html.presentation-webgl .home-target .dash-profile,
 html.presentation-webgl .battle-target .battle-profile{grid-template-columns:64px minmax(0,1fr)}
 html.presentation-webgl #homeAvatar{width:64px;height:64px}
-html.presentation-webgl .home-target [hidden],
-html.presentation-webgl .battle-target [hidden]{display:none!important}
 html.presentation-webgl .home-target .rail-worlds::after{content:none}
 html.presentation-webgl .home-target .currency-star::before{content:'\2605'}
 html.presentation-webgl .home-target .currency-gem::before{content:'\25C6'}
@@ -2761,11 +2755,11 @@ html body:has(#home.show .adventure-home) footer{display:block;opacity:1;padding
   color:#fff;text-shadow:0 1px 2px #182c5360;border:1px solid #ffffff70;border-radius:18px;
   box-shadow:0 4px 0 #233c3f70,inset 0 2px 0 #ffffff70;background:linear-gradient(180deg,#6186c6,#375494);
 }
-#home .home-target.adventure-home.home-shell .adventure-destinations .rail-brain{background:linear-gradient(180deg,#579fcf,#306fba)!important}
-#home .home-target.adventure-home.home-shell .adventure-destinations .rail-worlds{background:linear-gradient(180deg,#866dc6,#5944a2)!important;opacity:1}
+#home .home-target.adventure-home.home-shell .adventure-destinations .rail-brain{background:linear-gradient(180deg,#579fcf,#306fba)}
+#home .home-target.adventure-home.home-shell .adventure-destinations .rail-worlds{background:linear-gradient(180deg,#866dc6,#5944a2);opacity:1}
 #home .home-target.adventure-home.home-shell .adventure-destinations .rail-worlds::after{content:none}
-#home .home-target.adventure-home.home-shell .adventure-destinations .rail-base{background:linear-gradient(180deg,#e9ad4a,#b87525)!important;color:#402b15;text-shadow:none}
-#home .home-target.adventure-home.home-shell .adventure-destinations .rail-shop{background:linear-gradient(180deg,#49bdb2,#24837f)!important}
+#home .home-target.adventure-home.home-shell .adventure-destinations .rail-base{background:linear-gradient(180deg,#e9ad4a,#b87525);color:#402b15;text-shadow:none}
+#home .home-target.adventure-home.home-shell .adventure-destinations .rail-shop{background:linear-gradient(180deg,#49bdb2,#24837f)}
 #home .home-target.adventure-home.home-shell .adventure-destinations .rail-code{background:linear-gradient(180deg,#84ab68,#4e7c42)!important}
 #home .home-target.adventure-home.home-shell .adventure-destinations .rail-icon{width:38px;height:38px;border-radius:13px;background:#ffffff25;border:1px solid #ffffff60}
 #home .home-target.adventure-home.home-shell .adventure-destinations strong{font-size:.83rem;line-height:1.12}

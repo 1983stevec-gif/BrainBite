@@ -36,12 +36,6 @@ const css = readFileSync(cssFile, 'utf8');
 // These pre-existing, intentional theme overrides are tracked explicitly. A new override,
 // including another property on one of these selectors, remains a failing hazard.
 const IMPORTANT_SHADOW_ALLOWLIST = new Set([
-  '.rail-brain|background|#home .home-target.adventure-home.home-shell .adventure-destinations .rail-brain',
-  '.rail-base|background|#home .home-target.adventure-home.home-shell .adventure-destinations .rail-base',
-  '.rail-shop|background|#home .home-target.adventure-home.home-shell .adventure-destinations .rail-shop',
-  '.rail-worlds|background|#home .home-target.adventure-home.home-shell .adventure-destinations .rail-worlds',
-  '[hidden]|display|html.presentation-webgl .home-target [hidden]',
-  '[hidden]|display|html.presentation-webgl .battle-target [hidden]',
 ]);
 
 // Collect selector preludes only. Declaration values (which contain `#rrggbb` colours)

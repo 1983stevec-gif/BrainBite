@@ -20,14 +20,14 @@ async function expectNoHorizontalOverflow(page) {
 }
 
 async function expectInitiallyActionable(page, selector) {
-  const target = page.locator(selector);
+  const target = typeof selector === 'string' ? page.locator(selector) : selector;
   await expect(target).toBeVisible();
   await expect(target).toBeEnabled();
-  await expectInitiallyWithinViewport(page, selector);
+  await expectInitiallyWithinViewport(page, target);
 }
 
 async function expectInitiallyWithinViewport(page, selector) {
-  const target = page.locator(selector);
+  const target = typeof selector === 'string' ? page.locator(selector) : selector;
   await expect(target).toBeVisible();
   const geometry = await target.evaluate(element => {
     const rect = element.getBoundingClientRect();
@@ -40,6 +40,14 @@ async function expectInitiallyWithinViewport(page, selector) {
   expect(geometry.left).toBeGreaterThanOrEqual(0);
   expect(geometry.right).toBeLessThanOrEqual(geometry.width);
   expect(geometry.unobstructed).toBe(true);
+}
+
+async function expectControlsInitiallyActionable(page, selector, count) {
+  const controls = page.locator(selector);
+  await expect(controls).toHaveCount(count);
+  for (let index = 0; index < count; index += 1) {
+    await expectInitiallyActionable(page, controls.nth(index));
+  }
 }
 
 async function expectTextNotClipped(page, selector) {
@@ -58,13 +66,13 @@ async function expectTextNotClipped(page, selector) {
 }
 
 for (const viewport of phoneViewports) {
-  test(`DOM home exposes Play and Parents in initial ${viewport.width}x${viewport.height} viewport`, async ({ page }, testInfo) => {
+  test(`DOM home exposes Play, Parents, and usable dock controls in initial ${viewport.width}x${viewport.height} viewport`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
     await openFreshDomHome(page);
     expect(await page.evaluate(() => scrollY)).toBe(0);
     await expectInitiallyActionable(page, '#continueBtn');
     await expectInitiallyActionable(page, '#parentNav');
-    await expect(page.locator('#childDock')).toBeVisible();
+    await expectControlsInitiallyActionable(page, '#childDock button', 5);
     await expect(page.locator('header')).toBeHidden();
     await expectNoHorizontalOverflow(page);
     await page.screenshot({ path: testInfo.outputPath('dom-mobile-home.png') });
@@ -97,6 +105,12 @@ for (const viewport of phoneViewports) {
     });
     await page.reload();
     await expect(page.locator('#homeProfileName')).toHaveText('AlexandriaLongLearnerName');
+    const appliedScale = await page.locator('html').evaluate(element => ({
+      variable: element.style.getPropertyValue('--bb-text-scale'),
+      rootFontSize: parseFloat(getComputedStyle(element).fontSize),
+    }));
+    expect(appliedScale.variable).toBe('1.5');
+    expect(appliedScale.rootFontSize).toBeCloseTo(24, 1);
     await expectNoHorizontalOverflow(page);
     for (const selector of ['#continueBtn', '#parentNav', '#home [data-screen="settings"]', '#home [data-screen="profile"]']) {
       const target = page.locator(selector);
@@ -107,7 +121,7 @@ for (const viewport of phoneViewports) {
     }
     for (const selector of [
       '#homeProfileName',
-      '#continueBtn',
+      '#continueBtn > span:not(.rail-icon):not(.adventure-play-arrow)',
       '#parentNav',
       '#home [data-screen="settings"]',
       '#home [data-screen="profile"]',
@@ -125,8 +139,11 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 1024, height: 682
     await openFreshDomHome(page);
     await expect(page.locator('header')).toBeHidden();
     await expect(page.locator('#childDock')).toBeHidden();
-    await expect(page.locator('#home .dash-top')).toBeVisible();
-    await expect(page.locator('#home .adventure-destinations')).toBeVisible();
+    for (const selector of ['#homeProfileName', '#homeLevel', '#homeXpText', '#homeBrainBites', '#homeBrainifacts']) {
+      await expect(page.locator(selector)).not.toBeEmpty();
+      await expectInitiallyWithinViewport(page, selector);
+    }
+    await expectControlsInitiallyActionable(page, '#home .adventure-destinations button', 5);
     await expectInitiallyActionable(page, '#continueBtn');
     await expectInitiallyActionable(page, '#parentNav');
     await expectNoHorizontalOverflow(page);
@@ -136,18 +153,20 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 1024, height: 682
   });
 }
 
-test('DOM narrow 320px home keeps Play, Parents, and the child dock in the initial viewport without overflow', async ({ page }, testInfo) => {
+test('DOM narrow 320px keeps home actions and dock controls initially usable without horizontal overflow, then hides the dock before showing the Prompt card', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 320, height: 568 });
   await openFreshDomHome(page);
   expect(await page.evaluate(() => scrollY)).toBe(0);
   await expectNoHorizontalOverflow(page);
   await expectInitiallyActionable(page, '#continueBtn');
   await expectInitiallyActionable(page, '#parentNav');
-  await expectInitiallyWithinViewport(page, '#childDock');
+  await expectControlsInitiallyActionable(page, '#childDock button', 5);
   await page.screenshot({ path: testInfo.outputPath('dom-narrow-home.png'), fullPage: true });
   await page.locator('#continueBtn').focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('#game.show')).toBeVisible();
+  await expect(page.locator('#childDock')).toBeHidden();
+  await expectInitiallyWithinViewport(page, '#game .battle-prompt');
   await page.reload();
   await page.locator('#parentNav').focus();
   await page.keyboard.press('Enter');
