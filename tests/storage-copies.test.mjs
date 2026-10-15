@@ -204,17 +204,60 @@ test('total validation failure quarantines every raw generation before blank rot
   const quarantineAt = initialization.indexOf('preserveUnreadableStoreCopies();');
   const blankWriteAt = initialization.indexOf('writeStoreCopiesUnlocked(STORE);');
   assert.ok(quarantineAt >= 0 && quarantineAt < blankWriteAt, 'boot must quarantine unreadable bytes before writing blank state');
-  const preserve = new Function('localStorage', 'KEY', 'BACK', 'RECOVERY_KEY', 'UNREADABLE_STORE_QUARANTINE_KEY', 'readAllStoredStores', `
+  const preserve = new Function('localStorage', 'KEY', 'BACK', 'RECOVERY_KEY', 'UNREADABLE_STORE_QUARANTINE_KEY', 'readAllStoredStores', 'UNREADABLE_QUARANTINE_SNAPSHOT_LIMIT', 'UNREADABLE_QUARANTINE_DIAGNOSTIC_LIMIT', `
     ${appFunctionSource('readLocalStorage')}
+    ${appFunctionSource('checksum')}
     ${appFunctionSource('preserveUnreadableStoreCopies')}
     return preserveUnreadableStoreCopies;
-  `)(storage, DEFAULT_KEYS.primary, DEFAULT_KEYS.backup, DEFAULT_KEYS.recovery, quarantineKey, () => readAll(reader, DEFAULT_KEYS));
+  `)(storage, DEFAULT_KEYS.primary, DEFAULT_KEYS.backup, DEFAULT_KEYS.recovery, quarantineKey, () => readAll(reader, DEFAULT_KEYS), 3, 16);
   assert.equal(preserve(), true);
 
   writeRotated(storage, DEFAULT_KEYS, store('blank learner'), reader);
   const quarantine = JSON.parse(storage.getItem(quarantineKey));
   assert.deepEqual(quarantine.snapshots[0].generations, raw);
   assert.equal(nameOf(storage.getItem(DEFAULT_KEYS.primary)), 'blank learner');
+});
+
+test('unreadable-generation quarantine stays bounded and diagnoses pruned snapshots', () => {
+  const quarantineKey = 'bb-core-v3-unreadable-quarantine';
+  const storage = fakeStorage();
+  const reader = readerFor(storage);
+  const preserve = new Function('localStorage', 'KEY', 'BACK', 'RECOVERY_KEY', 'UNREADABLE_STORE_QUARANTINE_KEY', 'readAllStoredStores', 'UNREADABLE_QUARANTINE_SNAPSHOT_LIMIT', 'UNREADABLE_QUARANTINE_DIAGNOSTIC_LIMIT', `
+    ${appFunctionSource('readLocalStorage')}
+    ${appFunctionSource('checksum')}
+    ${appFunctionSource('preserveUnreadableStoreCopies')}
+    return preserveUnreadableStoreCopies;
+  `)(storage, DEFAULT_KEYS.primary, DEFAULT_KEYS.backup, DEFAULT_KEYS.recovery, quarantineKey, () => readAll(reader, DEFAULT_KEYS), 3, 16);
+
+  let newest;
+  for (let index = 0; index < 7; index += 1) {
+    newest = {
+      [DEFAULT_KEYS.primary]: `{broken primary ${index}`,
+      [DEFAULT_KEYS.backup]: JSON.stringify({ schemaVersion: 9, active: 4 + index, profiles: [{ id: `p-${index}`, name: `Evidence ${index}` }] }),
+      [DEFAULT_KEYS.recovery]: JSON.stringify({ schemaVersion: 10 + index, active: 0, profiles: [{ id: `future-${index}`, name: `Future ${index}` }] }),
+    };
+    for (const [key, value] of Object.entries(newest)) storage.data.set(key, value);
+    assert.equal(preserve(), true);
+  }
+
+  const quarantine = JSON.parse(storage.getItem(quarantineKey));
+  assert.equal(quarantine.snapshots.length, 3);
+  assert.deepEqual(quarantine.snapshots.at(-1).generations, newest, 'the newest unreadable raw bytes must always survive pruning');
+  assert.ok(quarantine.diagnostics.length > 0);
+  assert.deepEqual(quarantine.diagnostics.at(-1), {
+    type: 'snapshot-pruned',
+    at: quarantine.diagnostics.at(-1).at,
+    prunedSnapshotCount: 1,
+    retainedSnapshotCount: 3,
+    pruned: [{
+      generationKeys: [DEFAULT_KEYS.primary, DEFAULT_KEYS.backup, DEFAULT_KEYS.recovery],
+      byteLength: quarantine.diagnostics.at(-1).pruned[0].byteLength,
+      fingerprint: quarantine.diagnostics.at(-1).pruned[0].fingerprint,
+    }],
+  });
+  assert.ok(Number.isSafeInteger(quarantine.diagnostics.at(-1).at));
+  assert.ok(quarantine.diagnostics.at(-1).pruned[0].byteLength > 0);
+  assert.match(quarantine.diagnostics.at(-1).pruned[0].fingerprint, /^[0-9a-f]{8}$/);
 });
 
 // M2 native save mirror.

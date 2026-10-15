@@ -5,6 +5,8 @@ const KEY='bb-core-v3',BACK='bb-core-v3-back';
 const STORE_COPY_KEYS=BrainBiteStorageCopies.DEFAULT_KEYS;
 const PRE_OPERATION_ROLLBACK_KEY='bb-core-v3-pre-operation-rollback';
 const UNREADABLE_STORE_QUARANTINE_KEY='bb-core-v3-unreadable-quarantine';
+const UNREADABLE_QUARANTINE_SNAPSHOT_LIMIT=3;
+const UNREADABLE_QUARANTINE_DIAGNOSTIC_LIMIT=16;
 const PARENT_AUTH_KEY='bb-parent-auth-v1';
 const PARENT_AUTH_ITERATIONS=600000;
 const PARENT_LOCK_MS=15*60*1000;
@@ -16,7 +18,8 @@ const TIME_INACTIVITY_MS=15*60*1000;
 const TIME_EXTENSION_MS=15*60*1000;
 const TIME_EXIT_PREFIX='bb-time-usage-v1-exit:';
 const TIME_EXIT_RECEIPT_LIMIT=128;
-const SECRET_KEYS=new Set(['parentPin','parentAuth','pinHash','pinSalt','password','idToken','refreshToken','accessToken']);
+const SECRET_KEYS=new Set(['parentpin','parentauth','pinhash','pinsalt','pin','password','passwd','passphrase','idtoken','refreshtoken','accesstoken','token','authorization','apikey','apitoken','credential','credentials','secret','verifier','verifierb64']);
+const PROFILE_EXPORT_KEYS=new Set(['id','name','score','stars','spark','currencyLedger','progression','learningCore','bestCombo','missionStars','bite','unlockedBites','cosmetics','equippedCosmetic','programmableBits','activeProgrammableBitId','mastery','skills','mistakes','practice','snap','sessions','settings','controls','updatedAt','firstRun','codeLabProjects','codeBridgeLessons','programmableBitLessons','bubbleReefRewards']);
 const STORED_PROFILE_ID_PATTERN=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const $=id=>document.getElementById(id);
 function readLocalStorage(key){try{return localStorage.getItem(key)}catch{return null}}
@@ -776,10 +779,13 @@ function preserveUnreadableStoreCopies(){
  if(readAllStoredStores().length)return false;
  const generations={};for(const key of [KEY,BACK,RECOVERY_KEY]){const raw=readLocalStorage(key);if(raw!==null)generations[key]=raw}
  if(!Object.keys(generations).length)return false;
- const existingRaw=readLocalStorage(UNREADABLE_STORE_QUARANTINE_KEY);let snapshots=[];
- if(existingRaw!==null)try{const existing=JSON.parse(existingRaw);snapshots=existing?.version===1&&Array.isArray(existing.snapshots)?existing.snapshots:[{unreadableQuarantine:existingRaw}]}catch{snapshots=[{unreadableQuarantine:existingRaw}]}
- const signature=JSON.stringify(generations);if(snapshots.some(snapshot=>JSON.stringify(snapshot?.generations)===signature))return false;
- snapshots.push({generations});localStorage.setItem(UNREADABLE_STORE_QUARANTINE_KEY,JSON.stringify({version:1,snapshots}));return true
+ const existingRaw=readLocalStorage(UNREADABLE_STORE_QUARANTINE_KEY);let snapshots=[],diagnostics=[];
+ if(existingRaw!==null)try{const existing=JSON.parse(existingRaw);if(existing?.version===1&&Array.isArray(existing.snapshots)){snapshots=existing.snapshots;diagnostics=Array.isArray(existing.diagnostics)?existing.diagnostics:[]}else snapshots=[{unreadableQuarantine:existingRaw}]}catch{snapshots=[{unreadableQuarantine:existingRaw}]}
+ const signature=JSON.stringify(generations),added=!snapshots.some(snapshot=>JSON.stringify(snapshot?.generations)===signature);if(added)snapshots.push({generations});
+ const pruned=snapshots.length>UNREADABLE_QUARANTINE_SNAPSHOT_LIMIT?snapshots.splice(0,snapshots.length-UNREADABLE_QUARANTINE_SNAPSHOT_LIMIT):[];
+ if(pruned.length){diagnostics.push({type:'snapshot-pruned',at:Date.now(),prunedSnapshotCount:pruned.length,retainedSnapshotCount:snapshots.length,pruned:pruned.map(snapshot=>{const serialized=JSON.stringify(snapshot?.generations??snapshot);return {generationKeys:Object.keys(snapshot?.generations||{}),byteLength:new TextEncoder().encode(serialized).byteLength,fingerprint:checksum(serialized)}})});diagnostics=diagnostics.slice(-UNREADABLE_QUARANTINE_DIAGNOSTIC_LIMIT)}
+ if(!added&&!pruned.length)return false;
+ localStorage.setItem(UNREADABLE_STORE_QUARANTINE_KEY,JSON.stringify({version:1,snapshots,diagnostics}));return added
 }
 
 function writeStoreCopiesUnlocked(store){
@@ -1299,7 +1305,7 @@ function compactLearningCore(value){
  return {version:cloudNumber(state.version,1,100,1,{integer:true}),stage,completedStages:cloudIdArray(state.completedStages,{max:CLOUD_STAGES.size,itemMax:32,allowed:CLOUD_STAGES}),skills:cloudSkillMap(state.skills),mastery:cloudScoreMap(state.mastery),rewards:(Array.isArray(state.rewards)?state.rewards:[]).slice(-200).map(cloudReward).filter(Boolean),rewardLedger:cloudRewardLedger(state.rewardLedger),hub:{variant:state.hub?.variant==='upgraded'?'upgraded':'starter',expansionUnlocked:!!state.hub?.expansionUnlocked,visibleChangeCount:cloudNumber(state.hub?.visibleChangeCount,0,1_000_000,0,{integer:true}),upgrades:cloudIdArray(state.hub?.upgrades,{max:64})}}
 }
 function externalizeProfile(profile,{cloud=false}={}){
- const clean=scrubSecrets(structuredClone(profile||{}));
+ const source=scrubSecrets(structuredClone(profile||{})),clean=Object.fromEntries(Object.entries(source).filter(([key])=>PROFILE_EXPORT_KEYS.has(key)));
  if(!cloud)return clean;
  return cloudProfileProjection(clean)
 }
@@ -1645,7 +1651,7 @@ function sanitizeProgrammableBits(value){
 function scrubSecrets(value){
  if(Array.isArray(value))return value.map(scrubSecrets);
  if(!value||typeof value!=='object')return value;
- const clean={};for(const [key,child] of Object.entries(value))if(!SECRET_KEYS.has(key))clean[key]=scrubSecrets(child);return clean
+ const clean={};for(const [key,child] of Object.entries(value)){const normalized=key.replace(/[^a-z0-9]/gi,'').toLowerCase(),credentialLike=SECRET_KEYS.has(normalized)||['token','password','passwd','passphrase','authorization','apikey','credential','credentials','secret','verifier'].some(suffix=>normalized.endsWith(suffix));if(!credentialLike)clean[key]=scrubSecrets(child)}return clean
 }
 function migrateStore(x){
  x=scrubSecrets(x);

@@ -23,6 +23,12 @@ async function expectInitiallyActionable(page, selector) {
   const target = page.locator(selector);
   await expect(target).toBeVisible();
   await expect(target).toBeEnabled();
+  await expectInitiallyWithinViewport(page, selector);
+}
+
+async function expectInitiallyWithinViewport(page, selector) {
+  const target = page.locator(selector);
+  await expect(target).toBeVisible();
   const geometry = await target.evaluate(element => {
     const rect = element.getBoundingClientRect();
     const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
@@ -34,6 +40,21 @@ async function expectInitiallyActionable(page, selector) {
   expect(geometry.left).toBeGreaterThanOrEqual(0);
   expect(geometry.right).toBeLessThanOrEqual(geometry.width);
   expect(geometry.unobstructed).toBe(true);
+}
+
+async function expectTextNotClipped(page, selector) {
+  const target = page.locator(selector);
+  await expect(target).toBeVisible();
+  const dimensions = await target.evaluate(element => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }));
+  expect(dimensions.clientWidth).toBeGreaterThan(0);
+  expect(dimensions.clientHeight).toBeGreaterThan(0);
+  expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
+  expect(dimensions.scrollHeight).toBeLessThanOrEqual(dimensions.clientHeight + 1);
 }
 
 for (const viewport of phoneViewports) {
@@ -84,6 +105,15 @@ for (const viewport of phoneViewports) {
       expect(size.width).toBeGreaterThanOrEqual(44);
       expect(size.height).toBeGreaterThanOrEqual(44);
     }
+    for (const selector of [
+      '#homeProfileName',
+      '#continueBtn',
+      '#parentNav',
+      '#home [data-screen="settings"]',
+      '#home [data-screen="profile"]',
+    ]) {
+      await expectTextNotClipped(page, selector);
+    }
     await page.locator('#parentNav').click();
     await expect(page.locator('#parentPinInput')).toBeVisible();
   });
@@ -106,15 +136,20 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 1024, height: 682
   });
 }
 
-test('DOM narrow 320px home keeps activities and parent entry usable without overflow', async ({ page }, testInfo) => {
+test('DOM narrow 320px home keeps Play, Parents, and the child dock in the initial viewport without overflow', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 320, height: 568 });
   await openFreshDomHome(page);
+  expect(await page.evaluate(() => scrollY)).toBe(0);
   await expectNoHorizontalOverflow(page);
-  await expect(page.locator('#childDock')).toBeVisible();
+  await expectInitiallyActionable(page, '#continueBtn');
+  await expectInitiallyActionable(page, '#parentNav');
+  await expectInitiallyWithinViewport(page, '#childDock');
   await page.screenshot({ path: testInfo.outputPath('dom-narrow-home.png'), fullPage: true });
-  await page.locator('#continueBtn').click();
+  await page.locator('#continueBtn').focus();
+  await page.keyboard.press('Enter');
   await expect(page.locator('#game.show')).toBeVisible();
   await page.reload();
-  await page.locator('#parentNav').click();
+  await page.locator('#parentNav').focus();
+  await page.keyboard.press('Enter');
   await expect(page.locator('#parentPinInput')).toBeVisible();
 });

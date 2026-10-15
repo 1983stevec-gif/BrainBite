@@ -43,15 +43,18 @@ if (!(await serverIsReady())) {
 const browser = await chromium.launch({ headless: true });
 const reports = [];
 
-async function waitForScene(page, scene) {
-  // A bounded settle window is more stable than waiting on two independent
-  // counters while WebGL and the service worker initialize together.
-  await page.waitForTimeout(5000);
-  const ready = await page.evaluate((name) => {
+async function waitForScene(page, scene, measuredWorkMs) {
+  // Scale the readiness margin from work already measured in this viewport. Polling exits
+  // as soon as the counters are ready, while the one-minute cap still catches a real hang.
+  const timeoutMs = Math.min(60000, Math.max(5000, Math.ceil((measuredWorkMs * 3 + 5000) / 250) * 250));
+  const startedAt = Date.now();
+  await page.waitForFunction((name) => {
     const report = window.BrainBitePresentation?.getPerformanceReport?.()[name];
     return (report?.metrics?.sceneLoad?.count || 0) >= 1 && (report?.assetTiming?.count || 0) >= 3;
-  }, scene);
-  if (!ready) throw new Error(`${scene} presentation did not reach the measured-ready state`);
+  }, scene, { timeout: timeoutMs });
+  const settle = { scene, measuredWorkMs, timeoutMs, durationMs: Date.now() - startedAt };
+  console.log(JSON.stringify({ sceneSettle: settle }));
+  return settle;
 }
 
 async function settlePayloadReads(page, tasks, measured, timeoutMs = 5000) {
@@ -89,6 +92,7 @@ try {
     const payloadReads = [];
     const payloadPathsStarted = new Set();
     const measuredPayload = new Map();
+    const sceneSettles = [];
     page.on('response', response => {
       const path = decodeURIComponent(new URL(response.url()).pathname).replace(/^\/+/, '');
       if (!expectedPayload.has(path) || payloadPathsStarted.has(path)) return;
@@ -102,15 +106,19 @@ try {
     });
     let report;
     try {
+      const navigationStartedAt = Date.now();
       await page.goto(`${baseURL}/?presentation=webgl&probe=${Date.now()}`, { waitUntil: 'domcontentloaded' });
-      await waitForScene(page, 'home');
+      const navigationMs = Date.now() - navigationStartedAt;
+      const homeSettle = await waitForScene(page, 'home', navigationMs);
+      sceneSettles.push(homeSettle);
       await page.waitForTimeout(750);
       const home = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().home);
 
       // Bubble Reef is a separate home composition with its own geometry budget. Keep the
       // Jungle report above, then remount and gate the alternate scene too.
       await page.evaluate(() => window.BrainBiteWorldPreview.setProfile('bubble-reef'));
-      await waitForScene(page, 'home');
+      const bubbleReefSettle = await waitForScene(page, 'home', Math.max(navigationMs, homeSettle.durationMs));
+      sceneSettles.push(bubbleReefSettle);
       await page.waitForTimeout(750);
       const bubbleReefHome = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().home);
 
@@ -118,7 +126,8 @@ try {
         window.BrainBiteGame.startMission(1);
         await window.BrainBitePresentation?.syncFromScreen?.();
       });
-      await waitForScene(page, 'battle');
+      const battleSettle = await waitForScene(page, 'battle', Math.max(navigationMs, homeSettle.durationMs, bubbleReefSettle.durationMs));
+      sceneSettles.push(battleSettle);
       await page.waitForTimeout(750);
       const battle = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().battle);
       const runtime = await page.evaluate(() => window.BrainBitePresentation.getPerformanceReport().runtime);
@@ -202,6 +211,7 @@ try {
         errors,
         warnings,
         resourceFailures,
+        sceneSettles,
         performance: { home, bubbleReefHome, battle, runtime },
         payload,
         startupMs: startupMeasured ? startupMs : null,
@@ -228,6 +238,7 @@ try {
         errors,
         warnings,
         resourceFailures,
+        sceneSettles,
         performance: null,
         budgetGate: null,
       };
@@ -252,6 +263,7 @@ const summary = {
     errors: report.errors,
     warnings: report.warnings,
     resourceFailures: report.resourceFailures,
+    sceneSettles: report.sceneSettles,
     performance: report.performance,
     payload: report.payload,
     startupMs: report.startupMs,

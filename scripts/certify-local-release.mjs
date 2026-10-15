@@ -1,6 +1,8 @@
 /**
  * Reproducible local certification for the BrainBite shipping and MATCH paths.
  * External device, human-review, and production-host gates remain unverified.
+ * Retry-recovered browser tests remain passed and do not fail the run. This is an
+ * owner policy decision that should be revisited; flaky counts and status stay visible.
  */
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -61,6 +63,25 @@ async function gitSnapshot() {
     workingTreeClean: !status.stdout.trim(),
   };
 }
+
+export function buildCertificationReporting(runResults) {
+  const flakyGroups = runResults
+    .map(item => ({ label: item.label, flaky: Math.max(0, Number(item.testsFlaky) || 0) }))
+    .filter(item => item.flaky > 0);
+  const summary = {
+    total: runResults.length,
+    passed: runResults.filter(item => item.passed).length,
+    failed: runResults.filter(item => !item.passed).length,
+    flaky: flakyGroups.reduce((total, item) => total + item.flaky, 0),
+  };
+  const status = summary.failed ? 'failed' : summary.flaky ? 'passed-with-retries' : 'passed';
+  const flakyNotice = summary.flaky
+    ? `!!! RETRY-RECOVERED FLAKINESS: ${flakyGroups.map(item => `${item.label}=${item.flaky}`).join(', ')} (${summary.flaky} total). Certification status: ${status}; retries do not fail this run. !!!`
+    : null;
+  return { status, summary, flakyNotice };
+}
+
+async function main() {
 
 // The snapshot is taken before anything is written. This run regenerates tracked evidence
 // (viewport captures, the smoke report, and the report below), so snapshotting at the end
@@ -174,19 +195,17 @@ try {
   // with its report status on Windows without terminating its process tree.
 }
 
+const reporting = buildCertificationReporting(results);
 const report = {
   schema: 'brainbite.local-certification.v1',
+  status: reporting.status,
   generatedAt: new Date().toISOString(),
   branch: git.branch || 'unknown',
   commit: git.commit || 'unknown',
   workingTreeClean: git.workingTreeClean,
   scope: 'local automated release certification',
   results,
-  summary: {
-    total: results.length,
-    passed: results.filter(item => item.passed).length,
-    failed: results.filter(item => !item.passed).length,
-  },
+  summary: reporting.summary,
   externalGates: [
     { id: 'gate-8.4-mobile', status: 'UNVERIFIED', reason: 'Requires real phone/tablet/Chromebook devices.' },
     { id: 'gate-8.5-review', status: 'UNVERIFIED', reason: 'Requires educator, Spanish, legal/privacy, and screen-reader sign-off.' },
@@ -195,5 +214,9 @@ const report = {
 };
 await writeFile(output, `${JSON.stringify(report, null, 2)}\n`);
 await rm(tempOutput, { recursive: true, force: true });
+if (reporting.flakyNotice) console.warn(reporting.flakyNotice);
 console.log(`CERTIFICATION REPORT ${output}`);
 process.exitCode = report.summary.failed ? 1 : 0;
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();

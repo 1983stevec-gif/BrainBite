@@ -567,6 +567,46 @@ test('legacy secrets are scrubbed and every external boundary omits forbidden au
   expect(result.snap).toEqual([]);
 });
 
+test('local profile exports allowlist known fields and redact credential-key synonyms recursively', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    const secretMarker = 'CREDENTIAL_MARKER_74c8';
+    const extensionMarker = 'FUTURE_EXTENSION_MARKER_74c8';
+    const candidate = {
+      schemaVersion: 9,
+      registryVersion: REGISTRY.registryVersion,
+      active: 0,
+      deletedProfiles: [],
+      profiles: [blank('Allowlist Kid')],
+    };
+    candidate.profiles[0].futureBuildExtension = { value: extensionMarker };
+    const imported = importedStoreFromText(JSON.stringify(candidate));
+    const importedProfile = imported.profiles[0];
+    const canonicalRetainedUnknownField = importedProfile.futureBuildExtension?.value === extensionMarker;
+    importedProfile.settings.ApiToken = secretMarker;
+    importedProfile.controls.AUTHORIZATION = secretMarker;
+    importedProfile.learningCore = { stage: 'child-profile', verifierB64: secretMarker, nested: { TOKEN: secretMarker } };
+    importedProfile.snap = [{ id: 'local-recovery', topic: 'safe local recovery', ts: 41, token: secretMarker }];
+
+    const profileExport = externalizeProfile(importedProfile);
+    const storeExport = externalizeStore(imported);
+    return {
+      canonicalRetainedUnknownField,
+      profileExport,
+      storeProfile: storeExport.profiles[0],
+      serialized: JSON.stringify({ profileExport, storeExport }),
+    };
+  });
+
+  expect(result.canonicalRetainedUnknownField).toBe(true);
+  for (const exported of [result.profileExport, result.storeProfile]) {
+    expect(exported.name).toBe('Allowlist Kid');
+    expect(exported.snap).toEqual([{ id: 'local-recovery', topic: 'safe local recovery', ts: 41 }]);
+    expect(exported).not.toHaveProperty('futureBuildExtension');
+  }
+  expect(result.serialized).not.toContain('CREDENTIAL_MARKER_74c8');
+  expect(result.serialized).not.toContain('FUTURE_EXTENSION_MARKER_74c8');
+});
+
 test('Phase 2.4 retires Snap from production while preserving only local recovery records', async ({ page }) => {
   await page.goto('/?match=0&webgl=0&screen=snap&snap=1#snap');
   const result = await page.evaluate(async () => {

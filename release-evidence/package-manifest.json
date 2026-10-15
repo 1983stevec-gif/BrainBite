@@ -1,10 +1,10 @@
 {
   "schema": "brainbite.package-manifest.v1",
-  "generatedAt": "2026-10-14T21:50:19.857Z",
+  "generatedAt": "2026-10-15T13:29:47.366Z",
   "files": {
     "app.js": {
-      "sha256": "1ad97ad2a5fe55be0f82c1c1b41790e366285872e59579cf584ccfc9d64aa5b1",
-      "bytes": 297023
+      "sha256": "b86ee142a727d76dce3de79c5d08ba36cae0d6642adcc76259fe5de334d396c2",
+      "bytes": 298815
     },
     "assets/art/bite-village.svg": {
       "sha256": "10de1eed7772e502d1ac29f41c00e7b51b9dbea230312ece358a0184ebb2e49a",
@@ -387,7 +387,7 @@
       "bytes": 3059
     },
     "service-worker.js": {
-      "sha256": "c9ba7180ad88b8c6a49bab6d0bbfe8d790463b42b57b6349c859dce76efb3795",
+      "sha256": "e1662f927ef0f9bc69115da81678d79f18ee9788e0506fc5f74a1310468a32ee",
       "bytes": 5262
     },
     "styles.css": {

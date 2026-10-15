@@ -1,4 +1,4 @@
-const CACHE = 'brainbite-v2.0-shell-runtime-4d78675bea8f6e0c9a1a5f3c25b16c703fe54638ea541f4e017a38dec1385a6c';
+const CACHE = 'brainbite-v2.0-shell-runtime-e67f81206098ae5a05893769d4a787908f39beaf6636f5464a003533ccf2f744';
 const FALLBACK = './index.html';
 const CORE = [
   './',
